@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #711116;
+  --color-primary-light: #8e1a1f;
+  --color-primary-dark: #5a0e12;
+
+  --color-secondary: #f9e8d7;
+  --color-secondary-light: #fff5eb;
+  --color-secondary-dark: #ead6c2;
+
+  --color-luxury-black: #1A1A1A;
+  --color-luxury-border: rgba(113, 17, 22, 0.15);
+
+  --font-sans: "Outfit", sans-serif;
+  --font-serif: "Playfair Display", serif;
+
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+}
+
+@layer base {
+  :root {
+    background-color: var(--color-secondary-light);
+    color: var(--color-luxury-black);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply font-sans;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/70 backdrop-blur-xl border border-luxury-border shadow-sm;
+  }
+
+  .glass-card {
+    @apply bg-white/40 backdrop-blur-lg border border-luxury-border hover:bg-white/60 transition-all duration-300 shadow-sm;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-secondary-light font-bold px-8 py-3 rounded-full hover:bg-primary-light active:scale-95 transition-all shadow-lg shadow-primary/20;
+  }
+
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-primary via-primary-light to-primary-dark bg-clip-text text-transparent;
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Custom Selection */
+::selection {
+  @apply bg-primary/20 text-primary;
+}
+
+/* Custom Scrollbar for desktop */
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-secondary-dark;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/20 rounded-full hover:bg-primary/50 transition-colors;
+  }
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Auth Modal responsive fixes */
+body.auth-open .bottom-nav-container {
+  display: none !important;
+}
