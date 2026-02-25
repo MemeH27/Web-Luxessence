@@ -1,169 +1,376 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { BarChart3, Users, Package, ShoppingBag, TrendingUp, ArrowRight, Clock, DollarSign, CreditCard } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
+import { BarChart3, Users, Package, ShoppingBag, TrendingUp, ArrowRight, Clock, DollarSign, CreditCard, Calendar, CheckCircle2, ChevronRight } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
     const navigate = useNavigate();
+    const [loading, setLoading] = useState(true);
+    const [timeFilter, setTimeFilter] = useState('month'); // 'day' | 'week' | 'month' | 'custom'
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
     const [stats, setStats] = useState({
-        totalSales: 0,
+        revenue: 0,
+        cost: 0,
+        profit: 0,
         ordersCount: 0,
         customersCount: 0,
         productsCount: 0,
-        pendingCredits: 0
+        pendingCredits: 0,
+        inventoryValue: 0
     });
-    const [pendingOrders, setPendingOrders] = useState([]);
+
     const [chartData, setChartData] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [pendingOrders, setPendingOrders] = useState([]);
 
     useEffect(() => {
-        fetchStats();
-    }, []);
+        fetchDashboardData();
+    }, [timeFilter, selectedDate]);
 
-    const fetchStats = async () => {
+    const fetchDashboardData = async () => {
+        setLoading(true);
         try {
-            const { count: prodCount } = await supabase.from('products').select('*', { count: 'exact' });
-            const { count: custCount } = await supabase.from('customers').select('*', { count: 'exact' });
-            const { count: ordCount } = await supabase.from('orders').select('*', { count: 'exact' });
-            const { data: salesData } = await supabase.from('sales').select('total, payment_method, is_paid');
+            const { data: allProducts } = await supabase.from('products').select('cost, stock, price');
+            const { count: custCount } = await supabase.from('customers').select('*', { count: 'exact', head: true });
+            const { count: ordCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
             const { data: recentOrders } = await supabase.from('orders').select('*, customers(*)').eq('status', 'pending').limit(5);
 
-            const totalValue = salesData?.reduce((acc, curr) => acc + curr.total, 0) || 0;
-            const pendingValue = salesData?.filter(s => !s.is_paid).reduce((acc, curr) => acc + curr.total, 0) || 0;
+            const totalInventoryValue = allProducts?.reduce((acc, p) => acc + ((p.cost || p.price * 0.6) * p.stock), 0) || 0;
 
-            setStats({
-                totalSales: totalValue,
-                ordersCount: ordCount || 0,
-                customersCount: custCount || 0,
-                productsCount: prodCount || 0,
-                pendingCredits: pendingValue
+            let startDate = new Date(selectedDate);
+            let endDate = new Date(selectedDate);
+
+            if (timeFilter === 'day') {
+                startDate.setHours(0, 0, 0, 0);
+                endDate.setHours(23, 59, 59, 999);
+            } else if (timeFilter === 'week') {
+                // Last 7 days from selectedDate
+                startDate.setDate(startDate.getDate() - 6);
+                startDate.setHours(0, 0, 0, 0);
+                endDate.setHours(23, 59, 59, 999);
+            } else if (timeFilter === 'month') {
+                // Entire month of selectedDate
+                startDate.setDate(1);
+                startDate.setHours(0, 0, 0, 0);
+                endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+                endDate.setHours(23, 59, 59, 999);
+            }
+
+            const { data: salesData } = await supabase
+                .from('sales')
+                .select('*, order_id(*)')
+                .gte('created_at', startDate.toISOString())
+                .lte('created_at', endDate.toISOString());
+
+            const { data: allSalesForCredits } = await supabase
+                .from('sales')
+                .select('id, total, is_paid, payments(amount)')
+                .eq('is_paid', false);
+
+            // Real pending balance = total - sum of payments already made
+            const realPending = allSalesForCredits?.reduce((acc, sale) => {
+                const paid = (sale.payments || []).reduce((s, p) => s + Number(p.amount), 0);
+                return acc + Math.max(0, sale.total - paid);
+            }, 0) || 0;
+
+            let totalRevenue = 0;
+            let totalCost = 0;
+            const dataPoints = {};
+
+            salesData?.forEach(sale => {
+                totalRevenue += sale.total;
+                let saleCost = 0;
+                const items = sale.order_id?.items || [];
+                items.forEach(item => {
+                    saleCost += (item.cost || item.price * 0.6) * item.quantity;
+                });
+                totalCost += saleCost;
+
+                const dateKey = new Date(sale.created_at).toLocaleDateString();
+                if (!dataPoints[dateKey]) dataPoints[dateKey] = { name: dateKey, revenue: 0, cost: 0, profit: 0 };
+                dataPoints[dateKey].revenue += sale.total;
+                dataPoints[dateKey].cost += saleCost;
+                dataPoints[dateKey].profit += (sale.total - saleCost);
             });
 
+            const formattedChartData = Object.values(dataPoints).sort((a, b) => new Date(a.name) - new Date(b.name));
+
+            setStats({
+                revenue: totalRevenue,
+                cost: totalCost,
+                profit: totalRevenue - totalCost,
+                ordersCount: ordCount || 0,
+                customersCount: custCount || 0,
+                productsCount: allProducts?.length || 0,
+                pendingCredits: realPending,
+                inventoryValue: totalInventoryValue
+            });
+
+            setChartData(formattedChartData.length > 0 ? formattedChartData : [{ name: 'Sin datos', revenue: 0, cost: 0, profit: 0 }]);
             setPendingOrders(recentOrders || []);
 
-            // Improved Chart Data: Revenue vs Product Cost (Mocking realistic trend)
-            setChartData([
-                { name: 'Lun', revenue: 4500, cost: 2800 },
-                { name: 'Mar', revenue: 5200, cost: 3100 },
-                { name: 'Mié', revenue: 3800, cost: 2400 },
-                { name: 'Jue', revenue: 6100, cost: 3900 },
-                { name: 'Vie', revenue: 4900, cost: 2900 },
-                { name: 'Sáb', revenue: 7200, cost: 4500 },
-                { name: 'Dom', revenue: 6800, cost: 4200 },
-            ]);
         } catch (err) {
-            console.error(err);
+            console.error('Dashboard Error:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    const statCards = [
-        { label: 'Volumen Histórico', value: `L. ${stats.totalSales}`, icon: TrendingUp, color: 'text-primary', bg: 'bg-primary/10' },
-        { label: 'Cuentas x Cobrar', value: `L. ${stats.pendingCredits}`, icon: CreditCard, color: 'text-red-600', bg: 'bg-red-500/10' },
-        { label: 'Cartera de Clientes', value: stats.customersCount, icon: Users, color: 'text-primary', bg: 'bg-primary/10' },
-        { label: 'Unidades en Catálogo', value: stats.productsCount, icon: Package, color: 'text-primary', bg: 'bg-primary/10' },
-    ];
+
 
     return (
-        <div className="space-y-12">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-serif font-bold italic text-primary">Control de Mando</h1>
-                    <p className="text-primary/40 tracking-widest uppercase text-xs font-black">Inteligencia de Negocio Luxessence</p>
+        <div className="space-y-6 md:space-y-12 pb-20">
+            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-5 md:gap-8">
+                <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/5 rounded-2xl flex items-center justify-center border border-primary/5">
+                            <BarChart3 className="w-5 h-5 text-primary" />
+                        </div>
+                        <h1 className="text-4xl md:text-6xl font-serif font-black italic text-primary">Control de Mando</h1>
+                    </div>
+                    <p className="text-primary/40 font-medium italic text-lg pb-2">Análisis en tiempo real de márgenes y rendimiento comercial.</p>
                 </div>
-                <div className="flex gap-4">
-                    <button onClick={fetchStats} className="glass-panel px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-primary/5 transition-colors text-primary font-bold text-xs uppercase tracking-widest">
-                        <Clock className="w-4 h-4" /> Recargar Datos
+
+                <div className="flex flex-wrap items-center gap-3 md:gap-4 bg-white/60 backdrop-blur-xl p-3 md:p-4 rounded-2xl md:rounded-[2.5rem] border border-primary/5 shadow-2xl w-full xl:w-auto">
+                    <div className="flex bg-primary/5 p-1 md:p-1.5 rounded-xl md:rounded-[1.5rem]">
+                        {['day', 'week', 'month'].map(f => (
+                            <button
+                                key={f}
+                                onClick={() => setTimeFilter(f)}
+                                className={`px-4 md:px-8 py-2 md:py-2.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider md:tracking-widest transition-all ${timeFilter === f ? 'bg-primary text-secondary-light shadow-xl' : 'text-primary/40 hover:text-primary'}`}
+                            >
+                                {f === 'day' ? 'Día' : f === 'week' ? 'Semana' : 'Mes'}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="hidden md:block h-10 w-px bg-primary/10 mx-2" />
+
+                    <div className="flex items-center gap-2 md:gap-4 px-1 md:px-2">
+                        <Calendar className="w-5 h-5 text-primary/30" />
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-primary focus:ring-0 outline-none cursor-pointer"
+                        />
+                    </div>
+
+                    <button
+                        onClick={fetchDashboardData}
+                        className="p-3 md:p-4 bg-primary text-secondary-light hover:bg-primary-dark rounded-xl md:rounded-[1.2rem] transition-all active:scale-95 shadow-lg shadow-primary/20"
+                    >
+                        <Clock className="w-5 h-5" />
                     </button>
                 </div>
             </header>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {statCards.map((stat, i) => (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        key={stat.label}
-                        className="glass-panel p-8 rounded-[2.5rem] relative overflow-hidden group border-primary/10 bg-white shadow-sm"
-                    >
-                        <div className={`w-14 h-14 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-6 border border-primary/5`}>
-                            <stat.icon className="w-7 h-7" />
-                        </div>
-                        <p className="text-primary/30 uppercase tracking-[0.2em] text-[10px] font-black mb-1">{stat.label}</p>
-                        <h3 className="text-3xl font-serif font-bold italic text-primary">{stat.value}</h3>
-                        <div className={`absolute bottom-0 right-0 w-24 h-24 ${stat.bg} rounded-tl-[100px] opacity-10 pointer-events-none group-hover:scale-110 transition-transform duration-500`} />
-                    </motion.div>
-                ))}
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Sales Chart */}
-                <div className="lg:col-span-2 glass-panel p-10 rounded-[3rem] space-y-8 border-primary/10 bg-white shadow-sm">
-                    <div className="flex justify-between items-center">
-                        <div className="space-y-1">
-                            <h3 className="text-2xl font-serif italic text-primary">Margen de Utilidad</h3>
-                            <p className="text-[10px] text-primary/40 uppercase tracking-widest font-bold">Ingresos Semanales vs Costos de Producto</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
+                {/* Performance Chart */}
+                <div className="lg:col-span-2 bg-white/70 backdrop-blur-xl p-6 md:p-12 rounded-[2rem] md:rounded-[4rem] border border-primary/5 shadow-xl space-y-6 md:space-y-12">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
+                        <div className="space-y-2">
+                            <h3 className="text-2xl md:text-3xl font-serif font-bold italic text-primary tracking-tight">Margen de Operación</h3>
+                            <p className="text-[10px] text-primary/40 uppercase tracking-widest font-black flex items-center gap-2">
+                                <TrendingUp className="w-3 h-3" /> Comparativa de flujo de caja según filtros
+                            </p>
                         </div>
-                        <div className="flex gap-4 text-[10px] uppercase tracking-widest font-black text-primary/30">
-                            <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary" /> Ingresos</span>
-                            <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-secondary-dark" /> Costos</span>
+                        <div className="flex items-center gap-4 md:gap-8 bg-primary/5 px-4 md:px-8 py-2 md:py-3 rounded-xl md:rounded-2xl border border-primary/5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded-full bg-primary shadow-[0_0_10px_rgba(113,17,22,0.4)]" />
+                                <span className="text-[10px] uppercase font-black tracking-widest text-primary/60">Ingresos</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded-full bg-secondary shadow-[0_0_10px_rgba(234,214,194,0.4)]" />
+                                <span className="text-[10px] uppercase font-black tracking-widest text-primary/60">Costos</span>
+                            </div>
                         </div>
                     </div>
-                    <div className="h-[350px] min-h-[350px] w-full mt-4">
-                        <ResponsiveContainer width="99%" height="100%">
-                            <AreaChart data={chartData}>
-                                <defs>
-                                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#711116" stopOpacity={0.1} />
-                                        <stop offset="95%" stopColor="#711116" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(113,17,22,0.05)" vertical={false} />
-                                <XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} tick={{ fill: 'rgba(113,17,22,0.3)' }} />
-                                <YAxis fontSize={10} axisLine={false} tickLine={false} tick={{ fill: 'rgba(113,17,22,0.3)' }} />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#FFF', borderColor: 'rgba(113,17,22,0.1)', borderRadius: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid rgba(113,17,22,0.1)' }}
-                                    cursor={{ stroke: 'rgba(113,17,22,0.1)', strokeWidth: 2 }}
-                                    formatter={(value) => [`L. ${value}`, '']}
-                                />
-                                <Area type="monotone" dataKey="revenue" name="Ingresos" stroke="#711116" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
-                                <Area type="monotone" dataKey="cost" name="Costos" stroke="#ead6c2" strokeWidth={2} fillOpacity={0.3} fill="#ead6c2" />
-                            </AreaChart>
-                        </ResponsiveContainer>
+
+                    <div className="h-[450px] w-full overflow-x-auto no-scrollbar">
+                        <div className={`${chartData.length > 7 ? 'min-w-[1000px]' : 'min-w-full'} h-full`}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#711116" stopOpacity={0.15} />
+                                            <stop offset="95%" stopColor="#711116" stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#ead6c2" stopOpacity={0.15} />
+                                            <stop offset="95%" stopColor="#ead6c2" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="5 5" stroke="#f4f4f4" vertical={false} />
+                                    <XAxis
+                                        dataKey="name"
+                                        fontSize={10}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: 'rgba(113,17,22,0.4)', fontWeight: 'bold' }}
+                                        dy={15}
+                                    />
+                                    <YAxis
+                                        fontSize={10}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: 'rgba(113,17,22,0.4)', fontWeight: 'bold' }}
+                                        tickFormatter={(val) => `L. ${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val}`}
+                                        dx={-10}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', borderRadius: '2rem', border: '1px solid rgba(113,17,22,0.1)', boxShadow: '0 30px 60px rgba(0,0,0,0.15)', padding: '20px' }}
+                                        labelStyle={{ color: '#711116', fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic', marginBottom: '12px', fontSize: '1.1rem' }}
+                                        formatter={(val) => [`L. ${val.toLocaleString()}`, '']}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="revenue"
+                                        stroke="#711116"
+                                        strokeWidth={5}
+                                        fillOpacity={1}
+                                        fill="url(#colorRev)"
+                                        animationDuration={2500}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="cost"
+                                        stroke="#ead6c2"
+                                        strokeWidth={4}
+                                        fillOpacity={1}
+                                        fill="url(#colorCost)"
+                                        animationDuration={2000}
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
                 </div>
 
-                {/* Recent Orders */}
-                <div className="glass-panel p-10 rounded-[3rem] space-y-8 border-primary/10 bg-white shadow-sm">
-                    <h3 className="text-2xl font-serif italic text-primary">Próximos Despachos</h3>
-                    <div className="space-y-6">
-                        {pendingOrders.length === 0 ? (
-                            <p className="text-primary/20 text-center py-12 italic text-sm">Sin tareas de despacho pendientes</p>
-                        ) : (
-                            pendingOrders.map(order => (
-                                <div key={order.id} className="flex items-center justify-between border-b border-primary/5 pb-4 group">
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-black text-luxury-black group-hover:text-primary transition-colors">{order.customers?.first_name} {order.customers?.last_name}</p>
-                                        <p className="text-[10px] text-primary/30 uppercase tracking-widest font-bold">{new Date(order.created_at).toLocaleDateString()}</p>
+                {/* Side Panels */}
+                <div className="space-y-5 md:space-y-10">
+                    <div className="bg-primary p-8 md:p-14 rounded-[2rem] md:rounded-[4rem] text-secondary-light space-y-6 md:space-y-10 shadow-2xl relative overflow-hidden group">
+                        <div className="relative z-10 space-y-6 md:space-y-10">
+                            <div className="space-y-2 md:space-y-3">
+                                <span className="inline-block px-4 py-1.5 bg-secondary text-primary text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">Urgente</span>
+                                <h3 className="text-3xl md:text-4xl font-serif font-bold italic leading-tight">Despachos Pendientes</h3>
+                            </div>
+
+                            <div className="space-y-8">
+                                {pendingOrders.length === 0 ? (
+                                    <div className="py-12 flex flex-col items-center gap-4 opacity-40">
+                                        <CheckCircle2 className="w-12 h-12" />
+                                        <p className="text-sm italic font-medium">Todo bajo control.</p>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-serif font-bold text-primary italic">L. {order.total}</p>
-                                        <button onClick={() => navigate('/admin/orders')} className="text-[9px] uppercase tracking-widest font-black text-primary/40 hover:text-primary">Validar x{order.items.length}</button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
+                                ) : (
+                                    pendingOrders.map(order => (
+                                        <div key={order.id} className="flex items-center gap-6 group/item cursor-pointer" onClick={() => navigate('/admin/orders')}>
+                                            <div className="w-16 h-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center shrink-0 border border-white/10 group-hover/item:bg-secondary group-hover/item:text-primary transition-all duration-500 group-hover/item:scale-110">
+                                                <Package className="w-7 h-7" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 space-y-1">
+                                                <p className="text-base font-bold truncate tracking-tight">{order.customers?.first_name} {order.customers?.last_name}</p>
+                                                <p className="text-[10px] text-secondary-light/40 font-black uppercase tracking-widest">ID {order.id.slice(0, 8)}</p>
+                                            </div>
+                                            <ChevronRight className="w-5 h-5 opacity-20 group-hover/item:opacity-100 group-hover/item:translate-x-2 transition-all" />
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <button onClick={() => navigate('/admin/orders')} className="w-full py-6 bg-secondary text-primary rounded-[1.5rem] flex items-center justify-center gap-4 text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-white active:scale-95 transition-all duration-500">
+                                Gestionar Logística <ArrowRight className="w-5 h-5" />
+                            </button>
+                        </div>
+                        {/* Abstract Background Shapes */}
+                        <div className="absolute top-[-20%] right-[-20%] w-60 h-60 bg-white/10 rounded-full blur-[80px] pointer-events-none group-hover:scale-150 transition-transform duration-1000" />
+                        <div className="absolute bottom-[-10%] left-[-10%] w-40 h-40 bg-secondary/20 rounded-full blur-[60px] pointer-events-none" />
                     </div>
-                    <button onClick={() => navigate('/admin/orders')} className="w-full py-5 border border-primary/10 rounded-2xl flex items-center justify-center gap-3 text-[10px] uppercase tracking-[0.2em] font-black text-primary hover:bg-primary hover:text-secondary-light transition-all shadow-lg hover:shadow-primary/20">
-                        GESTIONAR PEDIDOS <ArrowRight className="w-4 h-4" />
-                    </button>
+
+                    <div className="bg-white/70 backdrop-blur-xl p-8 md:p-12 rounded-[2rem] md:rounded-[3.5rem] border border-primary/5 shadow-xl space-y-5 md:space-y-8">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-primary/5 rounded-2xl flex items-center justify-center">
+                                <BarChart3 className="text-primary w-5 h-5" />
+                            </div>
+                            <h4 className="font-serif font-bold italic text-xl md:text-2xl tracking-tight text-primary">Indicadores Clave</h4>
+                        </div>
+
+                        <div className="p-6 bg-amber-50 rounded-2xl border border-amber-100">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-amber-600/70 mb-1">Valor del Inventario</p>
+                            <p className="text-2xl md:text-3xl font-serif font-bold italic text-amber-700">L. {stats.inventoryValue.toLocaleString()}</p>
+                        </div>
+
+                        <div className="h-px bg-primary/5" />
+
+                        <ul className="space-y-5">
+                            {[
+                                { label: 'Clientes Registrados', val: stats.customersCount, icon: Users },
+                                { label: 'SKUs en Inventario', val: stats.productsCount, icon: Package },
+                                { label: 'Volumen Histórico', val: stats.ordersCount, icon: ShoppingBag },
+                            ].map(item => (
+                                <li key={item.label} className="flex justify-between items-center group/row">
+                                    <div className="flex items-center gap-4">
+                                        <item.icon className="w-4 h-4 text-primary/20 group-hover/row:text-primary transition-colors" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-primary/40 leading-none">{item.label}</span>
+                                    </div>
+                                    <span className="text-lg font-bold text-primary tabular-nums tracking-tight">{item.val}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
             </div>
+
+            {/* Sales Performance Metrics - moved from SalesHistory */}
+            <div className="bg-primary rounded-[2rem] md:rounded-[4rem] p-6 md:p-14 text-secondary-light relative overflow-hidden space-y-5 md:space-y-8">
+                <div className="relative z-10 space-y-2">
+                    <h3 className="text-2xl md:text-3xl font-serif font-bold italic">Rendimiento de Ventas</h3>
+                    <p className="text-secondary-light/40 text-[10px] font-black uppercase tracking-[0.2em]">Análisis financiero del periodo seleccionado</p>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+                    <div className="bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2 flex items-center gap-2">
+                            <TrendingUp className="w-3.5 h-3.5" /> Ingresos Totales
+                        </p>
+                        <p className="text-xl md:text-3xl font-serif font-bold italic text-secondary">L. {stats.revenue.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-orange-400/60 mb-2 flex items-center gap-2">
+                            <CreditCard className="w-3.5 h-3.5" /> Por Cobrar
+                        </p>
+                        <p className="text-xl md:text-3xl font-serif font-bold italic text-orange-400">L. {stats.pendingCredits.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-green-400/60 mb-2 flex items-center gap-2">
+                            <DollarSign className="w-3.5 h-3.5" /> Utilidad Neta
+                        </p>
+                        <p className="text-xl md:text-3xl font-serif font-bold italic text-green-400">L. {stats.profit.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-red-400/60 mb-2 flex items-center gap-2">
+                            <ShoppingBag className="w-3.5 h-3.5" /> Costo Operativo
+                        </p>
+                        <p className="text-xl md:text-3xl font-serif font-bold italic text-red-400">L. {stats.cost.toLocaleString()}</p>
+                    </div>
+                </div>
+                <div className="absolute top-0 right-0 w-60 h-60 bg-secondary/5 rounded-full blur-3xl opacity-30 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full blur-3xl opacity-30 pointer-events-none" />
+            </div>
+
+            {loading && (
+                <div className="fixed inset-0 bg-white/80 backdrop-blur-md z-[500] flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="relative">
+                            <div className="w-20 h-20 border-4 border-primary/10 rounded-full" />
+                            <div className="w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin absolute inset-0" />
+                        </div>
+                        <p className="text-xs font-black uppercase tracking-[0.3em] text-primary animate-pulse">Sincronizando Luxessence OS...</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -7,12 +7,12 @@
   --color-primary-light: #8e1a1f;
   --color-primary-dark: #5a0e12;
 
-  --color-secondary: #f9e8d7;
-  --color-secondary-light: #fff5eb;
-  --color-secondary-dark: #ead6c2;
+  --color-secondary: #f4f4f4;
+  --color-secondary-light: #fafafa;
+  --color-secondary-dark: #e5e5e5;
 
   --color-luxury-black: #1A1A1A;
-  --color-luxury-border: rgba(113, 17, 22, 0.15);
+  --color-luxury-border: rgba(113, 17, 22, 0.1);
 
   --font-sans: "Outfit", sans-serif;
   --font-serif: "Playfair Display", serif;
@@ -23,7 +23,7 @@
 
 @layer base {
   :root {
-    background-color: var(--color-secondary-light);
+    background-color: #fafafa;
     color: var(--color-luxury-black);
     -webkit-font-smoothing: antialiased;
   }

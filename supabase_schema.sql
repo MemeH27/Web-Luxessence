@@ -16,6 +16,8 @@ CREATE TABLE products (
   stock INTEGER DEFAULT 0,
   category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   image_url TEXT,
+  is_new_arrival BOOLEAN DEFAULT false,
+  is_gift_option BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -36,6 +38,8 @@ CREATE TABLE orders (
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processed', 'cancelled')),
   total DECIMAL(10,2) NOT NULL,
   items JSONB NOT NULL, -- [{product_id, name, quantity, price}]
+  delivery_mode TEXT DEFAULT 'domicilio',
+  client_email TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

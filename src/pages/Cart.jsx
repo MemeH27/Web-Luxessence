@@ -67,6 +67,7 @@ const Cart = () => {
             if (custError) throw custError;
 
             // 2. Create Order
+            const { data: { session } } = await supabase.auth.getSession();
             const { data: order, error: ordError } = await supabase
                 .from('orders')
                 .insert({
@@ -74,7 +75,8 @@ const Cart = () => {
                     items: cart,
                     total: finalTotal,
                     status: 'pending',
-                    delivery_mode: deliveryMode
+                    delivery_mode: deliveryMode,
+                    client_email: session?.user?.email || null
                 })
                 .select().single();
 
@@ -135,9 +137,12 @@ const Cart = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-6 space-y-16 pb-24">
+        <div className="max-w-7xl mx-auto px-6 space-y-16 pb-24 pt-13 md:pt-0">
             <header className="space-y-4 max-w-2xl">
-                <h1 className="text-5xl md:text-6xl font-serif font-bold italic text-primary">Bolsa de Compras</h1>
+                <h1 className="text-4xl md:text-6xl font-serif font-bold italic text-primary">
+                    <span className="md:hidden">Tu Carrito</span>
+                    <span className="hidden md:inline">Bolsa de Compras</span>
+                </h1>
                 <p className="text-luxury-black/40 tracking-[0.3em] uppercase text-xs font-black">Revisión de su pedido premium</p>
                 <div className="w-20 h-1 bg-primary/20 rounded-full" />
             </header>

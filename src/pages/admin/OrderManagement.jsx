@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { generateInvoice, shareInvoicePDF } from '../../utils/billing';
+import { shareInvoicePNG, downloadInvoicePNG } from '../../utils/billing';
 import { exportToExcel } from '../../utils/export';
-import { CheckCircle2, X, Download, Share2, Filter, Search, Calendar, Landmark, ChevronUp, ChevronDown, Printer, Receipt, Phone } from 'lucide-react';
+import { CheckCircle2, X, Download, Share2, Filter, Search, Calendar, Landmark, ChevronUp, ChevronDown, Printer, Receipt, Phone, Edit3, Trash2, ListChecks, TrendingUp, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReactToPrint } from 'react-to-print';
 import SecurityModal from '../../components/admin/SecurityModal';
+import Pagination from '../../components/admin/Pagination';
+import InvoiceTemplate from '../../components/admin/InvoiceTemplate';
 import { useToast } from '../../context/ToastContext';
 
 const OrderManagement = () => {
     const { addToast } = useToast();
     const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [discount, setDiscount] = useState(0);
@@ -22,6 +25,11 @@ const OrderManagement = () => {
     const [lastSaleData, setLastSaleData] = useState(null);
     const [isSecurityOpen, setIsSecurityOpen] = useState(false);
     const [securityAction, setSecurityAction] = useState(null);
+    const [deleteConfirmOrder, setDeleteConfirmOrder] = useState(null); // order waiting confirm
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5;
 
     const invoiceRef = useRef(null);
     const handlePrint = useReactToPrint({
@@ -34,8 +42,10 @@ const OrderManagement = () => {
     }, []);
 
     const fetchOrders = async () => {
+        setLoading(true);
         const { data } = await supabase.from('orders').select('*, customers(*)').order('created_at', { ascending: false });
         setOrders(data || []);
+        setLoading(false);
     };
 
     const handleSecurityConfirm = () => {
@@ -49,15 +59,53 @@ const OrderManagement = () => {
     };
 
     const handleDeleteOrder = (id) => {
-        setSecurityAction({ type: 'delete', id });
-        setIsSecurityOpen(true);
+        const order = orders.find(o => o.id === id);
+        if (order?.status === 'processed') {
+            // Show custom warning: deleting a processed order also removes the sale record
+            setDeleteConfirmOrder(order);
+        } else {
+            // Normal unprocessed order — use standard security modal
+            setSecurityAction({ type: 'delete', id });
+            setIsSecurityOpen(true);
+        }
     };
 
     const executeDelete = async (id) => {
-        const { error } = await supabase.from('orders').delete().eq('id', id);
-        if (!error) {
-            addToast('Pedido eliminado');
-            fetchOrders();
+        try {
+            const orderToDelete = orders.find(o => o.id === id);
+            if (!orderToDelete) return;
+
+            if (orderToDelete.status === 'processed') {
+                // Processed order: restock ONCE here, then delete linked sale and payments
+                for (const item of orderToDelete.items) {
+                    const { data: prod } = await supabase.from('products').select('stock').eq('id', item.id || item.product_id).single();
+                    if (prod) {
+                        await supabase.from('products').update({ stock: prod.stock + item.quantity }).eq('id', item.id || item.product_id);
+                    }
+                }
+                // Delete linked payments first (FK constraint)
+                const { data: linkedSale } = await supabase.from('sales').select('id').eq('order_id', id).single();
+                if (linkedSale) {
+                    await supabase.from('payments').delete().eq('sale_id', linkedSale.id);
+                }
+                // Delete linked sale record
+                await supabase.from('sales').delete().eq('order_id', id);
+            }
+
+            // Delete the order itself
+            const { error } = await supabase.from('orders').delete().eq('id', id);
+            if (!error) {
+                addToast(orderToDelete.status === 'processed'
+                    ? 'Pedido y factura anulados. Stock revertido correctamente.'
+                    : 'Pedido eliminado.');
+                setDeleteConfirmOrder(null);
+                fetchOrders();
+            } else {
+                throw error;
+            }
+        } catch (err) {
+            console.error(err);
+            addToast('Error al eliminar el pedido.', 'error');
         }
     };
 
@@ -99,13 +147,21 @@ const OrderManagement = () => {
                 .select().single();
 
             if (saleError) throw saleError;
+
+            // Update Stock
+            for (const item of selectedOrder.items) {
+                const { data: prod } = await supabase.from('products').select('stock').eq('id', item.id || item.product_id).single();
+                if (prod) {
+                    const newStock = Math.max(0, prod.stock - item.quantity);
+                    await supabase.from('products').update({ stock: newStock }).eq('id', item.id || item.product_id);
+                }
+            }
+
             await supabase.from('orders').update({ status: 'processed' }).eq('id', selectedOrder.id);
 
-            // Calculate total cost and profit
             const totalCost = selectedOrder.items.reduce((acc, item) => acc + ((item.cost || 0) * item.quantity), 0);
             const totalProfit = finalTotal - totalCost;
 
-            // Update sale with metrics if columns exist
             await supabase.from('sales').update({
                 total_cost: totalCost,
                 total_profit: totalProfit
@@ -124,7 +180,7 @@ const OrderManagement = () => {
             fetchOrders();
         } catch (error) {
             console.error(error);
-            alert('Error al procesar la venta.');
+            addToast('Error al procesar la venta.', 'error');
         } finally {
             setProcessing(false);
         }
@@ -139,125 +195,213 @@ const OrderManagement = () => {
         return matchesSearch && matchesStatus;
     });
 
+    const paginatedOrders = filteredOrders.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterStatus]);
+
     return (
-        <div className="space-y-12 pb-20">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-serif font-bold italic text-primary">Gestión de Pedidos</h1>
-                    <p className="text-primary/40 tracking-widest uppercase text-xs font-black">Control de flujo comercial</p>
+        <div className="space-y-6 md:space-y-12 pb-20">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
+                <div className="space-y-2">
+                    <h1 className="text-4xl md:text-6xl font-serif font-bold italic text-primary">Gestión de Pedidos</h1>
+                    <p className="text-primary/40 font-medium italic">Monitor de flujo comercial y facturación en tiempo real.</p>
                 </div>
                 <div className="flex gap-4">
-                    <button onClick={handleExport} className="glass-panel p-4 rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors">
+                    <button onClick={handleExport} className="glass-panel p-3 md:p-5 rounded-xl md:rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors shadow-sm">
                         <Download className="w-5 h-5" />
                     </button>
                 </div>
             </header>
 
-            <div className="flex flex-col md:flex-row gap-6 justify-between items-center glass-panel p-6 rounded-[2rem] border-primary/10 bg-white/40">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/30 w-5 h-5" />
-                    <input
-                        type="text"
-                        placeholder="Buscar cliente o teléfono..."
-                        className="w-full bg-primary/5 border border-primary/10 rounded-2xl py-3 pl-12 pr-4 focus:ring-1 focus:ring-primary outline-none transition-all"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-12">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-5 md:space-y-8">
+                    {/* Integrated Search & Filter Bar */}
+                    <div className="flex flex-col xl:flex-row gap-4 md:gap-6 items-center justify-between glass-panel p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border-primary/10 bg-white/40">
+                        <div className="relative w-full xl:w-80 group shrink-0">
+                            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/20 w-5 h-5 group-focus-within:text-primary transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Buscar cliente..."
+                                className="w-full bg-primary/5 border border-primary/10 rounded-xl md:rounded-2xl py-3 md:py-4 pl-14 md:pl-16 pr-4 md:pr-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-inner text-sm md:text-base"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex flex-wrap justify-center bg-primary/5 p-1 md:p-1.5 rounded-xl md:rounded-2xl border border-primary/5 w-full xl:w-auto">
+                            {[
+                                { id: 'all', label: 'Todos', icon: Filter },
+                                { id: 'pending', label: 'Pendientes', icon: Calendar },
+                                { id: 'processed', label: 'Listos', icon: CheckCircle2 }
+                            ].map(btn => (
+                                <button
+                                    key={btn.id}
+                                    onClick={() => setFilterStatus(btn.id)}
+                                    className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-lg md:rounded-xl text-[9px] md:text-[10px] uppercase font-black tracking-wider md:tracking-widest transition-all whitespace-nowrap ${filterStatus === btn.id
+                                        ? 'bg-primary text-white shadow-xl'
+                                        : 'text-primary/40 hover:text-primary'
+                                        }`}
+                                >
+                                    <btn.icon className="w-3.5 h-3.5" />
+                                    {btn.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 md:space-y-6">
+                        {loading ? (
+                            [1, 2, 3].map(i => <div key={i} className="h-32 md:h-40 glass-panel animate-pulse rounded-2xl md:rounded-[2.5rem] bg-white/40" />)
+                        ) : paginatedOrders.length === 0 ? (
+                            <div className="py-10 md:py-20 text-center italic text-primary/20 text-sm md:text-base bg-white/40 rounded-2xl md:rounded-[2.5rem] border border-dashed border-primary/10">No se encontraron pedidos en esta categoría</div>
+                        ) : (
+                            paginatedOrders.map((order) => (
+                                <motion.div
+                                    layout
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    key={order.id}
+                                    className="p-5 md:p-10 bg-white hover:bg-primary/[0.02] rounded-2xl md:rounded-[3rem] border border-primary/5 shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all flex flex-col md:flex-row items-center gap-5 md:gap-10 group"
+                                >
+                                    <div className="flex-1 flex flex-col md:flex-row gap-5 md:gap-10 w-full">
+                                        <div className="md:w-64 shrink-0 border-b md:border-b-0 md:border-r border-primary/5 pb-4 md:pb-0 md:pr-10">
+                                            <div className="space-y-1">
+                                                <h3 className="text-2xl font-serif font-bold italic text-primary leading-tight">
+                                                    {order.customers?.first_name} {order.customers?.last_name}
+                                                </h3>
+                                                <p className="text-[10px] text-primary/40 font-black uppercase tracking-widest">{new Date(order.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                            <div className="mt-3 md:mt-6 flex items-end gap-2">
+                                                <span className="text-3xl font-sans font-black text-primary">L. {Number(order.total).toLocaleString()}</span>
+                                                <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border mb-1.5 ${order.status === 'pending'
+                                                    ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                                    : 'bg-green-500/10 text-green-600 border-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.1)]'
+                                                    }`}>
+                                                    {order.status === 'pending' ? 'Por Procesar' : 'Facturado'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 w-full">
+                                            <div className="space-y-4">
+                                                <p className="text-[9px] uppercase tracking-[0.3em] text-primary/30 font-black">Detalle del Pedido</p>
+                                                <div className="space-y-2 max-h-24 overflow-y-auto no-scrollbar scroll-smooth p-1">
+                                                    {order.items.map((item, i) => (
+                                                        <div key={i} className="flex items-center gap-3 text-sm">
+                                                            <span className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center font-black text-primary text-[10px]">x{item.quantity}</span>
+                                                            <span className="text-primary/60 font-medium italic truncate">{item.name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-4 md:border-l border-primary/5 md:pl-8">
+                                                <p className="text-[9px] uppercase tracking-[0.3em] text-primary/30 font-black">Entrega y Contacto</p>
+                                                <div className="space-y-2">
+                                                    <p className="text-sm font-medium text-primary/80 italic flex items-start gap-2">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-primary/20 shrink-0 mt-2" />
+                                                        {order.customers?.address || 'Honduras'}
+                                                    </p>
+                                                    <p className="text-sm font-black text-primary flex items-center gap-2">
+                                                        <Phone className="w-3.5 h-3.5 opacity-30" /> {order.customers?.phone}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-row md:flex-col gap-3 shrink-0 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-primary/5">
+                                        {order.status === 'pending' && (
+                                            <button
+                                                onClick={() => handleOpenBilling(order)}
+                                                className="flex-1 md:w-40 bg-primary text-secondary-light py-4 md:py-5 rounded-xl md:rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2 md:gap-3"
+                                            >
+                                                <Receipt className="w-4 h-4" /> FACTURAR
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => handleDeleteOrder(order.id)}
+                                            className="p-4 md:p-5 bg-white hover:bg-red-500 text-red-500/40 hover:text-white rounded-xl md:rounded-2xl transition-all border border-primary/5 active:scale-95 flex items-center justify-center shadow-sm"
+                                            title="Cancelar Pedido"
+                                        >
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            ))
+                        )}
+                    </div>
+
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredOrders.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
                     />
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    {[
-                        { id: 'all', label: 'Todos', icon: Filter },
-                        { id: 'pending', label: 'Por Procesar', icon: Calendar },
-                        { id: 'processed', label: 'Completados', icon: CheckCircle2 }
-                    ].map(btn => (
-                        <button
-                            key={btn.id}
-                            onClick={() => setFilterStatus(btn.id)}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] uppercase font-bold tracking-widest transition-all ${filterStatus === btn.id
-                                ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                : 'bg-primary/5 text-primary/40 hover:bg-primary/10'
-                                }`}
-                        >
-                            <btn.icon className="w-3 h-3" />
-                            {btn.label}
-                        </button>
-                    ))}
+                {/* Sidebar Widget */}
+                <div className="space-y-5 md:space-y-8">
+                    <div className="bg-primary p-8 md:p-12 rounded-[2rem] md:rounded-[4rem] text-secondary-light space-y-6 md:space-y-10 shadow-3xl relative overflow-hidden">
+                        <div className="space-y-2 md:space-y-4 relative z-10">
+                            <h2 className="text-2xl md:text-3xl font-serif font-bold italic">Resumen Comercial</h2>
+                            <p className="text-secondary-light/40 text-xs font-medium uppercase tracking-[0.2em]">Kpis de Pedidos</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 md:gap-6 relative z-10">
+                            <div className="bg-white/5 p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] border border-white/10 group hover:bg-white/10 transition-colors">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2 md:mb-3">Pendientes de Cobro</p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-2xl md:text-3xl font-serif font-bold italic text-amber-500">L. {orders.filter(o => o.status === 'pending').reduce((acc, o) => acc + o.total, 0).toLocaleString()}</p>
+                                    <Calendar className="w-8 h-8 opacity-20" />
+                                </div>
+                            </div>
+
+                            <div className="bg-white/5 p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] border border-white/10 group hover:bg-white/10 transition-colors">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2 md:mb-3">Volumen Total Procesado</p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-2xl md:text-3xl font-serif font-bold italic text-secondary">L. {orders.filter(o => o.status === 'processed').reduce((acc, o) => acc + o.total, 0).toLocaleString()}</p>
+                                    <TrendingUp className="w-8 h-8 opacity-20" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-5 md:p-8 bg-secondary/10 rounded-2xl md:rounded-[2.5rem] border border-secondary/20 relative z-10">
+                            <p className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                                <ShoppingBag className="w-4 h-4" /> Flujo de Ventas
+                            </p>
+                            <p className="text-xs italic leading-relaxed">
+                                Tienes <span className="text-secondary font-bold">{orders.filter(o => o.status === 'pending').length} pedidos</span> esperando ser facturados.
+                                Procesa los más antiguos para mantener el flujo de caja.
+                            </p>
+                        </div>
+
+                        {/* Ambient Decoration */}
+                        <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/5 rounded-full blur-3xl opacity-50" />
+                    </div>
+
+                    <div className="bg-white border border-secondary/20 p-5 md:p-8 rounded-2xl md:rounded-[3rem] space-y-4 md:space-y-6 shadow-sm">
+                        <div className="flex items-center gap-4 text-primary">
+                            <ListChecks className="w-5 h-5" />
+                            <h4 className="font-serif font-bold italic">Sincronización Operativa</h4>
+                        </div>
+                        <ul className="space-y-4">
+                            <li className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest group">
+                                <span className="text-primary/40 group-hover:text-primary transition-colors">Base de Datos:</span>
+                                <span className="text-green-500 flex items-center gap-2">En Línea <CheckCircle2 className="w-3 h-3" /></span>
+                            </li>
+                            <li className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest group">
+                                <span className="text-primary/40 group-hover:text-primary transition-colors">Cola de Facturas:</span>
+                                <span className="text-green-500 flex items-center gap-2">Vacía <CheckCircle2 className="w-3 h-3" /></span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:gap-8">
-                {filteredOrders.length === 0 ? (
-                    <div className="py-20 text-center italic text-primary/20">No se encontraron pedidos en esta categoría</div>
-                ) : (
-                    filteredOrders.map((order) => (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            key={order.id}
-                            className="glass-card p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] flex flex-col lg:flex-row gap-3 md:gap-6 bg-white/40 relative overflow-hidden group border border-primary/5"
-                        >
-                            {/* Main Info Row (Horizontal on all screens) */}
-                            <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 min-w-0">
-                                <div className="flex justify-between items-center md:block md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-primary/5 pb-2 md:pb-0 md:pr-6">
-                                    <div className="space-y-0.5 min-w-0">
-                                        <h3 className="text-sm md:text-2xl font-serif italic text-primary truncate">
-                                            {order.customers?.first_name} {order.customers?.last_name}
-                                        </h3>
-                                        <p className="text-[8px] md:text-[10px] text-primary/40 font-bold uppercase tracking-widest">{new Date(order.created_at).toLocaleDateString()}</p>
-                                    </div>
-                                    <div className="text-right md:text-left md:mt-3">
-                                        <p className="text-lg md:text-3xl font-sans font-black text-primary">L. {Number(order.total).toLocaleString()}</p>
-                                        <span className={`inline-block px-1.5 py-0.5 md:px-3 md:py-1 rounded-md text-[7px] md:text-[9px] font-black uppercase tracking-tighter border mt-1 ${order.status === 'pending'
-                                            ? 'bg-amber-500/5 text-amber-600 border-amber-500/10'
-                                            : 'bg-green-500/5 text-green-600 border-green-500/10'
-                                            }`}>
-                                            {order.status === 'pending' ? 'Por Procesar' : 'Listo'}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Details Grid (More compact) */}
-                                <div className="flex-1 grid grid-cols-2 md:grid-cols-2 gap-4 min-w-0">
-                                    <div className="space-y-1.5 min-w-0">
-                                        <p className="text-[7px] md:text-[9px] uppercase tracking-[0.2em] text-primary/30 font-black">Pedido</p>
-                                        <div className="space-y-0.5 max-h-16 overflow-y-auto no-scrollbar">
-                                            {order.items.map((item, i) => (
-                                                <p key={i} className="text-[9px] md:text-sm text-luxury-black/60 truncate">
-                                                    <span className="font-black text-primary">x{item.quantity}</span> {item.name}
-                                                </p>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5 min-w-0 border-l border-primary/5 pl-4">
-                                        <p className="text-[7px] md:text-[9px] uppercase tracking-[0.2em] text-primary/30 font-black">Entrega</p>
-                                        <p className="text-[9px] md:text-sm font-medium text-luxury-black/70 italic line-clamp-1">{order.customers?.address || 'Honduras'}</p>
-                                        <p className="text-[9px] md:text-sm font-black text-primary">{order.customers?.phone}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex flex-row lg:flex-col gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-primary/5">
-                                {order.status === 'pending' && (
-                                    <button
-                                        onClick={() => handleOpenBilling(order)}
-                                        className="flex-1 lg:w-32 btn-primary !py-2.5 md:!py-3 text-[8px] md:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
-                                    >
-                                        PROCESAR
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => handleDeleteOrder(order.id)}
-                                    className="p-2.5 md:p-3 bg-red-500/5 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all shadow-sm border border-red-500/10 active:scale-95 flex items-center justify-center"
-                                    title="Cancelar Pedido"
-                                >
-                                    <X className="w-4 h-4 md:w-5 md:h-5" />
-                                </button>
-                            </div>
-                        </motion.div>
-                    ))
-                )}
             </div>
 
             {/* Billing Modal */}
@@ -359,133 +503,8 @@ const OrderManagement = () => {
                                 </p>
                             </div>
 
-                            {/* Content Wrapper (Scrollable) */}
                             <div className="flex-1 overflow-y-auto no-scrollbar">
-                                <div ref={invoiceRef} className="bg-white p-6 md:p-14 lg:p-20">
-                                    {/* Header Design */}
-                                    <div className="flex flex-col md:flex-row justify-between gap-8 border-b-2 border-primary/10 pb-10">
-                                        <div className="space-y-4">
-                                            <h2 className="text-4xl lg:text-5xl font-serif font-black italic text-primary tracking-tighter">LUXESSENCE</h2>
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] md:text-xs font-black text-primary/40 uppercase tracking-[0.3em]">Perfumería de Gama Alta</p>
-                                                <div className="text-[9px] md:text-xs text-primary/60 font-medium">
-                                                    <p>Santa Rosa de Copán | San Pedro Sula</p>
-                                                    <p>Tel: 3313-5869 / 8896-6603</p>
-                                                    <p>www.luxessence.store</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="text-left md:text-right space-y-4">
-                                            <div className="bg-primary/5 p-5 lg:p-8 rounded-[2.5rem] border border-primary/5 inline-block text-left md:text-right">
-                                                <p className="text-[10px] uppercase font-black text-primary/30 tracking-widest">Nº de Factura</p>
-                                                <p className="text-xl lg:text-2xl font-mono font-bold text-primary">#LUX-{lastSaleData.sale.id.slice(0, 8).toUpperCase()}</p>
-                                                <p className="text-[10px] uppercase font-black text-primary/30 tracking-widest mt-4">Fecha de Emisión</p>
-                                                <p className="text-sm font-bold text-primary">{new Date(lastSaleData.sale.created_at).toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Participants Grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 py-12">
-                                        <div className="space-y-4">
-                                            <p className="text-[10px] uppercase font-black text-primary/30 tracking-widest border-l-2 border-primary pl-3">Datos del Comprador</p>
-                                            <div className="space-y-1">
-                                                <h3 className="text-2xl font-serif font-bold italic text-primary">{lastSaleData.customer.first_name} {lastSaleData.customer.last_name}</h3>
-                                                <div className="text-sm text-primary/60 space-y-1 font-medium">
-                                                    <p className="flex items-center gap-2 font-bold"><Phone className="w-4 h-4 text-primary/40" /> {lastSaleData.customer.phone}</p>
-                                                    <p className="flex items-start gap-2 max-w-xs">{lastSaleData.customer.address || 'Honduras'}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-4 md:text-right">
-                                            <p className="text-[10px] uppercase font-black text-primary/30 tracking-widest md:border-r-2 md:border-primary md:pr-3">Detalles de Venta</p>
-                                            <div className="space-y-2">
-                                                <div>
-                                                    <p className="text-[10px] uppercase font-black text-primary/20">Método de Pago</p>
-                                                    <p className="text-sm font-black text-primary uppercase">{lastSaleData.sale.payment_method}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] uppercase font-black text-primary/20">Estado</p>
-                                                    <p className={`text-sm font-bold ${lastSaleData.sale.is_paid ? 'text-green-600' : 'text-red-500'}`}>{lastSaleData.sale.is_paid ? 'PAGADO' : 'PENDIENTE'}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Items List */}
-                                    <div className="space-y-4">
-                                        <p className="text-[10px] uppercase font-black text-primary/30 tracking-widest">Descripción de Artículos</p>
-                                        <div className="overflow-x-auto no-scrollbar rounded-2xl border border-primary/5 bg-primary/[0.01]">
-                                            <table className="w-full text-left min-w-[600px]">
-                                                <thead>
-                                                    <tr className="bg-primary text-white text-[10px] uppercase font-black tracking-[0.2em]">
-                                                        <th className="px-6 py-4">Cant.</th>
-                                                        <th className="px-6 py-4">Descripción del Producto</th>
-                                                        <th className="px-6 py-4 text-right">Unitario</th>
-                                                        <th className="px-6 py-4 text-right">Subtotal</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-primary/5">
-                                                    {lastSaleData.items.map((item, idx) => (
-                                                        <tr key={idx} className="text-sm">
-                                                            <td className="px-6 py-4 font-black text-primary/40">{item.quantity}</td>
-                                                            <td className="px-6 py-4 font-bold text-primary">{item.name}</td>
-                                                            <td className="px-6 py-4 text-right text-primary/60 italic">L. {Number(item.price).toLocaleString()}</td>
-                                                            <td className="px-6 py-4 text-right font-black text-primary">L. {(item.price * item.quantity).toLocaleString()}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div className="md:hidden text-center">
-                                            <p className="text-[8px] text-primary/20 uppercase font-black animate-pulse">Desliza para ver más →</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Summary */}
-                                    <div className="flex flex-col md:flex-row justify-between items-end gap-10 mt-12 pt-10 border-t border-primary/10">
-                                        <div className="max-w-xs space-y-4 text-[10px] text-primary/30 font-bold leading-relaxed hidden md:block italic">
-                                            <p>Gracias por elegir la distinción de Luxessence. Este documento sirve como comprobante comercial de su adquisición.</p>
-                                        </div>
-                                        <div className="w-full md:w-80 space-y-4">
-                                            <div className="space-y-2 px-4 text-sm">
-                                                <div className="flex justify-between font-bold text-primary/40 uppercase text-[10px] tracking-widest">
-                                                    <span>Suma Neto</span>
-                                                    <span>L. {(lastSaleData.sale.total + (lastSaleData.sale.discount || 0)).toLocaleString()}</span>
-                                                </div>
-                                                {lastSaleData.sale.discount > 0 && (
-                                                    <div className="flex justify-between font-black text-red-500/60 uppercase text-[10px] tracking-widest">
-                                                        <span>Incentivo Aplicado</span>
-                                                        <span>- L. {lastSaleData.sale.discount.toLocaleString()}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Clean Sans Serif Total */}
-                                            <div className="flex justify-between items-end pt-6 border-t border-primary/5 px-4">
-                                                <div className="space-y-1">
-                                                    <p className="text-[11px] uppercase font-black tracking-[0.2em] text-primary/40">Total a Pagar</p>
-                                                    <p className="text-4xl font-sans font-black text-primary tracking-tighter leading-none">
-                                                        L. {Number(lastSaleData.sale.total).toLocaleString()}
-                                                    </p>
-                                                </div>
-                                                <Receipt className="w-10 h-10 text-primary/10" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Print Styles */}
-                                    <style>{`
-                                        @media print {
-                                            @page { margin: 15mm; size: auto; }
-                                            body { background: white !important; }
-                                            .no-print { display: none !important; }
-                                            .print\\:p-0 { padding: 0 !important; }
-                                            .print\\:shadow-none { shadow: none !important; }
-                                            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                                        }
-                                    `}</style>
-                                </div>
+                                <InvoiceTemplate ref={invoiceRef} saleData={lastSaleData} />
                             </div>
 
                             {/* Sticky Footer Actions */}
@@ -498,13 +517,13 @@ const OrderManagement = () => {
                                     <span className="text-xs tracking-[0.2em] font-black">IMPRIMIR FACTURA</span>
                                 </button>
                                 <button
-                                    onClick={() => generateInvoice(lastSaleData, false)}
+                                    onClick={() => downloadInvoicePNG(invoiceRef.current, lastSaleData)}
                                     className="flex-1 bg-white hover:bg-primary/5 text-primary py-5 rounded-2xl flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-[0.2em] transition-all border border-primary/10 shadow-sm active:scale-95"
                                 >
-                                    <Download className="w-5 h-5 text-primary/40" /> DESCARGAR PDF
+                                    <Download className="w-5 h-5 text-primary/40" /> DESCARGAR FOTO
                                 </button>
                                 <button
-                                    onClick={() => shareInvoicePDF(lastSaleData)}
+                                    onClick={() => shareInvoicePNG(invoiceRef.current, lastSaleData)}
                                     className="md:flex-1 p-5 bg-green-500 text-white rounded-2xl flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-green-600 transition-all shadow-xl shadow-green-500/20 active:scale-95"
                                 >
                                     <Share2 className="w-5 h-5 text-white/60" /> ENVIAR WHATSAPP
@@ -521,6 +540,61 @@ const OrderManagement = () => {
                 onConfirm={handleSecurityConfirm}
                 title={securityAction?.type === 'delete' ? 'Eliminar Pedido' : 'Autorizar Facturación'}
             />
+
+            {/* Custom Warning Modal for deleting PROCESSED orders */}
+            <AnimatePresence>
+                {deleteConfirmOrder && (
+                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            onClick={() => setDeleteConfirmOrder(null)}
+                            className="absolute inset-0 bg-primary/30 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative bg-white rounded-[2.5rem] w-full max-w-md p-10 shadow-2xl space-y-6 z-10"
+                        >
+                            <div className="w-16 h-16 bg-red-100 rounded-[1.5rem] flex items-center justify-center mx-auto">
+                                <Trash2 className="w-8 h-8 text-red-600" />
+                            </div>
+                            <div className="text-center space-y-2">
+                                <h3 className="text-2xl font-serif font-bold italic text-primary">¿Anular Pedido Facturado?</h3>
+                                <p className="text-sm text-primary/50 leading-relaxed">
+                                    El pedido de{' '}
+                                    <span className="font-bold text-primary">
+                                        {deleteConfirmOrder.customers?.first_name} {deleteConfirmOrder.customers?.last_name}
+                                    </span>{' '}
+                                    ya fue facturado y está registrado en el Libro de Ventas.
+                                </p>
+                            </div>
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-1">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">⚠ Esto también hará:</p>
+                                <ul className="text-xs text-amber-700 space-y-1 mt-2">
+                                    <li>• Eliminará la factura del Libro de Ventas</li>
+                                    <li>• Revertirá el stock de los productos <span className="font-bold">una sola vez</span></li>
+                                    <li>• Borrará los abonos/cuotas registrados de esa venta</li>
+                                </ul>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setDeleteConfirmOrder(null)}
+                                    className="flex-1 py-4 bg-primary/5 text-primary rounded-2xl text-sm font-black uppercase tracking-wider hover:bg-primary/10 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => executeDelete(deleteConfirmOrder.id)}
+                                    className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-sm font-black uppercase tracking-wider hover:bg-red-700 active:scale-95 transition-all shadow-lg shadow-red-200"
+                                >
+                                    Sí, Anular Todo
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

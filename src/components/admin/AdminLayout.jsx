@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, History, LogOut, Sparkles, ChevronLeft, Menu, X, Percent } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, History, LogOut, Sparkles, ChevronLeft, Menu, X, Percent, Store } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const AdminLayout = () => {
@@ -19,135 +19,178 @@ const AdminLayout = () => {
         { name: 'Inventario', path: '/admin/inventory', icon: Package },
         { name: 'Ventas', path: '/admin/sales', icon: History },
         { name: 'Clientes', path: '/admin/customers', icon: Users },
+        { name: 'Destacados', path: '/admin/featured', icon: Sparkles },
         { name: 'Promociones', path: '/admin/promotions', icon: Percent },
     ];
 
     return (
-        <div className="min-h-screen bg-secondary-light flex">
-            {/* Sidebar */}
-            <aside className="w-80 bg-primary p-10 flex flex-col hidden lg:flex sticky top-0 h-screen shadow-2xl overflow-y-auto no-scrollbar">
-                <div className="flex items-center justify-between mb-20">
+        <div className="min-h-screen bg-secondary-light flex overflow-hidden">
+            {/* Desktop Sidebar */}
+            <aside className="w-80 bg-primary p-12 flex flex-col hidden lg:flex sticky top-0 h-screen shadow-[10px_0_50px_rgba(0,0,0,0.2)] overflow-y-auto no-scrollbar border-r border-white/5 relative z-50">
+                {/* Subtle Ambient Glow */}
+                <div className="absolute top-0 left-0 w-full h-40 bg-secondary/5 blur-[100px] pointer-events-none" />
+
+                <div className="flex items-center justify-between mb-24 relative z-10">
                     <Link to="/" className="flex items-center gap-4 group">
-                        <img src="/img/logo.svg" className="w-12 h-12 transition-transform duration-500 group-hover:rotate-12" />
-                        <h2 className="text-4xl font-serif font-black italic text-secondary-light leading-[0.85]">
-                            Admin<br /><span className="text-2xl opacity-50">Suite</span>
+                        <div className="relative">
+                            <img src="/img/logo.svg" className="w-14 h-14 transition-all duration-700 group-hover:rotate-[360deg] group-hover:scale-110" />
+                            <div className="absolute inset-0 bg-secondary/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <h2 className="text-4xl font-serif font-black italic text-secondary-light leading-[0.8] tracking-tighter">
+                            Lux<br /><span className="text-xl opacity-30 italic font-medium tracking-widest pl-1 uppercase font-sans">Admin</span>
                         </h2>
                     </Link>
-                    <button
-                        onClick={() => navigate('/')}
-                        className="p-3 bg-secondary-light/10 hover:bg-secondary-light/20 rounded-2xl transition-all text-secondary-light shadow-lg group"
-                        title="Volver a la tienda"
-                    >
-                        <ChevronLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
-                    </button>
                 </div>
 
-                <nav className="flex-1 space-y-3">
+                <nav className="flex-1 space-y-4 relative z-10">
+                    <p className="text-[8px] font-black uppercase tracking-[0.4em] text-secondary-light/10 mb-6 pl-6">Navegación Oficial</p>
                     {menuItems.map((item) => {
                         const isActive = location.pathname === item.path;
                         return (
                             <Link
                                 key={item.path}
                                 to={item.path}
-                                className={`flex items-center gap-4 px-8 py-5 rounded-[2rem] transition-all duration-500 group ${isActive
-                                    ? 'bg-secondary-light text-primary font-bold shadow-2xl shadow-black/20 scale-[1.02]'
-                                    : 'text-secondary-light/40 hover:text-secondary-light hover:bg-secondary-light/5'
+                                className={`flex items-center gap-5 px-8 py-5 rounded-[2.5rem] transition-all duration-500 group relative overflow-hidden ${isActive
+                                    ? 'bg-secondary text-primary font-bold shadow-[0_20px_40px_rgba(212,175,55,0.15)] scale-[1.05]'
+                                    : 'text-secondary-light/30 hover:text-secondary-light hover:bg-white/[0.03] border border-transparent hover:border-white/5'
                                     }`}
                             >
-                                <item.icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px]' : 'group-hover:translate-x-1 transition-transform'}`} />
-                                <span className="tracking-widest uppercase text-[10px] font-black">{item.name}</span>
+                                <item.icon className={`w-5 h-5 transition-transform duration-500 ${isActive ? 'stroke-[2.5px]' : 'group-hover:scale-110 group-hover:rotate-6'}`} />
+                                <span className="tracking-[0.2em] uppercase text-[9px] font-black italic">{item.name}</span>
+                                {isActive && <motion.div layoutId="activeNav" className="absolute left-0 w-1.5 h-6 bg-primary rounded-full" />}
                             </Link>
                         );
                     })}
                 </nav>
 
-                <div className="pt-8 border-t border-secondary-light/5 mt-auto">
+                <div className="pt-10 border-t border-white/5 mt-10 relative z-10">
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-4 px-8 py-5 text-secondary-light/40 hover:text-red-400 hover:bg-red-400/5 rounded-[2rem] transition-all group"
+                        className="w-full flex items-center gap-5 px-8 py-5 text-secondary-light/20 hover:text-red-400 hover:bg-red-400/5 rounded-[2.5rem] transition-all group border border-transparent hover:border-red-400/10"
                     >
                         <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-black uppercase tracking-widest text-[10px]">Cerrar Sesión</span>
+                        <span className="font-black uppercase tracking-[0.2em] text-[10px] italic">Finalizar Sesión</span>
                     </button>
+
+                    <div className="mt-8 flex items-center gap-4 px-8 opacity-10 grayscale hover:opacity-50 transition-opacity duration-700">
+                        <div className="w-8 h-8 rounded-full bg-secondary-light/20 flex items-center justify-center">
+                            <Store className="w-4 h-4 text-secondary-light" />
+                        </div>
+                        <p className="text-[7px] font-black uppercase tracking-widest text-secondary-light">Luxessence Secure Console</p>
+                    </div>
                 </div>
             </aside>
 
-            {/* Main Content */}
-            <main className="flex-1 h-screen overflow-y-auto p-6 md:p-12 no-scrollbar relative">
+            {/* Main Content Area */}
+            <div className="flex-1 h-screen flex flex-col min-w-0">
                 {/* Mobile Header */}
-                <div className="lg:hidden flex justify-between items-center mb-10 bg-primary p-6 rounded-[2.5rem] shadow-xl pt-safe relative z-[110]">
+                <header className="lg:hidden flex justify-between items-center p-6 bg-primary shadow-xl shrink-0 z-50">
                     <div className="flex items-center gap-3">
                         <img src="/img/logo.svg" className="w-10 h-10" />
                         <h2 className="text-xl font-serif font-black italic text-secondary-light leading-none">Admin <span className="opacity-50">Suite</span></h2>
                     </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="p-4 bg-secondary-light/10 text-secondary-light rounded-2xl active:scale-90 transition-all"
-                            title="Volver a la tienda"
-                        >
-                            <ChevronLeft className="w-6 h-6" />
-                        </button>
-                        <button
-                            onClick={() => setIsMenuOpen(!isMenuOpen)}
-                            className="p-4 bg-secondary-light/10 text-secondary-light rounded-2xl active:scale-90 transition-all"
-                        >
-                            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                        </button>
-                    </div>
-                </div>
+                    <button
+                        onClick={() => setIsMenuOpen(true)}
+                        className="p-4 bg-secondary-light/10 text-secondary-light rounded-2xl active:scale-90 transition-all shadow-lg"
+                    >
+                        <Menu className="w-6 h-6" />
+                    </button>
+                </header>
 
-                <AnimatePresence>
-                    {isMenuOpen && (
+                <main className="flex-1 overflow-y-auto p-6 md:p-12 no-scrollbar relative min-w-0">
+                    <motion.div
+                        key={location.pathname}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="max-w-7xl mx-auto"
+                    >
+                        <Outlet />
+                    </motion.div>
+                </main>
+            </div>
+
+            {/* Mobile Sidebar Overlay */}
+            <AnimatePresence>
+                {isMenuOpen && (
+                    <>
                         <motion.div
-                            initial={{ opacity: 0, x: '100%' }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: '100%' }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsMenuOpen(false)}
+                            className="fixed inset-0 bg-luxury-black/60 backdrop-blur-md z-[100] lg:hidden"
+                        />
+                        <motion.aside
+                            initial={{ x: '100%', opacity: 0.5 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: '100%', opacity: 0.5 }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="fixed inset-0 z-[100] bg-primary flex flex-col p-10 pt-40"
+                            className="fixed right-0 top-0 bottom-0 w-[85%] max-w-[400px] bg-primary z-[110] flex flex-col p-8 lg:hidden shadow-[-20px_0_60px_-15px_rgba(0,0,0,0.5)] border-l border-white/5"
                         >
-                            <nav className="flex-1 space-y-4">
-                                {menuItems.map((item) => (
-                                    <Link
-                                        key={item.path}
-                                        to={item.path}
-                                        onClick={() => setIsMenuOpen(false)}
-                                        className={`flex items-center justify-between p-8 rounded-[2.5rem] transition-all ${location.pathname === item.path
-                                            ? 'bg-secondary-light text-primary font-bold shadow-2xl'
-                                            : 'text-secondary-light/60 border border-secondary-light/5'}`}
-                                    >
-                                        <div className="flex items-center gap-6">
-                                            <item.icon className="w-6 h-6" />
-                                            <span className="text-xl font-serif italic">{item.name}</span>
-                                        </div>
-                                        <ChevronLeft className="w-5 h-5 opacity-20 rotate-180" />
-                                    </Link>
-                                ))}
-                            </nav>
-                            <div className="pt-10 border-t border-secondary-light/5 pb-safe">
+                            <div className="flex items-center justify-between mb-12">
+                                <div className="flex items-center gap-3">
+                                    <img src="/img/logo.svg" className="w-8 h-8" />
+                                    <h2 className="text-lg font-serif font-black italic text-secondary-light">Admin <span className="opacity-40">Menu</span></h2>
+                                </div>
                                 <button
-                                    onClick={() => { handleLogout(); setIsMenuOpen(false); }}
-                                    className="w-full flex items-center gap-4 p-8 text-red-400 bg-red-400/5 rounded-[2.5rem] font-black uppercase tracking-widest text-[10px]"
+                                    onClick={() => setIsMenuOpen(false)}
+                                    className="p-3 bg-white/5 text-secondary-light rounded-xl active:scale-95 transition-all"
                                 >
-                                    <LogOut className="w-5 h-5" /> Cerrar Sesión
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
 
-                <motion.div
-                    key={location.pathname}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="max-w-7xl mx-auto"
-                >
-                    <Outlet />
-                </motion.div>
+                            <nav className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-8">
+                                <div className="text-[8px] font-black uppercase tracking-[0.3em] text-secondary-light/20 mb-6 pl-4">Navegación Principal</div>
+                                {menuItems.map((item) => {
+                                    const isActive = location.pathname === item.path;
+                                    return (
+                                        <Link
+                                            key={item.path}
+                                            to={item.path}
+                                            onClick={() => setIsMenuOpen(false)}
+                                            className={`flex items-center justify-between p-6 rounded-[2rem] transition-all group ${isActive
+                                                ? 'bg-secondary-light text-primary font-bold shadow-xl'
+                                                : 'text-secondary-light/40 hover:text-secondary-light hover:bg-white/5 border border-white/5'}`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <item.icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px]' : ''}`} />
+                                                <span className="text-xs font-black uppercase tracking-widest leading-none">{item.name}</span>
+                                            </div>
+                                            {isActive && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                        </Link>
+                                    );
+                                })}
 
-                {/* Ambient Decorative */}
-                <div className="fixed top-0 right-0 w-[300px] h-[300px] bg-primary/2 rounded-full blur-[100px] pointer-events-none -z-10" />
-            </main>
+                                <div className="pt-8 mt-4 border-t border-white/5">
+                                    <div className="text-[8px] font-black uppercase tracking-[0.3em] text-secondary-light/20 mb-6 pl-4">Accesos Directos</div>
+                                    <button
+                                        onClick={() => { navigate('/'); setIsMenuOpen(false); }}
+                                        className="w-full flex items-center gap-4 p-6 text-secondary-light/40 hover:text-secondary-light bg-white/5 rounded-[2rem] transition-all border border-white/5 mb-3"
+                                    >
+                                        <Store className="w-5 h-5" />
+                                        <span className="text-xs font-black uppercase tracking-widest leading-none">Ver Tienda</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { handleLogout(); setIsMenuOpen(false); }}
+                                        className="w-full flex items-center gap-4 p-6 text-red-400 bg-red-400/5 rounded-[2rem] transition-all border border-red-400/10"
+                                    >
+                                        <LogOut className="w-5 h-5" />
+                                        <span className="text-xs font-black uppercase tracking-widest leading-none">Cerrar Sesión</span>
+                                    </button>
+                                </div>
+                            </nav>
+
+                            <div className="pt-6 border-t border-white/5 flex items-center justify-center">
+                                <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/10 italic">Luxessence v1.0.2</p>
+                            </div>
+                        </motion.aside>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* Ambient Decorative */}
+            <div className="fixed top-0 right-0 w-[400px] h-[400px] bg-primary/2 rounded-full blur-[120px] pointer-events-none -z-10" />
         </div>
     );
 };

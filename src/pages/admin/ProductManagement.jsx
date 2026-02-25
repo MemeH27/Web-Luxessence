@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { exportToExcel } from '../../utils/export';
-import { Plus, Edit3, Trash2, X, Upload, Search, Download, Package2, ChevronUp, ChevronDown, ListPlus, Lock } from 'lucide-react';
+import { Plus, Edit3, Trash2, X, Upload, Search, Download, Package2, ChevronUp, ChevronDown, ListPlus, Lock, CheckCircle2, Circle, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SecurityModal from '../../components/admin/SecurityModal';
+import Pagination from '../../components/admin/Pagination';
 import { useToast } from '../../context/ToastContext';
 
 const StepperInput = ({ label, value, onChange, min = 0, step = 1, prefix = '' }) => (
@@ -54,12 +55,17 @@ const ProductManagement = () => {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
+
     // Security Modal State
     const [isSecurityOpen, setIsSecurityOpen] = useState(false);
     const [securityAction, setSecurityAction] = useState(null); // { type, id, data }
 
     const [form, setForm] = useState({
-        name: '', description: '', price: 0, cost: 0, stock: 0, category_id: '', image_url: ''
+        name: '', description: '', price: 0, cost: 0, stock: 0, category_id: '', image_url: '',
+        is_new_arrival: false, is_gift_option: false, is_coming_soon: false
     });
 
     useEffect(() => {
@@ -89,7 +95,11 @@ const ProductManagement = () => {
             setForm({ ...prod });
         } else {
             setEditingProduct(null);
-            setForm({ name: '', description: '', price: 0, cost: 0, stock: 0, category_id: categories[0]?.id || '', image_url: '' });
+            setForm({
+                name: '', description: '', price: 0, cost: 0, stock: 0,
+                category_id: categories[0]?.id || '', image_url: '',
+                is_new_arrival: false, is_gift_option: false, is_coming_soon: false
+            });
         }
         setIsModalOpen(true);
     };
@@ -156,12 +166,21 @@ const ProductManagement = () => {
         }
     };
 
+    const toggleComingSoon = async (id, currentStatus) => {
+        try {
+            const { error } = await supabase.from('products').update({ is_coming_soon: !currentStatus }).eq('id', id);
+            if (error) throw error;
+            addToast(`Producto ${!currentStatus ? 'marcado como Próximamente' : 'removido de Próximamente'}`);
+            fetchData();
+        } catch (err) {
+            addToast('Error al cambiar estado', 'error');
+        }
+    };
+
     const handleSecurityConfirm = () => {
         if (!securityAction) return;
         if (securityAction.type === 'delete') {
             executeDelete(securityAction.id);
-        } else if (securityAction.type === 'edit') {
-            setIsModalOpen(true);
         }
         setSecurityAction(null);
     };
@@ -172,19 +191,18 @@ const ProductManagement = () => {
     };
 
     const executeDelete = async (id) => {
-        if (!confirm('¿Eliminar este producto del sistema?')) return;
         setLoading(true);
         try {
             const { error } = await supabase.from('products').delete().eq('id', id);
             if (error) {
                 console.error('Error deleting product:', error);
-                alert(`Error al eliminar: ${error.message}`);
+                addToast(`Error al eliminar: ${error.message}`, 'error');
             } else {
                 addToast('Producto eliminado');
                 fetchData();
             }
         } catch (err) {
-            alert('Error inesperado al eliminar');
+            addToast('Error inesperado al eliminar', 'error');
         } finally {
             setLoading(false);
         }
@@ -203,85 +221,189 @@ const ProductManagement = () => {
     };
 
 
-    const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredProducts = products.filter(p =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.categories?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const paginatedProducts = filteredProducts.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    // Reset to page 1 on search
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     return (
         <div className="space-y-12 pb-12">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-serif font-bold italic text-primary">Gestión de Catálogo</h1>
-                    <p className="text-primary/40 tracking-widest uppercase text-xs font-black">Control maestro de inventario</p>
+                <div className="space-y-2">
+                    <h1 className="text-4xl md:text-6xl font-serif font-black italic text-primary leading-tight">Gestión de Inventario</h1>
+                    <p className="text-primary/40 font-medium italic">Control maestro de catálogo, existencias y precios.</p>
                 </div>
-                <div className="flex gap-4">
-                    <button onClick={handleExport} className="glass-panel p-4 rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors">
+                <div className="flex gap-4 w-full md:w-auto">
+                    <button onClick={handleExport} className="glass-panel p-5 rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors shadow-sm border-primary/5">
                         <Download className="w-5 h-5" />
                     </button>
-                    <button onClick={() => handleOpenModal()} className="btn-primary flex items-center gap-2">
-                        <Plus className="w-5 h-5" /> Nuevo Producto
+                    <button onClick={() => handleOpenModal()} className="btn-primary flex-1 md:flex-none flex items-center justify-center gap-3 !py-5 shadow-xl shadow-primary/10">
+                        <Plus className="w-6 h-6" /> <span className="text-xs uppercase tracking-widest font-black">Nuevo Producto</span>
                     </button>
                 </div>
             </header>
 
-            {/* View Bar */}
-            <div className="flex flex-col md:flex-row gap-6 justify-between items-center glass-panel p-6 rounded-[2rem] border-primary/10">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/30 w-5 h-5" />
-                    <input
-                        type="text"
-                        placeholder="Filtrar por nombre..."
-                        className="w-full bg-primary/5 border border-primary/10 rounded-2xl py-3 pl-12 pr-4 focus:ring-1 focus:ring-primary outline-none transition-all"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                {/* Product List Panel */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Search Bar */}
+                    <div className="relative group">
+                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/20 w-5 h-5 group-focus-within:text-primary transition-colors" />
+                        <input
+                            type="text"
+                            placeholder="Buscar por nombre o categoría..."
+                            className="w-full bg-white border border-primary/5 rounded-[2rem] py-6 pl-16 pr-8 focus:ring-1 focus:ring-primary outline-none shadow-sm font-medium transition-all"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="bg-white/40 rounded-[3rem] p-4 md:p-8 shadow-sm border border-primary/5 min-h-[600px] max-h-[800px] overflow-y-auto no-scrollbar space-y-4">
+                        {loading ? (
+                            <div className="flex items-center justify-center h-full text-primary/20 italic font-serif">Destilando catálogo...</div>
+                        ) : paginatedProducts.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-primary/20 italic font-serif">No hay tesoros que coincidan.</div>
+                        ) : (
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 px-1">
+                                {paginatedProducts.map(prod => (
+                                    <motion.div
+                                        layout
+                                        key={prod.id}
+                                        className="group bg-white rounded-[2rem] border border-primary/10 hover:border-primary/20 shadow-sm hover:shadow-xl transition-all flex items-center p-3 md:p-5 gap-4 overflow-hidden"
+                                    >
+                                        <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-[1.8rem] overflow-hidden bg-primary/5 shrink-0 shadow-inner group-hover:scale-105 transition-transform duration-500">
+                                            <img src={prod.image_url || '/img/logo.svg'} className="w-full h-full object-cover" alt={prod.name} />
+                                            {prod.is_coming_soon && (
+                                                <div className="absolute inset-0 bg-orange-500/20 backdrop-blur-[2px] flex items-center justify-center">
+                                                    <Clock className="w-8 h-8 text-white drop-shadow-lg animate-pulse" />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0 flex flex-col justify-between py-1 h-full">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <p className="text-[8px] uppercase tracking-widest text-primary/30 font-black truncate">{prod.categories?.name}</p>
+                                                    <div className={`w-2 h-2 rounded-full shrink-0 ${prod.stock > 10 ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.3)]' : prod.stock > 0 ? 'bg-orange-500' : 'bg-red-500 shadow-[0_0_5px_rgba(239,44,44,0.3)]'}`} />
+                                                </div>
+                                                <h3 className="font-serif font-bold italic text-primary text-base md:text-xl leading-snug truncate" title={prod.name}>
+                                                    {prod.name}
+                                                </h3>
+                                            </div>
+
+                                            <div className="flex items-baseline gap-3">
+                                                <p className="text-xl md:text-3xl font-sans font-black text-primary tracking-tighter">L. {prod.price.toLocaleString()}</p>
+                                                <span className="text-[9px] font-black text-primary/20 uppercase tracking-[0.2em] whitespace-nowrap">Stock: {prod.stock}</span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 pt-2 border-t border-primary/5 mt-1">
+                                                <button
+                                                    onClick={() => toggleComingSoon(prod.id, prod.is_coming_soon)}
+                                                    className={`p-2.5 md:p-3 rounded-xl transition-all border ${prod.is_coming_soon
+                                                        ? 'bg-orange-500 border-orange-400 text-white shadow-lg shadow-orange-500/10'
+                                                        : 'bg-primary/5 border-transparent text-primary/30 hover:text-orange-500 hover:bg-orange-500/5'}`}
+                                                    title="Próximamente"
+                                                >
+                                                    <Clock className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => { setEditingProduct(prod); setForm(prod); setIsModalOpen(true); }}
+                                                    className="p-2.5 md:p-3 bg-primary/5 text-primary/30 hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
+                                                    title="Editar"
+                                                >
+                                                    <Edit3 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(prod.id)}
+                                                    className="p-2.5 md:p-3 bg-red-500/5 text-red-500/30 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Pagination */}
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredProducts.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
                     />
                 </div>
-                <p className="text-[10px] uppercase tracking-widest font-black text-primary/40">{filteredProducts.length} Referencias Activas</p>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-                {loading ? (
-                    [1, 2, 3].map(i => <div key={i} className="h-40 glass-panel animate-pulse rounded-[1.5rem] md:rounded-[2.5rem]" />)
-                ) : filteredProducts.length === 0 ? (
-                    <div className="col-span-full py-20 text-center italic text-primary/20 italic">No hay productos que coincidan con la búsqueda</div>
-                ) : (
-                    filteredProducts.map(prod => (
-                        <motion.div
-                            layout
-                            key={prod.id}
-                            className="glass-card p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 md:gap-6 group relative bg-white/40 overflow-hidden"
-                        >
-                            <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl md:rounded-2xl overflow-hidden bg-primary/5 border border-primary/10 shrink-0 shadow-inner">
-                                <img src={prod.image_url || '/img/logo.svg'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={prod.name} />
+                {/* Info & Stats Sidebar */}
+                <div className="space-y-8">
+                    {/* Summary Card */}
+                    <div className="bg-primary p-12 rounded-[4rem] text-secondary-light space-y-10 shadow-3xl relative overflow-hidden">
+                        <div className="space-y-4 relative z-10">
+                            <h2 className="text-3xl font-serif font-bold italic">Resumen de Inventario</h2>
+                            <p className="text-secondary-light/40 text-xs font-medium uppercase tracking-[0.2em]">Métricas del Catálogo</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-6 relative z-10">
+                            <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2">Total Referencias</p>
+                                <p className="text-3xl font-serif font-bold italic text-secondary">{products.length}</p>
                             </div>
-                            <div className="flex-1 space-y-1 relative z-10 min-w-0">
-                                <div className="flex justify-between items-start gap-2">
-                                    <h3 className="font-serif italic text-base md:text-lg leading-tight text-primary line-clamp-1">{prod.name}</h3>
-                                    <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
-                                        <button onClick={() => { setEditingProduct(prod); setForm(prod); setIsModalOpen(true); }} className="p-1.5 bg-primary/5 hover:bg-primary text-primary hover:text-white rounded-lg transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
-                                        <button onClick={() => handleDelete(prod.id)} className="p-1.5 bg-red-500/5 hover:bg-red-500 text-red-500 hover:text-white rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
-                                    </div>
-                                </div>
-                                <p className="text-[8px] md:text-[9px] uppercase tracking-widest bg-primary/5 text-primary/40 px-2 py-0.5 rounded-md font-black inline-block">
-                                    {prod.categories?.name}
-                                </p>
-                                <div className="flex items-center justify-between md:justify-start md:gap-4 pt-1">
-                                    <span className="text-primary font-sans font-bold text-lg md:text-xl">L. {prod.price}</span>
-                                    <div className="flex items-center gap-1.5 bg-primary/[0.03] px-2 py-0.5 rounded-full border border-primary/5">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${prod.stock > 10 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : prod.stock > 0 ? 'bg-orange-500' : 'bg-red-500'}`} />
-                                        <span className="text-[9px] md:text-[10px] uppercase font-black text-primary/30">Stock: {prod.stock}</span>
-                                    </div>
-                                </div>
+                            <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2">Valor Stock (Total)</p>
+                                <p className="text-2xl font-bold truncate">L. {Math.round(products.reduce((acc, p) => acc + (p.price * p.stock), 0)).toLocaleString()}</p>
                             </div>
-                            <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-[40px] md:w-20 md:h-20 md:rounded-bl-[50px] -z-0 pointer-events-none" />
-                        </motion.div>
-                    ))
-                )}
+                        </div>
+
+                        <div className="p-8 bg-secondary/10 rounded-[2.5rem] border border-secondary/20 relative z-10">
+                            <p className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                                <Package2 className="w-4 h-4" /> Lanzamientos
+                            </p>
+                            <p className="text-xs italic leading-relaxed">
+                                Tienes <span className="text-secondary font-bold">{products.filter(p => p.is_coming_soon).length} productos</span> marcados como lanzamientos futuros.
+                            </p>
+                        </div>
+
+                        {/* Ambient Decoration */}
+                        <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/5 rounded-full blur-3xl opacity-50" />
+                    </div>
+
+                    <div className="bg-white border border-secondary/20 p-8 rounded-[3rem] space-y-6 shadow-sm">
+                        <div className="flex items-center gap-4 text-primary">
+                            <ListPlus className="w-5 h-5" />
+                            <h4 className="font-serif font-bold italic">Sincronización</h4>
+                        </div>
+                        <ul className="space-y-4">
+                            <li className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest group">
+                                <span className="text-primary/40 group-hover:text-primary transition-colors">Backup:</span>
+                                <span className="text-green-500 flex items-center gap-2">OK <CheckCircle2 className="w-3 h-3" /></span>
+                            </li>
+                            <li className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest group">
+                                <span className="text-primary/40 group-hover:text-primary transition-colors">Seguridad:</span>
+                                <span className="text-primary flex items-center gap-2">Activa <Lock className="w-3 h-3" /></span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
 
             <SecurityModal
                 isOpen={isSecurityOpen}
                 onClose={() => setIsSecurityOpen(false)}
                 onConfirm={handleSecurityConfirm}
-                title={securityAction?.type === 'delete' ? 'Eliminar Producto' : 'Modificar Producto'}
+                title="Eliminar Producto"
             />
 
             {/* Modals */}
@@ -289,27 +411,24 @@ const ProductManagement = () => {
                 {isModalOpen && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-2xl rounded-[3.5rem] p-10 md:p-14 relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-4xl rounded-[4rem] p-10 md:p-14 relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10">
                             <div className="flex justify-between items-center mb-10">
                                 <div className="space-y-1">
-                                    <h2 className="text-3xl font-serif font-bold italic text-primary">{editingProduct ? 'Perfil de Producto' : 'Nueva Referencia'}</h2>
+                                    <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-primary">{editingProduct ? 'Perfil de Producto' : 'Nueva Referencia'}</h2>
                                     <p className="text-[10px] text-primary/30 uppercase tracking-[0.2em] font-black">Identidad Comercial y Técnica</p>
                                 </div>
-                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-primary/5 rounded-full text-primary transition-colors"><X className="w-6 h-6" /></button>
+                                <button onClick={() => setIsModalOpen(false)} className="p-3 bg-primary/5 hover:bg-red-500 hover:text-white rounded-full text-primary transition-all"><X className="w-7 h-7" /></button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="md:col-span-2 space-y-6">
-                                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-primary/10 rounded-[2.5rem] p-10 group hover:border-primary/30 transition-colors relative h-48 overflow-hidden bg-white shadow-inner">
+                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                <div className="md:col-span-1 space-y-6">
+                                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-primary/10 rounded-[3rem] p-10 group hover:border-primary/30 transition-colors relative h-64 overflow-hidden bg-white shadow-inner">
                                         {form.image_url ? (
-                                            <>
-                                                <img src={form.image_url} className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm scale-110" />
-                                                <img src={form.image_url || '/img/logo.svg'} className="relative z-10 h-full object-contain drop-shadow-2xl" />
-                                            </>
+                                            <img src={form.image_url} className="w-full h-full object-contain" />
                                         ) : (
-                                            <div className="text-center space-y-2 relative z-10">
-                                                <Upload className="text-primary w-10 h-10 mx-auto opacity-30" />
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">Sube la imagen de tu producto</p>
+                                            <div className="text-center space-y-4">
+                                                <Upload className="text-primary w-12 h-12 mx-auto opacity-20" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">Sube la imagen del producto</p>
                                             </div>
                                         )}
                                         <input type="file" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
@@ -317,87 +436,52 @@ const ProductManagement = () => {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2 md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Nombre del producto</label>
-                                    <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-serif italic text-lg text-primary" />
-                                </div>
+                                <div className="md:col-span-1 space-y-8">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Nombre Comercial</label>
+                                        <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-5 px-8 outline-none transition-all shadow-sm font-serif italic text-xl text-primary focus:border-primary" />
+                                    </div>
 
-                                <div className="space-y-4 md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Categoría de Producto</label>
-                                    <div className="flex gap-4">
-                                        <div className="relative flex-1">
-                                            <div className="relative group">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                                    className="w-full bg-white border-2 border-primary/10 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none flex items-center justify-between transition-all shadow-sm font-bold text-primary"
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Segmento / Categoría</label>
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex-1 relative">
+                                                <select
+                                                    value={form.category_id}
+                                                    onChange={e => setForm({ ...form, category_id: e.target.value })}
+                                                    className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 font-bold text-primary outline-none focus:border-primary appearance-none cursor-pointer shadow-sm"
                                                 >
-                                                    <span className={form.category_id ? 'text-primary' : 'text-primary/30'}>
-                                                        {categories.find(c => c.id === form.category_id)?.name || 'Seleccione una categoría'}
-                                                    </span>
-                                                    <ChevronDown className={`w-5 h-5 text-primary/30 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                                                </button>
-
-                                                <AnimatePresence>
-                                                    {isDropdownOpen && (
-                                                        <>
-                                                            <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
-                                                            <motion.div
-                                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                                className="absolute top-full left-0 right-0 mt-3 bg-white border border-primary/10 rounded-[2rem] shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
-                                                            >
-                                                                <div className="max-h-60 overflow-y-auto p-2 no-scrollbar">
-                                                                    {categories.length === 0 ? (
-                                                                        <div className="p-4 text-center text-[10px] uppercase tracking-widest text-primary/40 font-black">
-                                                                            No hay categorías disponibles
-                                                                        </div>
-                                                                    ) : (
-                                                                        categories.map(cat => (
-                                                                            <button
-                                                                                key={cat.id}
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    setForm({ ...form, category_id: cat.id });
-                                                                                    setIsDropdownOpen(false);
-                                                                                }}
-                                                                                className={`w-full text-left p-4 rounded-xl text-sm transition-all flex items-center justify-between group/item ${form.category_id === cat.id ? 'bg-primary text-secondary-light' : 'hover:bg-primary/5 text-primary'}`}
-                                                                            >
-                                                                                <span className="font-bold">{cat.name}</span>
-                                                                                {form.category_id === cat.id && <div className="w-1.5 h-1.5 rounded-full bg-secondary-light" />}
-                                                                            </button>
-                                                                        ))
-                                                                    )}
-                                                                </div>
-                                                            </motion.div>
-                                                        </>
-                                                    )}
-                                                </AnimatePresence>
+                                                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                                                </select>
+                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-20">
+                                                    <ChevronDown className="w-4 h-4" />
+                                                </div>
                                             </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsCategoryModalOpen(true)}
+                                                className="w-14 h-14 bg-primary text-secondary rounded-2xl flex items-center justify-center shrink-0 shadow-lg hover:scale-105 transition-all"
+                                                title="Nueva Categoría"
+                                            >
+                                                <Plus className="w-7 h-7" />
+                                            </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsCategoryModalOpen(true)}
-                                            className="w-16 h-16 bg-primary text-secondary-light rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 shrink-0"
-                                            title="Nueva Categoría"
-                                        >
-                                            <Plus className="w-8 h-8" />
-                                        </button>
                                     </div>
                                 </div>
 
-                                <StepperInput label="Precio de Venta (PVP)" prefix="L." value={form.price} onChange={v => setForm({ ...form, price: v })} step={5} />
-                                <StepperInput label="Costo Unitario" prefix="L." value={form.cost} onChange={v => setForm({ ...form, cost: v })} step={5} />
-                                <StepperInput label="Stock Inicial / Existencia" value={form.stock} onChange={v => setForm({ ...form, stock: v })} />
-
-                                <div className="space-y-2 md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Detalles Adicionales (Opcional)</label>
-                                    <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="3" placeholder="Especificaciones, notas o detalles del producto..." className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm resize-none font-sans text-sm italic" />
+                                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    <StepperInput label="PVP (L.)" value={form.price} onChange={v => setForm({ ...form, price: v })} step={50} />
+                                    <StepperInput label="Costo (L.)" value={form.cost} onChange={v => setForm({ ...form, cost: v })} step={50} />
+                                    <StepperInput label="Existencia" value={form.stock} onChange={v => setForm({ ...form, stock: v })} />
                                 </div>
 
-                                <button type="submit" className="md:col-span-2 btn-primary !py-5 mt-4 group">
-                                    {editingProduct ? 'Confirmar Modificaciones' : 'Incorporar al Inventario'}
+                                <div className="md:col-span-2 space-y-3">
+                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Notas del Producto</label>
+                                    <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="3" className="w-full bg-white border border-primary/10 rounded-[2rem] py-5 px-8 outline-none transition-all shadow-sm resize-none text-sm italic focus:border-primary" />
+                                </div>
+
+                                <button type="submit" className="md:col-span-2 btn-primary !py-6 mt-4 font-black uppercase tracking-[0.3em] text-xs">
+                                    {editingProduct ? 'ACTUALIZAR INVENTARIO' : 'DAR DE ALTA PRODUCTO'}
                                 </button>
                             </form>
                         </motion.div>

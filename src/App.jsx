@@ -5,6 +5,7 @@ import Catalog from './pages/Catalog';
 import Cart from './pages/Cart';
 import Contact from './pages/Contact';
 import Profile from './pages/Profile';
+import About from './pages/About';
 import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
 import OrderManagement from './pages/admin/OrderManagement';
@@ -12,6 +13,7 @@ import ProductManagement from './pages/admin/ProductManagement';
 import SalesHistory from './pages/admin/SalesHistory';
 import CustomerManagement from './pages/admin/CustomerManagement';
 import Promotions from './pages/admin/Promotions';
+import Featured from './pages/admin/Featured';
 import AdminLayout from './components/admin/AdminLayout';
 import { CartProvider } from './context/CartContext';
 import { ToastProvider } from './context/ToastContext';
@@ -54,7 +56,7 @@ function App() {
             <Route path="/reset-password" element={<Layout><Suspense fallback={null}><ResetPassword /></Suspense></Layout>} />
             <Route path="/contact" element={<Layout><Contact /></Layout>} />
             <Route path="/profile" element={<Layout><Profile /></Layout>} />
-            <Route path="/about" element={<Layout><div className="max-w-7xl mx-auto px-6 py-20 text-center"><h1 className="text-5xl font-serif italic mb-6 text-primary">Nuestra Curaduría</h1><p className="text-luxury-black/60 max-w-2xl mx-auto leading-relaxed text-lg">Luxessence no solo vende fragancias; curamos experiencias de distinción. Desde lociones exclusivas hasta accesorios Jibbitz y carteras de diseño, cada pieza es seleccionada para elevar su estilo cotidiano.</p></div></Layout>} />
+            <Route path="/about" element={<Layout><About /></Layout>} />
 
             {/* Admin Routes */}
             <Route path="/admin" element={<Login />} />
@@ -73,6 +75,7 @@ function App() {
               <Route path="sales" element={<SalesHistory />} />
               <Route path="customers" element={<CustomerManagement />} />
               <Route path="promotions" element={<Promotions />} />
+              <Route path="featured" element={<Featured />} />
             </Route>
           </Routes>
         </CartProvider>

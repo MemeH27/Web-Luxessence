@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, X, Search, Tag, Settings, Percent, CheckCircle2, Circle, Power } from 'lucide-react';
+import { Plus, Trash2, X, Search, Tag, Settings, Percent, CheckCircle2, Circle, Power, Calendar, Gift, ChevronRight, Package, TrendingUp, Sparkles, AlertCircle, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useToast } from '../../context/ToastContext';
+import Pagination from '../../components/admin/Pagination';
+import SecurityModal from '../../components/admin/SecurityModal';
 
 const Promotions = () => {
+    const { addToast } = useToast();
     const [promotions, setPromotions] = useState([]);
     const [products, setProducts] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -11,13 +15,21 @@ const Promotions = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 6;
+
+    // Security Modal
+    const [isSecurityOpen, setIsSecurityOpen] = useState(false);
+    const [securityAction, setSecurityAction] = useState(null);
+
     const [form, setForm] = useState({
         title: '',
         description: '',
         discount_badge: '',
         restrictions: '',
         product_ids: [],
-        new_prices: {}, // product_id -> price
+        new_prices: {},
         is_active: true,
         start_date: new Date().toISOString().split('T')[0],
         end_date: '',
@@ -79,35 +91,22 @@ const Promotions = () => {
 
     const handleSelectAll = () => {
         if (form.product_ids.length === products.length) {
-            // Deselect all
             setForm({ ...form, product_ids: [], new_prices: {} });
         } else {
-            // Select all
             const allIds = products.map(p => p.id);
             const allPrices = {};
-            products.forEach(p => {
-                allPrices[p.id] = p.price;
-            });
+            products.forEach(p => { allPrices[p.id] = p.price; });
             setForm({ ...form, product_ids: allIds, new_prices: allPrices });
         }
-    };
-
-    const handlePriceChange = (productId, price) => {
-        setForm({
-            ...form,
-            new_prices: { ...form.new_prices, [productId]: price }
-        });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-
         const formattedPrices = {};
         Object.entries(form.new_prices).forEach(([id, price]) => {
             formattedPrices[id] = Number(price);
         });
-
         const payload = { ...form, new_prices: formattedPrices };
 
         try {
@@ -115,104 +114,204 @@ const Promotions = () => {
                 ? await supabase.from('promotions').update(payload).eq('id', editingPromotion.id)
                 : await supabase.from('promotions').insert(payload);
 
-            if (error) {
-                alert(`Error al guardar promoción: ${error.message}`);
-            } else {
-                setIsModalOpen(false);
-                fetchData();
-            }
+            if (error) throw error;
+            addToast('Promoción guardada correctamente');
+            setIsModalOpen(false);
+            fetchData();
         } catch (err) {
-            alert('Error inesperado');
+            addToast('Error al guardar la promoción', 'error');
         } finally {
             setLoading(false);
         }
     };
 
     const toggleStatus = async (promo) => {
-        const { error } = await supabase
-            .from('promotions')
-            .update({ is_active: !promo.is_active })
-            .eq('id', promo.id);
-
-        if (!error) fetchData();
+        try {
+            const { error } = await supabase.from('promotions').update({ is_active: !promo.is_active }).eq('id', promo.id);
+            if (error) throw error;
+            addToast(`Promoción ${!promo.is_active ? 'activada' : 'desactivada'}`);
+            fetchData();
+        } catch (err) {
+            addToast('Error al cambiar estado', 'error');
+        }
     };
 
-    const handleDelete = async (id) => {
-        if (confirm('¿Desea eliminar esta promoción?')) {
-            const { error } = await supabase.from('promotions').delete().eq('id', id);
-            if (!error) fetchData();
+    const handleDeletePromo = (id) => {
+        setSecurityAction({ type: 'delete', id });
+        setIsSecurityOpen(true);
+    };
+
+    const executeDelete = async (id) => {
+        const { error } = await supabase.from('promotions').delete().eq('id', id);
+        if (!error) {
+            addToast('Campaña eliminada permanentemente');
+            fetchData();
         }
     };
 
     const filteredPromotions = promotions.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
+    const paginatedPromotions = filteredPromotions.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
     return (
-        <div className="space-y-12 pb-12">
+        <div className="space-y-12 pb-20">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-serif font-bold italic text-primary">Promociones</h1>
-                    <p className="text-primary/40 tracking-widest uppercase text-xs font-black">Ofertas y Eventos Especiales</p>
+                <div className="space-y-2">
+                    <h1 className="text-4xl md:text-6xl font-serif font-black italic text-primary">Marketing & Offers</h1>
+                    <p className="text-primary/40 font-medium italic">Configura campañas exclusivas y dinámicas de fidelización.</p>
                 </div>
-                <button onClick={() => handleOpenModal()} className="btn-primary flex items-center gap-2">
-                    <Plus className="w-5 h-5" /> Nueva Promoción
+                <button onClick={() => handleOpenModal()} className="btn-primary flex items-center gap-4 !rounded-[2rem] !px-10 !py-5 shadow-2xl shadow-primary/20">
+                    <Plus className="w-5 h-5" /> <span className="text-xs uppercase font-black tracking-widest italic">NUEVA CAMPAÑA</span>
                 </button>
             </header>
 
-            {/* List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {loading && promotions.length === 0 ? (
-                    <div className="col-span-full h-32 flex items-center justify-center text-primary/20 italic">Cargando promociones...</div>
-                ) : filteredPromotions.length === 0 ? (
-                    <div className="col-span-full py-20 text-center italic text-primary/20">No hay promociones activas</div>
-                ) : (
-                    filteredPromotions.map(promo => (
-                        <motion.div
-                            layout
-                            key={promo.id}
-                            className={`glass-card p-8 rounded-[2.5rem] border transition-all ${promo.is_active ? 'border-primary/20' : 'border-primary/5 opacity-60'}`}
-                        >
-                            <div className="flex justify-between items-start mb-6">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-3">
-                                        <Tag className="w-4 h-4 text-primary" />
-                                        <span className="text-[10px] uppercase font-black tracking-widest text-primary/40">Promo ID: {promo.id.slice(0, 8)}</span>
-                                    </div>
-                                    <h3 className="text-2xl font-serif font-bold italic text-primary">{promo.title}</h3>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => toggleStatus(promo)}
-                                        className={`p-3 rounded-2xl transition-all ${promo.is_active ? 'bg-primary text-secondary-light shadow-lg' : 'bg-primary/5 text-primary/30'}`}
-                                    >
-                                        <Power className="w-5 h-5" />
-                                    </button>
-                                    <button onClick={() => handleDelete(promo.id)} className="p-3 bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all">
-                                        <Trash2 className="w-5 h-5" />
-                                    </button>
-                                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Search & Stats Bar */}
+                    <div className="glass-panel p-6 rounded-[2.5rem] flex flex-col md:flex-row gap-6 items-center justify-between border-primary/10 bg-white/40">
+                        <div className="relative w-full md:w-96 group">
+                            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/20 w-5 h-5 group-focus-within:text-primary transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Buscar campaña por nombre..."
+                                className="w-full bg-primary/5 border border-primary/10 rounded-2xl py-4 pl-16 pr-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-inner"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex gap-4">
+                            <span className="text-[10px] uppercase tracking-widest font-black text-primary/40 bg-white/50 px-6 py-2 rounded-full border border-primary/5 flex items-center gap-2">
+                                <Activity className="w-3 h-3 text-green-500" /> {promotions.filter(p => p.is_active).length} Activas
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Promotions Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 content-start">
+                        {loading && promotions.length === 0 ? (
+                            [1, 2, 3, 4].map(i => <div key={i} className="h-64 glass-panel animate-pulse rounded-[3rem] bg-white/40" />)
+                        ) : paginatedPromotions.length === 0 ? (
+                            <div className="col-span-full py-32 text-center bg-white/40 rounded-[3rem] border border-dashed border-primary/10 flex flex-col items-center gap-6">
+                                <Sparkles className="w-16 h-16 text-primary/10" />
+                                <p className="italic text-primary/20 text-xl font-serif">Aún no has lanzado campañas de marketing</p>
                             </div>
-
-                            <div className="space-y-4">
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="px-3 py-1 bg-secondary-light text-primary text-[10px] font-black uppercase tracking-tighter rounded-full border border-primary/10">
-                                        {promo.discount_badge}
-                                    </span>
-                                    <span className="px-3 py-1 bg-primary/5 text-primary/40 text-[10px] font-black uppercase tracking-tighter rounded-full">
-                                        {promo.product_ids.length} Productos
-                                    </span>
-                                </div>
-                                <p className="text-xs text-primary/60 line-clamp-2">{promo.description}</p>
-
-                                <button
-                                    onClick={() => handleOpenModal(promo)}
-                                    className="w-full py-4 bg-white/50 border border-primary/5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-primary/40 hover:bg-primary hover:text-secondary-light transition-all"
+                        ) : (
+                            paginatedPromotions.map(promo => (
+                                <motion.div
+                                    layout
+                                    key={promo.id}
+                                    className={`group relative overflow-hidden bg-white rounded-[3rem] p-8 md:p-10 border transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 ${promo.is_active ? 'border-primary/10' : 'border-primary/5 grayscale opacity-60'}`}
                                 >
-                                    Editar Detalles
-                                </button>
+                                    <div className="flex justify-between items-start mb-8">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-2 h-2 rounded-full ${promo.is_active ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-primary/20'}`} />
+                                                <span className="text-[9px] uppercase font-black tracking-widest text-primary/30">{promo.is_active ? 'Vigente' : 'Pausada'}</span>
+                                            </div>
+                                            <h3 className="text-2xl font-serif font-bold italic text-primary leading-tight group-hover:text-luxury-black transition-colors">{promo.title}</h3>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => toggleStatus(promo)} className={`p-3 rounded-xl transition-all ${promo.is_active ? 'bg-primary text-secondary-light' : 'bg-primary/5 text-primary/40'}`}><Power className="w-4 h-4" /></button>
+                                            <button onClick={() => handleOpenModal(promo)} className="p-3 bg-primary/5 text-primary/40 hover:bg-primary hover:text-white rounded-xl transition-all"><Settings className="w-4 h-4" /></button>
+                                            <button onClick={() => handleDeletePromo(promo.id)} className="p-3 bg-red-500/5 text-red-500/40 hover:bg-red-500 hover:text-white rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className="px-4 py-1.5 bg-secondary text-primary text-[9px] font-black uppercase tracking-[0.2em] rounded-full shadow-sm">
+                                                {promo.discount_badge}
+                                            </span>
+                                            <span className="px-4 py-1.5 bg-primary/5 text-primary/60 text-[9px] font-black uppercase tracking-[0.2em] rounded-full border border-primary/5">
+                                                {promo.product_ids.length} Productos
+                                            </span>
+                                        </div>
+
+                                        <p className="text-xs text-primary/60 font-medium leading-relaxed italic line-clamp-2">"{promo.description}"</p>
+
+                                        <div className="pt-6 border-t border-primary/5 flex justify-between items-center">
+                                            <div className="flex items-center gap-2 text-primary/30">
+                                                <Calendar className="w-3.5 h-3.5" />
+                                                <span className="text-[9px] font-black uppercase tracking-widest">
+                                                    {promo.start_date} {promo.end_date ? `— ${promo.end_date}` : ''}
+                                                </span>
+                                            </div>
+                                            <ChevronRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0 text-primary/20" />
+                                        </div>
+                                    </div>
+
+                                    {/* Ambient Glow */}
+                                    {promo.is_active && <div className="absolute top-0 right-0 w-24 h-24 bg-secondary/5 rounded-bl-full pointer-events-none" />}
+                                </motion.div>
+                            ))
+                        )}
+                    </div>
+
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredPromotions.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                    />
+                </div>
+
+                {/* Sidebar Context */}
+                <div className="space-y-8">
+                    <div className="bg-primary p-12 rounded-[4rem] text-secondary-light space-y-10 shadow-3xl relative overflow-hidden">
+                        <div className="space-y-4 relative z-10">
+                            <h2 className="text-3xl font-serif font-bold italic">Promo Analytics</h2>
+                            <p className="text-secondary-light/40 text-xs font-medium uppercase tracking-[0.2em]">Impacto de Campaña</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-6 relative z-10">
+                            <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/10">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-3">Alcance de Audiencia</p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-3xl font-serif font-bold italic text-secondary">Global</p>
+                                    <Sparkles className="w-8 h-8 opacity-20" />
+                                </div>
                             </div>
-                        </motion.div>
-                    ))
-                )}
+
+                            <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/10">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-3">Ratio de Conversión</p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-3xl font-serif font-bold italic text-secondary">+12.4%</p>
+                                    <TrendingUp className="w-8 h-8 opacity-20" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-8 bg-secondary/10 rounded-[2.5rem] border border-secondary/20 relative z-10">
+                            <p className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4" /> Optimización Lux
+                            </p>
+                            <p className="text-xs italic leading-relaxed">
+                                Las campañas con distintivos visuales capturan un <span className="text-secondary font-bold">40% más de interés</span>.
+                                Asegúrate de rotar tus ofertas flash mensualmente.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white border border-secondary/20 p-8 rounded-[3rem] space-y-6 shadow-sm">
+                        <div className="flex items-center gap-4 text-primary">
+                            <Gift className="w-5 h-5" />
+                            <h4 className="font-serif font-bold italic">Próximas Ventanas</h4>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="p-4 bg-primary/5 rounded-2xl flex justify-between items-center group">
+                                <span className="text-[10px] font-black text-primary/40 uppercase group-hover:text-primary transition-colors">Navidad Lux:</span>
+                                <span className="text-[8px] bg-primary text-white px-2 py-0.5 rounded-full font-black">Dic 15</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Modal */}
@@ -224,122 +323,113 @@ const Promotions = () => {
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-secondary-light w-full max-w-4xl rounded-[3.5rem] p-10 md:p-14 relative z-10 shadow-3xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10"
+                            className="bg-secondary-light w-full max-w-5xl rounded-[4rem] p-10 md:p-14 relative z-10 shadow-3xl overflow-hidden max-h-[90vh] flex flex-col border border-primary/10"
                         >
-                            <div className="flex justify-between items-center mb-10">
+                            <div className="flex justify-between items-center mb-10 shrink-0">
                                 <div className="space-y-1">
-                                    <h2 className="text-3xl font-serif font-bold italic text-primary">{editingPromotion ? 'Editor de Promoción' : 'Nueva Campaña'}</h2>
-                                    <p className="text-[10px] text-primary/30 uppercase tracking-[0.2em] font-black">Estrategia y Descuentos</p>
+                                    <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-primary">{editingPromotion ? 'Relanzar Campaña' : 'Estrategia de Ventas'}</h2>
+                                    <p className="text-[10px] text-primary/30 uppercase tracking-[0.2em] font-black pb-2">Planificación y Ajuste de Catálogo</p>
                                 </div>
-                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-primary/5 rounded-full text-primary transition-colors"><X className="w-6 h-6" /></button>
+                                <button onClick={() => setIsModalOpen(false)} className="p-3 bg-primary/5 hover:bg-red-500 hover:text-white rounded-full text-primary transition-all"><X className="w-7 h-7" /></button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Título de la Promoción</label>
-                                        <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Ej: 10% de descuento..." className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-serif italic text-lg text-primary" />
+                            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto no-scrollbar grid grid-cols-1 lg:grid-cols-2 gap-12 pr-4">
+                                <div className="space-y-8">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Eslogan o Título</label>
+                                        <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-5 px-8 outline-none transition-all shadow-sm font-serif italic text-xl text-primary focus:border-primary" />
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Distintivo (Badge)</label>
-                                        <input required value={form.discount_badge} onChange={e => setForm({ ...form, discount_badge: e.target.value })} placeholder="Ej: 10% OFF / 2x1" className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-black text-primary" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Descripción</label>
-                                        <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="3" className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm resize-none text-sm" />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Restricciones</label>
-                                        <textarea value={form.restrictions} onChange={e => setForm({ ...form, restrictions: e.target.value })} rows="2" placeholder="Aplican restricciones..." className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm resize-none text-xs italic" />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Fecha Inicio</label>
-                                            <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-3 px-4 text-xs font-bold text-primary outline-none" />
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Incentivo (Badge)</label>
+                                            <input required value={form.discount_badge} onChange={e => setForm({ ...form, discount_badge: e.target.value })} placeholder="Ej: 20% OFF" className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 outline-none shadow-sm font-black text-primary text-sm focus:border-primary" />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Fecha Fin</label>
-                                            <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-3 px-4 text-xs font-bold text-primary outline-none" />
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Lógica</label>
+                                            <select value={form.promo_type} onChange={e => setForm({ ...form, promo_type: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 font-bold text-primary text-xs outline-none focus:ring-1 focus:ring-primary">
+                                                <option value="discount">Precio Especial</option>
+                                                <option value="bogo">2x1 / Regalo</option>
+                                            </select>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Tipo de Promoción</label>
-                                        <div className="flex gap-4">
-                                            {['discount', 'bogo'].map(type => (
-                                                <button
-                                                    key={type}
-                                                    type="button"
-                                                    onClick={() => setForm({ ...form, promo_type: type })}
-                                                    className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${form.promo_type === type ? 'bg-primary text-secondary-light border-primary shadow-lg' : 'bg-white text-primary/40 border-primary/10'}`}
-                                                >
-                                                    {type === 'discount' ? 'Descuento / Precio' : '2x1 / Gratis (BOGO)'}
-                                                </button>
-                                            ))}
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Restricciones o Letra Pequeña</label>
+                                        <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="3" className="w-full bg-white border border-primary/10 rounded-3xl py-5 px-8 outline-none transition-all shadow-sm resize-none text-xs font-medium italic focus:border-primary" />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Apertura</label>
+                                            <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 text-[10px] font-black text-primary outline-none" />
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Clausura</label>
+                                            <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 text-[10px] font-black text-primary outline-none" />
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-end px-1">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black">Seleccionar Productos y Precios</label>
-                                        <button
-                                            type="button"
-                                            onClick={handleSelectAll}
-                                            className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
-                                        >
-                                            {form.product_ids.length === products.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+                                <div className="space-y-8 h-[500px] flex flex-col">
+                                    <div className="flex justify-between items-center px-1">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black">Universo Participante</label>
+                                        <button type="button" onClick={handleSelectAll} className="text-[9px] font-black uppercase tracking-widest text-primary/40 hover:text-primary underline decoration-primary/20">
+                                            {form.product_ids.length === products.length ? 'Desmarcar Todo' : 'Añadir Todo el Catálogo'}
                                         </button>
                                     </div>
-                                    <div className="bg-white/50 border border-primary/5 rounded-[2.5rem] p-6 max-h-[400px] overflow-y-auto no-scrollbar space-y-4 shadow-inner">
-                                        {products.map(prod => (
-                                            <div key={prod.id} className="space-y-3 p-4 bg-white rounded-3xl border border-primary/5 shadow-sm">
-                                                <div className="flex items-center justify-between">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleProductSelection(prod.id)}
-                                                        className="flex items-center gap-3 text-left group"
-                                                    >
-                                                        {form.product_ids.includes(prod.id) ? <CheckCircle2 className="text-primary w-5 h-5" /> : <Circle className="text-primary/20 w-5 h-5 group-hover:text-primary transition-colors" />}
-                                                        <span className={`text-sm font-bold ${form.product_ids.includes(prod.id) ? 'text-primary' : 'text-primary/40'}`}>{prod.name}</span>
-                                                    </button>
-                                                    <span className="text-[10px] text-primary/20 font-black">L. {prod.price}</span>
-                                                </div>
 
-                                                {form.product_ids.includes(prod.id) && (
-                                                    <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 pt-2 border-t border-primary/5">
-                                                        <span className="text-[8px] uppercase font-black text-primary/40">
-                                                            {form.promo_type === 'bogo' ? 'Regla BOGO:' : 'Precio Promo:'}
-                                                        </span>
-                                                        <div className="flex-1 relative">
-                                                            {form.promo_type === 'discount' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-primary/20">L.</span>}
+                                    <div className="flex-1 bg-primary/5 rounded-[3rem] p-8 overflow-y-auto no-scrollbar space-y-4 border border-primary/5 shadow-inner">
+                                        {products.map(prod => (
+                                            <div key={prod.id} className={`p-4 rounded-2xl transition-all border ${form.product_ids.includes(prod.id) ? 'bg-white border-primary/10 shadow-md' : 'bg-transparent border-transparent opacity-50'}`}>
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <button type="button" onClick={() => toggleProductSelection(prod.id)} className="flex items-center gap-4 text-left flex-1">
+                                                        <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${form.product_ids.includes(prod.id) ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}>
+                                                            {form.product_ids.includes(prod.id) && <CheckCircle2 className="text-white w-3 h-3" />}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-black text-primary truncate leading-none mb-1">{prod.name}</p>
+                                                            <p className="text-[8px] font-bold text-primary/30 uppercase tracking-widest italic">Normal: L. {prod.price}</p>
+                                                        </div>
+                                                    </button>
+
+                                                    {form.product_ids.includes(prod.id) && form.promo_type === 'discount' && (
+                                                        <div className="w-28 relative">
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-primary/20">L.</span>
                                                             <input
-                                                                type={form.promo_type === 'discount' ? 'number' : 'text'}
-                                                                value={form.promo_type === 'discount' ? form.new_prices[prod.id] : 'Compra 1 Lleva 1 Gratis'}
-                                                                readOnly={form.promo_type === 'bogo'}
-                                                                onChange={(e) => form.promo_type === 'discount' && handlePriceChange(prod.id, e.target.value)}
-                                                                className={`w-full bg-primary/5 border-none rounded-xl py-2 ${form.promo_type === 'discount' ? 'pl-7' : 'px-3'} pr-3 text-sm font-bold text-primary focus:ring-1 focus:ring-primary outline-none`}
+                                                                type="number"
+                                                                value={form.new_prices[prod.id]}
+                                                                onChange={(e) => setForm({ ...form, new_prices: { ...form.new_prices, [prod.id]: e.target.value } })}
+                                                                className="w-full bg-primary/[0.03] border-none rounded-xl py-2 pl-7 pr-3 text-[10px] font-black text-primary outline-none focus:ring-1 focus:ring-primary"
                                                             />
                                                         </div>
-                                                    </motion.div>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                <button type="submit" disabled={loading} className="md:col-span-2 btn-primary !py-5 mt-4">
-                                    {loading ? 'Procesando...' : editingPromotion ? 'Actualizar Promoción' : 'Activar Nueva Campaña'}
-                                </button>
+                                <div className="lg:col-span-2 pt-6 shrink-0">
+                                    <button type="submit" disabled={loading} className="w-full btn-primary !py-6 shadow-3xl !rounded-[2.5rem] font-black uppercase tracking-[0.4em] text-xs active:scale-95 transition-all flex items-center justify-center gap-4">
+                                        {loading ? 'DESPLEGANDO...' : (editingPromotion ? 'ACTUALIZAR OFERTA' : 'LANZAR CAMPAÑA OFICIAL')}
+                                    </button>
+                                </div>
                             </form>
                         </motion.div>
                     </div>
                 )}
             </AnimatePresence>
+
+            <SecurityModal
+                isOpen={isSecurityOpen}
+                onClose={() => setIsSecurityOpen(false)}
+                onConfirm={() => {
+                    if (securityAction?.type === 'delete') executeDelete(securityAction.id);
+                    setIsSecurityOpen(false);
+                }}
+                title="Eliminar Campaña"
+            />
         </div>
     );
 };

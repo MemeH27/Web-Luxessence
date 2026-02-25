@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Grid, ShoppingBag, Send } from 'lucide-react';
+import { Home, Grid, Users, Send } from 'lucide-react';
 
 const BottomNav = () => {
     const navigate = useNavigate();
@@ -9,7 +9,7 @@ const BottomNav = () => {
     const tabs = [
         { id: 'home', path: '/', icon: Home, label: 'Inicio' },
         { id: 'catalog', path: '/catalog', icon: Grid, label: 'Catálogo' },
-        { id: 'cart', path: '/cart', icon: ShoppingBag, label: 'Carrito' },
+        { id: 'about', path: '/about', icon: Users, label: 'Nosotros' },
         { id: 'contact', path: '/contact', icon: Send, label: 'Contacto' },
     ];
 

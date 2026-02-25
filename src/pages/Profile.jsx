@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 
 const Profile = () => {
     const { addToast } = useToast();
@@ -10,6 +11,7 @@ const Profile = () => {
     const [saving, setSaving] = useState(false);
     const [user, setUser] = useState(null);
     const [orders, setOrders] = useState([]);
+    const [expandedOrder, setExpandedOrder] = useState(null);
     const [formData, setFormData] = useState({
         first_name: '',
         last_name: '',
@@ -21,7 +23,39 @@ const Profile = () => {
 
     useEffect(() => {
         fetchProfile();
+
+        // Real-time listener for orders
+        const setupOrdersListener = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const channel = supabase
+                .channel(`profile_orders_${session.user.id}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `client_email=eq.${session.user.email}`
+                }, () => {
+                    fetchOrdersOnly(session.user.email);
+                })
+                .subscribe();
+
+            return () => supabase.removeChannel(channel);
+        };
+
+        setupOrdersListener();
     }, []);
+
+    const fetchOrdersOnly = async (email) => {
+        const { data: ordersData } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('client_email', email)
+            .order('created_at', { ascending: false })
+            .limit(5);
+        setOrders(ordersData || []);
+    };
 
     const fetchProfile = async () => {
         setLoading(true);
@@ -37,15 +71,7 @@ const Profile = () => {
                 department: session.user.user_metadata?.department || ''
             });
 
-            // Fetch recent orders
-            const { data: ordersData } = await supabase
-                .from('orders')
-                .select('*')
-                .eq('client_email', session.user.email)
-                .order('created_at', { ascending: false })
-                .limit(5);
-
-            setOrders(ordersData || []);
+            fetchOrdersOnly(session.user.email);
         }
         setLoading(false);
     };
@@ -220,21 +246,55 @@ const Profile = () => {
                         <div className="space-y-4">
                             {orders.length > 0 ? (
                                 orders.map(order => (
-                                    <div key={order.id} className="p-4 bg-white/50 border border-primary/5 rounded-2xl flex justify-between items-center group hover:bg-white transition-all">
-                                        <div className="space-y-1">
-                                            <p className="text-xs font-black text-primary">#{order.id.slice(0, 8)}</p>
-                                            <p className="text-[10px] text-primary/40 uppercase tracking-widest">{new Date(order.created_at).toLocaleDateString()}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-bold text-primary font-sans">L. {order.total}</p>
-                                            <span className={`text-[8px] uppercase font-black px-2 py-0.5 rounded-full ${order.status === 'processed' ? 'bg-green-100 text-green-700' : 'bg-primary/10 text-primary'
-                                                }`}>
-                                                {order.status === 'pending' ? 'Pedido en proceso' :
-                                                    order.status === 'processing' ? 'Preparando envío' :
-                                                        order.status === 'shipped' ? 'En camino' :
-                                                            order.status === 'processed' ? 'Pedido Exitoso' : 'Entregado'}
-                                            </span>
-                                        </div>
+                                    <div key={order.id} className="flex flex-col">
+                                        <button
+                                            onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                                            className="p-5 bg-white/50 border border-primary/5 rounded-2xl flex justify-between items-center group hover:bg-white transition-all text-left"
+                                        >
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-black text-primary flex items-center gap-2">
+                                                    #{order.id.slice(0, 8)}
+                                                    {expandedOrder === order.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3 text-primary/30" />}
+                                                </p>
+                                                <p className="text-[10px] text-primary/40 uppercase tracking-widest">{new Date(order.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-primary font-sans">L. {Number(order.total).toLocaleString()}</p>
+                                                <span className={`text-[8px] uppercase font-black px-2 py-0.5 rounded-full ${order.status === 'processed' ? 'bg-green-100 text-green-700' : 'bg-primary/10 text-primary'
+                                                    }`}>
+                                                    {order.status === 'pending' ? 'Recibido' :
+                                                        order.status === 'processing' ? 'Preparando' :
+                                                            order.status === 'shipped' ? 'En camino' :
+                                                                order.status === 'processed' ? 'Venta Exitosa' : 'Entregado'}
+                                                </span>
+                                            </div>
+                                        </button>
+
+                                        <AnimatePresence>
+                                            {expandedOrder === order.id && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="overflow-hidden bg-primary/[0.02] mx-2 rounded-b-2xl border-x border-b border-primary/5"
+                                                >
+                                                    <div className="p-4 space-y-3 font-sans">
+                                                        {order.items?.map((item, idx) => (
+                                                            <div key={idx} className="flex justify-between items-center text-[10px]">
+                                                                <div className="flex gap-2 items-center">
+                                                                    <span className="font-black text-primary/30">x{item.quantity}</span>
+                                                                    <span className="font-medium text-primary/60 italic truncate max-w-[120px]">{item.name}</span>
+                                                                </div>
+                                                                <span className="font-bold text-primary">L. {(item.price * item.quantity).toLocaleString()}</span>
+                                                            </div>
+                                                        ))}
+                                                        <div className="pt-2 border-t border-primary/5 mt-2">
+                                                            <p className="text-[9px] text-primary/30 uppercase font-black italic">Modo: {order.delivery_mode === 'domicilio' ? 'A Domicilio' : 'Pick-up'}</p>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
                                 ))
                             ) : (
