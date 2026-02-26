@@ -53,6 +53,8 @@ const Cart = () => {
         }
 
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+
             // 1. Create/Get Customer
             const { data: customer, error: custError } = await supabase
                 .from('customers')
@@ -60,14 +62,14 @@ const Cart = () => {
                     first_name: formData.first_name,
                     last_name: formData.last_name,
                     phone: formData.phone,
-                    address: formData.address
+                    address: formData.address,
+                    email: session?.user?.email || null
                 }, { onConflict: 'phone' })
                 .select().single();
 
             if (custError) throw custError;
 
             // 2. Create Order
-            const { data: { session } } = await supabase.auth.getSession();
             const { data: order, error: ordError } = await supabase
                 .from('orders')
                 .insert({

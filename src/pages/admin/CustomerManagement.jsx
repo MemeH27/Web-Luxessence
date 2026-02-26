@@ -14,7 +14,7 @@ const CustomerManagement = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
-    const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', address: '' });
+    const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', address: '', loyalty_stamps: 0 });
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -42,18 +42,27 @@ const CustomerManagement = () => {
             setForm({ ...cust });
         } else {
             setEditingCustomer(null);
-            setForm({ first_name: '', last_name: '', email: '', phone: '', address: '' });
+            setForm({ first_name: '', last_name: '', email: '', phone: '+504 ', address: '', loyalty_stamps: 0 });
         }
         setIsModalOpen(true);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        const rawPhone = form.phone ? form.phone.replace('+504', '').replace(/\D/g, '') : '';
+        if (rawPhone.length > 0 && rawPhone.length !== 8) {
+            addToast('El número de teléfono debe tener exactamente 8 dígitos (sin contar +504)', 'error');
+            return;
+        }
+
+        const formattedForm = { ...form, phone: rawPhone.length === 8 ? `+504 ${rawPhone}` : '' };
+
         if (editingCustomer) {
-            await supabase.from('customers').update(form).eq('id', editingCustomer.id);
+            await supabase.from('customers').update(formattedForm).eq('id', editingCustomer.id);
             addToast('Cliente actualizado');
         } else {
-            await supabase.from('customers').insert(form);
+            await supabase.from('customers').insert(formattedForm);
             addToast('Cliente registrado');
         }
         setIsModalOpen(false);
@@ -146,7 +155,7 @@ const CustomerManagement = () => {
                     </div>
 
                     {/* Customer Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 min-h-[500px] content-start">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 min-h-[500px] content-start">
                         {loading ? (
                             [1, 2, 3, 4].map(i => <div key={i} className="h-64 glass-panel animate-pulse rounded-[3rem] bg-white/40 border-primary/5" />)
                         ) : paginatedCustomers.length === 0 ? (
@@ -159,50 +168,68 @@ const CustomerManagement = () => {
                                 <motion.div
                                     layout
                                     key={cust.id}
-                                    className="p-8 md:p-10 bg-white hover:bg-primary/[0.02] rounded-[3rem] border border-primary/5 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all group relative overflow-hidden flex flex-col justify-between"
+                                    className="p-5 bg-white hover:bg-primary/[0.02] rounded-[2rem] border border-primary/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col"
                                 >
-                                    <div className="space-y-6 relative z-10">
-                                        <div className="flex justify-between items-start">
-                                            <div className="space-y-1">
-                                                <h3 className="text-2xl font-serif font-bold italic text-primary leading-tight group-hover:text-luxury-black transition-colors">{cust.first_name} {cust.last_name}</h3>
-                                                <p className="text-[10px] uppercase tracking-widest text-primary/30 font-black flex items-center gap-2">
-                                                    <UserCheck className="w-3 h-3" /> Registrado en {new Date(cust.created_at).getFullYear()}
-                                                </p>
+                                    <div className="space-y-6 relative z-10 w-full">
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div className="space-y-4 flex-1">
+                                                <h3 className="text-xl font-serif font-bold italic text-primary leading-tight truncate">{cust.first_name} {cust.last_name}</h3>
+
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[8px] uppercase tracking-widest text-primary/30 font-black">Registrado:</span>
+                                                    <p className="text-[10px] font-bold text-primary/40 uppercase tracking-tighter">
+                                                        {new Date(cust.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '')}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => handleOpenModal(cust)} className="p-3 bg-primary/5 hover:bg-primary text-primary/40 hover:text-white rounded-xl transition-all shadow-sm active:scale-95"><Edit3 className="w-4 h-4" /></button>
-                                                <button onClick={() => handleDelete(cust.id)} className="p-3 bg-red-500/5 hover:bg-red-500 text-red-500/40 hover:text-white rounded-xl transition-all shadow-sm active:scale-95"><Trash2 className="w-4 h-4" /></button>
+                                            <div className="flex gap-1 shrink-0">
+                                                <button onClick={() => handleOpenModal(cust)} className="p-2 bg-primary/5 hover:bg-primary text-primary/40 hover:text-white rounded-xl transition-all"><Edit3 className="w-3.5 h-3.5" /></button>
+                                                <button onClick={() => handleDelete(cust.id)} className="p-2 bg-red-500/5 hover:bg-red-500 text-red-500/40 hover:text-white rounded-xl transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-4 text-sm text-luxury-black/60 font-medium">
-                                                <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
-                                                    <Phone className="w-4 h-4 text-primary/40" />
+                                        <div className="flex items-center justify-between bg-primary p-3 rounded-2xl border border-primary/10 shadow-lg shadow-primary/10">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-2 bg-white/10 rounded-lg">
+                                                    <Star className="w-3.5 h-3.5 text-secondary" />
                                                 </div>
-                                                <span className="font-black text-primary/80">{cust.phone}</span>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-white/50">Sellos</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="flex gap-1">
+                                                    {[1, 2, 3, 4, 5].map((s) => (
+                                                        <div
+                                                            key={s}
+                                                            className={`w-2 h-2 rounded-full transition-all duration-500 ${cust.loyalty_stamps >= s ? 'bg-secondary scale-110 shadow-[0_0_8px_rgba(229,193,88,0.6)]' : 'bg-white/10'}`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <span className="text-xs font-black text-secondary ml-1">{cust.loyalty_stamps || 0}/5</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2 pt-1">
+                                            <div className="flex items-center gap-3 text-xs font-medium">
+                                                <Phone className="w-3.5 h-3.5 text-primary/20" />
+                                                <span className="font-bold text-primary/70">{cust.phone}</span>
                                             </div>
                                             {cust.email && (
-                                                <div className="flex items-center gap-4 text-sm text-luxury-black/60">
-                                                    <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
-                                                        <Mail className="w-4 h-4 text-primary/40" />
-                                                    </div>
+                                                <div className="flex items-center gap-3 text-[11px] text-luxury-black/40">
+                                                    <Mail className="w-3.5 h-3.5 text-primary/20" />
                                                     <span className="truncate italic">{cust.email}</span>
                                                 </div>
                                             )}
                                             {cust.address && (
-                                                <div className="flex items-start gap-4 text-sm text-luxury-black/60 border-t border-primary/5 pt-4 mt-4">
-                                                    <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
-                                                        <MapPin className="w-4 h-4 text-primary/40" />
-                                                    </div>
-                                                    <p className="italic leading-relaxed text-xs text-balance line-clamp-2">{cust.address}</p>
+                                                <div className="flex items-start gap-3 text-[10px] text-luxury-black/40 border-t border-primary/5 pt-2">
+                                                    <MapPin className="w-3.5 h-3.5 text-primary/20 mt-0.5" />
+                                                    <p className="italic leading-relaxed line-clamp-1">{cust.address}</p>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
 
                                     {/* Ambient Decoration */}
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[100px] -z-0 pointer-events-none group-hover:bg-primary/10 transition-colors" />
+                                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/5 rounded-full -z-0 pointer-events-none" />
                                 </motion.div>
                             ))
                         )}
@@ -282,40 +309,63 @@ const CustomerManagement = () => {
                 {isModalOpen && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-2xl rounded-[4rem] p-10 md:p-14 relative z-10 shadow-3xl border border-primary/10">
-                            <div className="flex justify-between items-center mb-10">
-                                <div className="space-y-2">
-                                    <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-primary">{editingCustomer ? 'Perfil del Cliente' : 'Nuevo Registro'}</h2>
-                                    <p className="text-[10px] text-primary/30 uppercase tracking-[0.2em] font-black italic">Información Privada de Cartera</p>
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-2xl rounded-[3rem] md:rounded-[4rem] p-6 md:p-14 relative z-10 shadow-3xl border border-primary/10 max-h-[90vh] overflow-y-auto no-scrollbar">
+                            <div className="flex justify-between items-start md:items-center mb-8 md:mb-10">
+                                <div className="space-y-1 md:space-y-2 pt-2 md:pt-0">
+                                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-bold italic text-primary">{editingCustomer ? 'Perfil del Cliente' : 'Nuevo Registro'}</h2>
+                                    <p className="text-[9px] md:text-[10px] text-primary/30 uppercase tracking-[0.2em] font-black italic">Información Privada de Cartera</p>
                                 </div>
-                                <button onClick={() => setIsModalOpen(false)} className="p-3 hover:bg-primary/5 rounded-full text-primary transition-all active:rotate-90"><X className="w-7 h-7" /></button>
+                                <button onClick={() => setIsModalOpen(false)} className="p-2 md:p-3 hover:bg-primary/5 rounded-full text-primary transition-all active:rotate-90 shrink-0"><X className="w-5 h-5 md:w-7 md:h-7" /></button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Nombre</label>
-                                    <input required value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-5 px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm group-focus:border-primary" />
+                                    <label className="text-[9px] md:text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Nombre</label>
+                                    <input required value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-3 px-6 md:py-5 md:px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm group-focus:border-primary" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Apellido</label>
-                                    <input required value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-5 px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm" />
+                                    <label className="text-[9px] md:text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Apellido</label>
+                                    <input value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-3 px-6 md:py-5 md:px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm" />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Teléfono</label>
-                                    <input required type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-5 px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm" />
+                                <div className="space-y-2 col-span-1 md:col-span-2">
+                                    <label className="text-[9px] md:text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Teléfono</label>
+                                    <div className="flex bg-white border border-primary/10 rounded-2xl shadow-sm focus-within:ring-1 focus-within:ring-primary transition-all overflow-hidden items-stretch">
+                                        <div className="bg-primary/5 px-4 md:px-6 flex items-center justify-center border-r border-primary/10 shrink-0">
+                                            <span className="text-primary font-bold text-sm md:text-base">+504</span>
+                                        </div>
+                                        <input
+                                            type="tel"
+                                            placeholder="0000 0000"
+                                            value={form.phone ? form.phone.replace('+504', '').trim() : ''}
+                                            onChange={e => {
+                                                const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                                setForm({ ...form, phone: `+504 ${digitsOnly}` });
+                                            }}
+                                            className="w-full bg-transparent py-3 px-4 md:py-5 md:px-6 outline-none text-sm md:text-base font-medium"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Email (Opcional)</label>
-                                    <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-5 px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm" />
+                                <div className="space-y-2 col-span-1 md:col-span-1">
+                                    <label className="text-[9px] md:text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Email (Opcional)</label>
+                                    <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-3 px-6 md:py-5 md:px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm" />
+                                </div>
+                                <div className="space-y-2 col-span-1 md:col-span-1">
+                                    <label className="text-[9px] md:text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Sellos de Fidelidad</label>
+                                    <div className="relative">
+                                        <Star className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-secondary" />
+                                        <input type="number" min="0" max="5" value={form.loyalty_stamps || 0} onChange={e => setForm({ ...form, loyalty_stamps: parseInt(e.target.value) || 0 })} className="w-full bg-white border border-primary/10 rounded-2xl py-3 px-6 pl-12 md:py-5 md:pl-14 md:px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-bold text-primary" />
+                                    </div>
                                 </div>
                                 <div className="space-y-2 md:col-span-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Dirección de Entrega Presidencial</label>
-                                    <textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} rows="3" className="w-full bg-white border border-primary/10 rounded-[2rem] py-5 px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm resize-none italic" />
+                                    <label className="text-[9px] md:text-[10px] uppercase tracking-widest text-primary/40 font-black ml-2">Dirección de Entrega Presidencial</label>
+                                    <textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} rows="3" className="w-full bg-white border border-primary/10 rounded-[2rem] py-4 px-6 md:py-5 md:px-8 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm resize-none italic text-sm md:text-base" />
                                 </div>
 
-                                <button type="submit" className="md:col-span-2 btn-primary !py-6 mt-4 shadow-3xl text-sm italic tracking-widest font-black uppercase">
-                                    {editingCustomer ? 'ACTUALIZAR PERFIL EXCLUSIVO' : 'DAR DE ALTA EN LUXESSENCE'}
-                                </button>
+                                <div className="md:col-span-2 pt-2 md:pt-4">
+                                    <button type="submit" className="w-full btn-primary !py-4 md:!py-6 shadow-3xl text-xs md:text-sm italic tracking-widest font-black uppercase">
+                                        {editingCustomer ? 'ACTUALIZAR PERFIL EXCLUSIVO' : 'DAR DE ALTA EN LUXESSENCE'}
+                                    </button>
+                                </div>
                             </form>
                         </motion.div>
                     </div>

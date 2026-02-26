@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { shareInvoicePNG, downloadInvoicePNG } from '../../utils/billing';
 import { exportToExcel } from '../../utils/export';
-import { CheckCircle2, X, Download, Share2, Filter, Search, Calendar, Landmark, ChevronUp, ChevronDown, Printer, Receipt, Phone, Edit3, Trash2, ListChecks, TrendingUp, ShoppingBag } from 'lucide-react';
+import { CheckCircle2, X, Download, Share2, Filter, Search, Calendar, Landmark, ChevronUp, ChevronDown, Printer, Receipt, Phone, Edit3, Trash2, ListChecks, TrendingUp, ShoppingBag, Package, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReactToPrint } from 'react-to-print';
 import SecurityModal from '../../components/admin/SecurityModal';
@@ -17,6 +17,7 @@ const OrderManagement = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [discount, setDiscount] = useState(0);
+    const [useLoyaltyDiscount, setUseLoyaltyDiscount] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('Contado');
     const [filterStatus, setFilterStatus] = useState('pending');
     const [processing, setProcessing] = useState(false);
@@ -80,7 +81,8 @@ const OrderManagement = () => {
                 for (const item of orderToDelete.items) {
                     const { data: prod } = await supabase.from('products').select('stock').eq('id', item.id || item.product_id).single();
                     if (prod) {
-                        await supabase.from('products').update({ stock: prod.stock + item.quantity }).eq('id', item.id || item.product_id);
+                        const revertQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
+                        await supabase.from('products').update({ stock: prod.stock + revertQty }).eq('id', item.id || item.product_id);
                     }
                 }
                 // Delete linked payments first (FK constraint)
@@ -111,12 +113,13 @@ const OrderManagement = () => {
 
     const handleOpenBilling = (order) => {
         setSelectedOrder(order);
+        setDiscount(0);
+        setUseLoyaltyDiscount(false);
         setIsModalOpen(true);
     };
 
     const handleProcessSale = () => {
-        setSecurityAction({ type: 'process' });
-        setIsSecurityOpen(true);
+        executeProcessSale();
     };
 
     const handleExport = () => {
@@ -133,14 +136,16 @@ const OrderManagement = () => {
     const executeProcessSale = async () => {
         setProcessing(true);
         try {
-            const finalTotal = selectedOrder.total - Number(discount);
+            const calculatedDiscount = useLoyaltyDiscount ? selectedOrder.total * 0.10 : Number(discount);
+            const finalTotal = Math.max(0, selectedOrder.total - calculatedDiscount);
+
             const { data: sale, error: saleError } = await supabase
                 .from('sales')
                 .insert({
                     order_id: selectedOrder.id,
                     customer_id: selectedOrder.customer_id,
                     total: finalTotal,
-                    discount: Number(discount),
+                    discount: calculatedDiscount,
                     payment_method: paymentMethod,
                     is_paid: paymentMethod === 'Contado'
                 })
@@ -152,12 +157,24 @@ const OrderManagement = () => {
             for (const item of selectedOrder.items) {
                 const { data: prod } = await supabase.from('products').select('stock').eq('id', item.id || item.product_id).single();
                 if (prod) {
-                    const newStock = Math.max(0, prod.stock - item.quantity);
+                    const deductQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
+                    const newStock = Math.max(0, prod.stock - deductQty);
                     await supabase.from('products').update({ stock: newStock }).eq('id', item.id || item.product_id);
                 }
             }
 
             await supabase.from('orders').update({ status: 'processed' }).eq('id', selectedOrder.id);
+
+            // Loyalty Stamps Logic
+            if (selectedOrder.customer_id) {
+                let newStamps = selectedOrder.customers?.loyalty_stamps || 0;
+                if (useLoyaltyDiscount) {
+                    newStamps = 0; // Reset after using
+                } else {
+                    newStamps = Math.min(newStamps + 1, 5); // Add 1 stamp, max 5
+                }
+                await supabase.from('customers').update({ loyalty_stamps: newStamps }).eq('id', selectedOrder.customer_id);
+            }
 
             const totalCost = selectedOrder.items.reduce((acc, item) => acc + ((item.cost || 0) * item.quantity), 0);
             const totalProfit = finalTotal - totalCost;
@@ -267,66 +284,67 @@ const OrderManagement = () => {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     key={order.id}
-                                    className="p-5 md:p-10 bg-white hover:bg-primary/[0.02] rounded-2xl md:rounded-[3rem] border border-primary/5 shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all flex flex-col md:flex-row items-center gap-5 md:gap-10 group"
+                                    className="p-6 md:p-8 bg-white hover:bg-primary/[0.015] rounded-3xl md:rounded-[3rem] border border-primary/5 shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all flex flex-col xl:flex-row gap-6 md:gap-10 group relative"
                                 >
-                                    <div className="flex-1 flex flex-col md:flex-row gap-5 md:gap-10 w-full">
-                                        <div className="md:w-64 shrink-0 border-b md:border-b-0 md:border-r border-primary/5 pb-4 md:pb-0 md:pr-10">
-                                            <div className="space-y-1">
-                                                <h3 className="text-2xl font-serif font-bold italic text-primary leading-tight">
-                                                    {order.customers?.first_name} {order.customers?.last_name}
-                                                </h3>
-                                                <p className="text-[10px] text-primary/40 font-black uppercase tracking-widest">{new Date(order.created_at).toLocaleDateString()}</p>
-                                            </div>
-                                            <div className="mt-3 md:mt-6 flex items-end gap-2">
-                                                <span className="text-3xl font-sans font-black text-primary">L. {Number(order.total).toLocaleString()}</span>
-                                                <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border mb-1.5 ${order.status === 'pending'
-                                                    ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                                    : 'bg-green-500/10 text-green-600 border-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.1)]'
-                                                    }`}>
-                                                    {order.status === 'pending' ? 'Por Procesar' : 'Facturado'}
-                                                </div>
-                                            </div>
+                                    <div className="w-full xl:w-64 shrink-0 border-b xl:border-b-0 xl:border-r border-primary/5 pb-6 xl:pb-0 pr-0 xl:pr-8 flex flex-col justify-between">
+                                        <div className="space-y-1">
+                                            <h3 className="text-2xl font-serif font-bold italic text-primary leading-tight">
+                                                {order.customers?.first_name} {order.customers?.last_name}
+                                            </h3>
+                                            <p className="text-xs text-primary/40 font-bold uppercase tracking-widest">{new Date(order.created_at).toLocaleDateString()}</p>
                                         </div>
-
-                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 w-full">
-                                            <div className="space-y-4">
-                                                <p className="text-[9px] uppercase tracking-[0.3em] text-primary/30 font-black">Detalle del Pedido</p>
-                                                <div className="space-y-2 max-h-24 overflow-y-auto no-scrollbar scroll-smooth p-1">
-                                                    {order.items.map((item, i) => (
-                                                        <div key={i} className="flex items-center gap-3 text-sm">
-                                                            <span className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center font-black text-primary text-[10px]">x{item.quantity}</span>
-                                                            <span className="text-primary/60 font-medium italic truncate">{item.name}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                        <div className="mt-6 flex flex-wrap items-center gap-3">
+                                            <div className="flex items-baseline gap-1 mr-2">
+                                                <span className="text-2xl font-bold text-primary/80">L.</span>
+                                                <span className="text-4xl font-sans font-black text-primary tracking-tighter">{Number(order.total).toLocaleString()}</span>
                                             </div>
-                                            <div className="space-y-4 md:border-l border-primary/5 md:pl-8">
-                                                <p className="text-[9px] uppercase tracking-[0.3em] text-primary/30 font-black">Entrega y Contacto</p>
-                                                <div className="space-y-2">
-                                                    <p className="text-sm font-medium text-primary/80 italic flex items-start gap-2">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-primary/20 shrink-0 mt-2" />
-                                                        {order.customers?.address || 'Honduras'}
-                                                    </p>
-                                                    <p className="text-sm font-black text-primary flex items-center gap-2">
-                                                        <Phone className="w-3.5 h-3.5 opacity-30" /> {order.customers?.phone}
-                                                    </p>
-                                                </div>
+                                            <div className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border ${order.status === 'pending'
+                                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                                : 'bg-green-500/10 text-green-600 border-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.1)]'
+                                                }`}>
+                                                {order.status === 'pending' ? 'Por Procesar' : 'Facturado'}
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-row md:flex-col gap-3 shrink-0 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-primary/5">
+                                    <div className="flex-1 flex flex-col md:flex-row gap-8 w-full min-w-0">
+                                        <div className="flex-1 min-w-0 space-y-4">
+                                            <p className="text-[10px] uppercase tracking-[0.25em] text-primary/40 font-black">Detalle del Pedido</p>
+                                            <div className="space-y-3 max-h-36 overflow-y-auto no-scrollbar scroll-smooth pr-2">
+                                                {order.items.map((item, i) => (
+                                                    <div key={i} className="flex gap-4 text-sm items-start">
+                                                        <span className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center font-black text-primary text-[10px] shrink-0 border border-primary/10">x{item.quantity}</span>
+                                                        <span className="text-primary/70 font-medium italic pt-1.5 leading-snug break-words">{item.name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="hidden md:block w-px bg-primary/5 shrink-0" />
+                                        <div className="flex-1 min-w-0 space-y-4">
+                                            <p className="text-[10px] uppercase tracking-[0.25em] text-primary/40 font-black">Entrega y Contacto</p>
+                                            <div className="space-y-4 pt-1">
+                                                <p className="text-sm font-medium text-primary/80 italic leading-relaxed text-balance">
+                                                    {order.customers?.address || 'Honduras'}
+                                                </p>
+                                                <p className="text-sm font-black text-primary flex items-center gap-2">
+                                                    <Phone className="w-4 h-4 text-primary/30" /> {order.customers?.phone}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-row xl:flex-col gap-3 shrink-0 pt-6 xl:pt-0 border-t xl:border-t-0 border-primary/5 w-full xl:w-40 justify-center">
                                         {order.status === 'pending' && (
                                             <button
                                                 onClick={() => handleOpenBilling(order)}
-                                                className="flex-1 md:w-40 bg-primary text-secondary-light py-4 md:py-5 rounded-xl md:rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2 md:gap-3"
+                                                className="flex-1 xl:flex-none py-4 px-6 bg-primary text-secondary-light rounded-2xl md:rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:bg-luxury-black active:scale-95 transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Receipt className="w-4 h-4" /> FACTURAR
                                             </button>
                                         )}
                                         <button
                                             onClick={() => handleDeleteOrder(order.id)}
-                                            className="p-4 md:p-5 bg-white hover:bg-red-500 text-red-500/40 hover:text-white rounded-xl md:rounded-2xl transition-all border border-primary/5 active:scale-95 flex items-center justify-center shadow-sm"
+                                            className="flex-none p-4 w-auto xl:w-full bg-white hover:bg-red-500 text-red-500/40 hover:text-white rounded-2xl md:rounded-[1.5rem] transition-all border border-primary/5 active:scale-95 flex items-center justify-center shadow-sm"
                                             title="Cancelar Pedido"
                                         >
                                             <X className="w-5 h-5" />
@@ -347,42 +365,38 @@ const OrderManagement = () => {
 
                 {/* Sidebar Widget */}
                 <div className="space-y-5 md:space-y-8">
-                    <div className="bg-primary p-8 md:p-12 rounded-[2rem] md:rounded-[4rem] text-secondary-light space-y-6 md:space-y-10 shadow-3xl relative overflow-hidden">
-                        <div className="space-y-2 md:space-y-4 relative z-10">
-                            <h2 className="text-2xl md:text-3xl font-serif font-bold italic">Resumen Comercial</h2>
-                            <p className="text-secondary-light/40 text-xs font-medium uppercase tracking-[0.2em]">Kpis de Pedidos</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:gap-6 relative z-10">
-                            <div className="bg-white/5 p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] border border-white/10 group hover:bg-white/10 transition-colors">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2 md:mb-3">Pendientes de Cobro</p>
-                                <div className="flex items-center justify-between">
-                                    <p className="text-2xl md:text-3xl font-serif font-bold italic text-amber-500">L. {orders.filter(o => o.status === 'pending').reduce((acc, o) => acc + o.total, 0).toLocaleString()}</p>
-                                    <Calendar className="w-8 h-8 opacity-20" />
-                                </div>
+                    <div className="bg-primary p-8 md:p-14 rounded-[2rem] md:rounded-[4rem] text-secondary-light space-y-6 md:space-y-10 shadow-2xl relative overflow-hidden group">
+                        <div className="relative z-10 space-y-6 md:space-y-10">
+                            <div className="space-y-2 md:space-y-3">
+                                <span className="inline-block px-4 py-1.5 bg-secondary text-primary text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">Urgente</span>
+                                <h3 className="text-3xl md:text-4xl font-serif font-bold italic leading-tight">Despachos Pendientes</h3>
                             </div>
 
-                            <div className="bg-white/5 p-5 md:p-8 rounded-2xl md:rounded-[2.5rem] border border-white/10 group hover:bg-white/10 transition-colors">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2 md:mb-3">Volumen Total Procesado</p>
-                                <div className="flex items-center justify-between">
-                                    <p className="text-2xl md:text-3xl font-serif font-bold italic text-secondary">L. {orders.filter(o => o.status === 'processed').reduce((acc, o) => acc + o.total, 0).toLocaleString()}</p>
-                                    <TrendingUp className="w-8 h-8 opacity-20" />
-                                </div>
+                            <div className="space-y-8">
+                                {orders.filter(o => o.status === 'pending').slice(0, 5).length === 0 ? (
+                                    <div className="py-12 flex flex-col items-center gap-4 opacity-40">
+                                        <CheckCircle2 className="w-12 h-12" />
+                                        <p className="text-sm italic font-medium">Todo bajo control.</p>
+                                    </div>
+                                ) : (
+                                    orders.filter(o => o.status === 'pending').slice(0, 5).map(order => (
+                                        <div key={order.id} className="flex items-center gap-6 group/item cursor-pointer" onClick={() => handleOpenBilling(order)}>
+                                            <div className="w-16 h-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center shrink-0 border border-white/10 group-hover/item:bg-secondary group-hover/item:text-primary transition-all duration-500 group-hover/item:scale-110">
+                                                <Package className="w-7 h-7" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 space-y-1">
+                                                <p className="text-base font-bold truncate tracking-tight">{order.customers?.first_name} {order.customers?.last_name}</p>
+                                                <p className="text-[10px] text-secondary-light/40 font-black uppercase tracking-widest">ID {order.id.slice(0, 8)}</p>
+                                            </div>
+                                            <Receipt className="w-5 h-5 opacity-20 group-hover/item:opacity-100 group-hover/item:translate-x-2 transition-all" />
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </div>
-
-                        <div className="p-5 md:p-8 bg-secondary/10 rounded-2xl md:rounded-[2.5rem] border border-secondary/20 relative z-10">
-                            <p className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                                <ShoppingBag className="w-4 h-4" /> Flujo de Ventas
-                            </p>
-                            <p className="text-xs italic leading-relaxed">
-                                Tienes <span className="text-secondary font-bold">{orders.filter(o => o.status === 'pending').length} pedidos</span> esperando ser facturados.
-                                Procesa los más antiguos para mantener el flujo de caja.
-                            </p>
-                        </div>
-
-                        {/* Ambient Decoration */}
-                        <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/5 rounded-full blur-3xl opacity-50" />
+                        {/* Abstract Background Shapes */}
+                        <div className="absolute top-[-20%] right-[-20%] w-60 h-60 bg-white/10 rounded-full blur-[80px] pointer-events-none group-hover:scale-150 transition-transform duration-1000" />
+                        <div className="absolute bottom-[-10%] left-[-10%] w-40 h-40 bg-secondary/20 rounded-full blur-[60px] pointer-events-none" />
                     </div>
 
                     <div className="bg-white border border-secondary/20 p-5 md:p-8 rounded-2xl md:rounded-[3rem] space-y-4 md:space-y-6 shadow-sm">
@@ -436,12 +450,22 @@ const OrderManagement = () => {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Incentivo / Descuento (L)</label>
-                                    <div className="flex items-center gap-4 bg-white border border-primary/10 rounded-2xl p-2 shadow-sm">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Incentivo / Descuento (L)</label>
+                                        {(selectedOrder?.customers?.loyalty_stamps || 0) >= 5 && (
+                                            <button
+                                                onClick={() => setUseLoyaltyDiscount(!useLoyaltyDiscount)}
+                                                className={`text-[9px] uppercase font-black px-2 py-1 rounded transition-colors shadow-sm ${useLoyaltyDiscount ? 'bg-secondary text-primary border border-secondary shadow-secondary/20' : 'bg-white text-secondary border border-secondary/50 hover:bg-secondary/10'}`}
+                                            >
+                                                {useLoyaltyDiscount ? '10% Fidelidad Aplicado' : 'Canjear 10% Fidelidad'}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-4 bg-white border border-primary/10 rounded-2xl p-2 shadow-sm" style={useLoyaltyDiscount ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
                                         <button onClick={() => setDiscount(Math.max(0, Number(discount) - 50))} className="p-4 hover:bg-primary/5 rounded-xl text-primary/40 transition-colors"><ChevronDown className="w-5 h-5" /></button>
                                         <input
                                             type="number"
-                                            value={discount}
+                                            value={useLoyaltyDiscount ? selectedOrder.total * 0.10 : discount}
                                             onChange={(e) => setDiscount(e.target.value)}
                                             className="w-full bg-transparent border-none text-center font-serif font-bold text-2xl text-primary outline-none"
                                         />
@@ -456,11 +480,13 @@ const OrderManagement = () => {
                                     </div>
                                     <div className="flex justify-between text-xs text-red-600/60 uppercase tracking-widest font-black italic">
                                         <span>Aplicación de Descuento</span>
-                                        <span>- L. {discount || 0}</span>
+                                        <span>- L. {useLoyaltyDiscount ? selectedOrder?.total * 0.10 : (discount || 0)}</span>
                                     </div>
                                     <div className="pt-6 border-t border-primary/10 flex justify-between items-end">
                                         <span className="text-[10px] uppercase tracking-[0.2em] font-black text-primary/40">Total a Percibir</span>
-                                        <span className="text-4xl font-serif font-bold text-primary tracking-tighter">L. {selectedOrder?.total - (discount || 0)}</span>
+                                        <span className="text-4xl font-serif font-bold text-primary tracking-tighter">
+                                            L. {Math.max(0, selectedOrder?.total - (useLoyaltyDiscount ? selectedOrder?.total * 0.10 : (discount || 0)))}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -585,7 +611,11 @@ const OrderManagement = () => {
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={() => executeDelete(deleteConfirmOrder.id)}
+                                    onClick={() => {
+                                        setSecurityAction({ type: 'delete', id: deleteConfirmOrder.id });
+                                        setIsSecurityOpen(true);
+                                        setDeleteConfirmOrder(null);
+                                    }}
                                     className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-sm font-black uppercase tracking-wider hover:bg-red-700 active:scale-95 transition-all shadow-lg shadow-red-200"
                                 >
                                     Sí, Anular Todo

@@ -19,9 +19,13 @@ const SalesHistory = () => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [filterMethod, setFilterMethod] = useState('all'); // Contado, Crédito, all
 
-    // Pagination State
+    // Server-side Pagination State
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [totalCount, setTotalCount] = useState(0);
+    const itemsPerPage = 15;
+
+    // Debounced search
+    const [debouncedSearch, setDebouncedSearch] = useState('');
 
     // Modal States
     const [isSecurityOpen, setIsSecurityOpen] = useState(false);
@@ -44,40 +48,110 @@ const SalesHistory = () => {
         documentTitle: `Factura_Luxessence_${selectedSale?.id.slice(0, 8)}`,
     });
 
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1); // Reset to first page on search
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // Fetch sales with server-side pagination and filtering
     useEffect(() => {
         fetchSales();
-    }, []);
+    }, [currentPage, filterPeriod, filterMethod, selectedDate, debouncedSearch]);
+
+    const buildDateRange = () => {
+        let startDate = new Date(selectedDate);
+        let endDate = new Date(selectedDate);
+
+        if (filterPeriod === 'day') {
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
+        } else if (filterPeriod === 'week') {
+            startDate.setDate(startDate.getDate() - 6);
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
+        } else if (filterPeriod === 'month') {
+            startDate.setDate(1);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            // 'all' - no date filter
+            return null;
+        }
+
+        return { start: startDate.toISOString(), end: endDate.toISOString() };
+    };
 
     const fetchSales = async () => {
         setLoading(true);
         try {
-            // 1. Fetch sales with orders and customers
-            const { data: salesData, error: salesError } = await supabase
+            const dateRange = buildDateRange();
+            const from = (currentPage - 1) * itemsPerPage;
+            const to = from + itemsPerPage - 1;
+
+            // Build query with filters
+            let query = supabase
                 .from('sales')
-                .select('*, orders(*, items), customers(*)')
+                .select('*, orders(*, items), customers(*)', { count: 'exact' })
                 .order('created_at', { ascending: false });
 
+            // Apply date filter
+            if (dateRange) {
+                query = query
+                    .gte('created_at', dateRange.start)
+                    .lte('created_at', dateRange.end);
+            }
+
+            // Apply payment method filter
+            if (filterMethod !== 'all') {
+                query = query.eq('payment_method', filterMethod);
+            }
+
+            // Get paginated data
+            const { data: salesData, error: salesError, count } = await query
+                .range(from, to);
+
             if (salesError) throw salesError;
+            setTotalCount(count || 0);
 
             if (salesData && salesData.length > 0) {
                 const saleIds = salesData.map(s => s.id);
 
-                // 2. Fetch payments for these sales separately to avoid join errors
-                const { data: paymentsData, error: paymentsError } = await supabase
-                    .from('payments')
-                    .select('*')
-                    .in('sale_id', saleIds);
+                // Fetch payments for these sales (if table exists)
+                let paymentsMap = {};
+                try {
+                    const { data: paymentsData } = await supabase
+                        .from('payments')
+                        .select('*')
+                        .in('sale_id', saleIds);
 
-                // Note: It's okay if payments table doesn't exist yet or has no data
-                // We handle it gracefully
-                const paymentsMap = (paymentsData || []).reduce((acc, p) => {
-                    if (!acc[p.sale_id]) acc[p.sale_id] = [];
-                    acc[p.sale_id].push(p);
-                    return acc;
-                }, {});
+                    paymentsMap = (paymentsData || []).reduce((acc, p) => {
+                        if (!acc[p.sale_id]) acc[p.sale_id] = [];
+                        acc[p.sale_id].push(p);
+                        return acc;
+                    }, {});
+                } catch (paymentsError) {
+                    // Table might not exist yet, continue without payments
+                    console.warn('Payments table not available:', paymentsError.message);
+                }
 
-                // 3. Merge payments into sales
-                const mergedSales = salesData.map(s => ({
+                // If there's a search term, we need to filter client-side since 
+                // Supabase doesn't support full-text search on joined tables easily
+                let filteredData = salesData;
+                if (debouncedSearch) {
+                    filteredData = salesData.filter(s => {
+                        const fullName = `${s.customers?.first_name} ${s.customers?.last_name}`.toLowerCase();
+                        return fullName.includes(debouncedSearch.toLowerCase()) ||
+                            s.id.toLowerCase().includes(debouncedSearch.toLowerCase());
+                    });
+                }
+
+                // Merge payments into sales
+                const mergedSales = filteredData.map(s => ({
                     ...s,
                     payments: paymentsMap[s.id] || []
                 }));
@@ -131,7 +205,8 @@ const SalesHistory = () => {
             for (const item of items) {
                 const { data: prod } = await supabase.from('products').select('stock').eq('id', item.id || item.product_id).single();
                 if (prod) {
-                    await supabase.from('products').update({ stock: prod.stock + item.quantity }).eq('id', item.id || item.product_id);
+                    const revertQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
+                    await supabase.from('products').update({ stock: prod.stock + revertQty }).eq('id', item.id || item.product_id);
                 }
             }
 
@@ -230,43 +305,14 @@ const SalesHistory = () => {
         exportToExcel(exportData, 'Historial_Ventas_Luxessence', 'Ventas');
     };
 
-    const filteredSales = sales.filter(s => {
-        const fullName = `${s.customers?.first_name} ${s.customers?.last_name}`.toLowerCase();
-        const matchesSearch = fullName.includes(searchTerm.toLowerCase()) ||
-            s.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const filteredSales = sales; // Server-side filtered already
 
-        const matchesMethod = filterMethod === 'all' || s.payment_method === filterMethod;
+    const paginatedSales = filteredSales;
 
-        let matchesPeriod = true;
-        if (filterPeriod !== 'all') {
-            const saleDate = new Date(s.created_at);
-            const refDate = new Date(selectedDate);
-
-            if (filterPeriod === 'day') {
-                matchesPeriod = saleDate.toDateString() === refDate.toDateString();
-            } else if (filterPeriod === 'week') {
-                const weekStart = new Date(refDate);
-                weekStart.setDate(refDate.getDate() - 6);
-                weekStart.setHours(0, 0, 0, 0);
-                const weekEnd = new Date(refDate);
-                weekEnd.setHours(23, 59, 59, 999);
-                matchesPeriod = saleDate >= weekStart && saleDate <= weekEnd;
-            } else if (filterPeriod === 'month') {
-                matchesPeriod = saleDate.getMonth() === refDate.getMonth() && saleDate.getFullYear() === refDate.getFullYear();
-            }
-        }
-
-        return matchesSearch && matchesMethod && matchesPeriod;
-    });
-
-    const paginatedSales = filteredSales.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
-
+    // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterPeriod, filterMethod, selectedDate]);
+    }, [debouncedSearch, filterPeriod, filterMethod, selectedDate]);
 
     const calculateSaleMetrics = (sale) => {
         const cost = sale.total_cost || sale.orders?.items?.reduce((acc, item) => acc + ((item.cost || 0) * item.quantity), 0) || 0;
@@ -408,7 +454,7 @@ const SalesHistory = () => {
 
                     <Pagination
                         currentPage={currentPage}
-                        totalItems={filteredSales.length}
+                        totalItems={totalCount}
                         itemsPerPage={itemsPerPage}
                         onPageChange={setCurrentPage}
                     />
@@ -465,7 +511,11 @@ const SalesHistory = () => {
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={() => executeDelete(deleteConfirmSale.id)}
+                                    onClick={() => {
+                                        setSecurityAction({ type: 'delete', id: deleteConfirmSale.id });
+                                        setIsSecurityOpen(true);
+                                        setDeleteConfirmSale(null);
+                                    }}
                                     className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-sm font-black uppercase tracking-wider hover:bg-red-700 active:scale-95 transition-all shadow-lg shadow-red-200"
                                 >
                                     Sí, Anular

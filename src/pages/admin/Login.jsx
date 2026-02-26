@@ -1,22 +1,92 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Lock, User, Sparkles, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
+
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
 
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [attempts, setAttempts] = useState(0);
+    const [lockedUntil, setLockedUntil] = useState(null);
+    const [showAttempts, setShowAttempts] = useState(false);
     const navigate = useNavigate();
+
+    // Check for existing lockout on component mount
+    useEffect(() => {
+        const storedLock = localStorage.getItem('lux_login_locked_until');
+        if (storedLock) {
+            const lockTime = parseInt(storedLock);
+            if (lockTime > Date.now()) {
+                setLockedUntil(lockTime);
+            } else {
+                localStorage.removeItem('lux_login_locked_until');
+            }
+        }
+
+        // Load previous attempts
+        const storedAttempts = localStorage.getItem('lux_login_attempts');
+        if (storedAttempts) {
+            setAttempts(parseInt(storedAttempts));
+        }
+    }, []);
+
+    // Update lockout timer display
+    useEffect(() => {
+        if (!lockedUntil) return;
+
+        const interval = setInterval(() => {
+            if (Date.now() >= lockedUntil) {
+                setLockedUntil(null);
+                setAttempts(0);
+                localStorage.removeItem('lux_login_locked_until');
+                localStorage.removeItem('lux_login_attempts');
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [lockedUntil]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-        if (error) alert('Acceso denegado. Verifique sus credenciales.');
-        else {
+        // Check if account is locked
+        if (lockedUntil && Date.now() < lockedUntil) {
+            const remainingMinutes = Math.ceil((lockedUntil - Date.now()) / 60000);
+            setError(`Demasiados intentos. Intenta de nuevo en ${remainingMinutes} minutos.`);
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+        const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (authError) {
+            const newAttempts = attempts + 1;
+            setAttempts(newAttempts);
+            localStorage.setItem('lux_login_attempts', newAttempts.toString());
+
+            if (newAttempts >= MAX_ATTEMPTS) {
+                const lockUntil = Date.now() + LOCKOUT_DURATION;
+                setLockedUntil(lockUntil);
+                localStorage.setItem('lux_login_locked_until', lockUntil.toString());
+                setError(`Demasiados intentos fallidos. Cuenta bloqueada por 15 minutos.`);
+            } else {
+                const remaining = MAX_ATTEMPTS - newAttempts;
+                setError(`Credenciales inválidas. Te quedan ${remaining} intentos.`);
+                setShowAttempts(true);
+                setTimeout(() => setShowAttempts(false), 3000);
+            }
+        } else {
+            // Successful login - reset attempts
+            localStorage.removeItem('lux_login_attempts');
+            localStorage.removeItem('lux_login_locked_until');
+            setAttempts(0);
             localStorage.setItem('lux_auth', 'true');
             navigate('/admin/dashboard');
         }
@@ -67,20 +137,40 @@ const Login = () => {
                                     <input
                                         type="password"
                                         required
-                                        className="w-full bg-primary/5 border border-primary/10 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-1 focus:ring-primary placeholder:text-primary/20 text-primary font-medium transition-all"
+                                        disabled={lockedUntil && Date.now() < lockedUntil}
+                                        className="w-full bg-primary/5 border border-primary/10 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-1 focus:ring-primary placeholder:text-primary/20 text-primary font-medium transition-all disabled:opacity-50"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                     />
                                 </div>
                             </div>
+
+                            {/* Error Message */}
+                            {(error || showAttempts) && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={`p-4 rounded-2xl text-center ${lockedUntil && Date.now() < lockedUntil ? 'bg-red-50 border border-red-200' : 'bg-red-50 border border-red-100'}`}
+                                >
+                                    <p className="text-xs font-bold text-red-600 flex items-center justify-center gap-2">
+                                        <AlertTriangle className="w-4 h-4" />
+                                        {error || (attempts > 0 && `${attempts} intento${attempts > 1 ? 's' : ''} fallido${attempts > 1 ? 's' : ''}`)}
+                                    </p>
+                                    {lockedUntil && Date.now() < lockedUntil && (
+                                        <p className="text-[10px] text-red-500 mt-1">
+                                            Bloqueado hasta: {new Date(lockedUntil).toLocaleTimeString()}
+                                        </p>
+                                    )}
+                                </motion.div>
+                            )}
                         </div>
 
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="w-full btn-primary !py-6 group flex items-center justify-center gap-3 shadow-3xl"
+                            disabled={loading || (lockedUntil && Date.now() < lockedUntil)}
+                            className="w-full btn-primary !py-6 group flex items-center justify-center gap-3 shadow-3xl disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'Validando...' : 'INICIAR SESIÓN HQ'}
+                            {loading ? 'Validando...' : lockedUntil && Date.now() < lockedUntil ? 'Cuenta Bloqueada' : 'INICIAR SESIÓN HQ'}
                             {!loading && <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
                         </button>
                     </form>

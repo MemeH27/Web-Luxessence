@@ -350,28 +350,28 @@ const ProductManagement = () => {
                 {/* Info & Stats Sidebar */}
                 <div className="space-y-8">
                     {/* Summary Card */}
-                    <div className="bg-primary p-12 rounded-[4rem] text-secondary-light space-y-10 shadow-3xl relative overflow-hidden">
-                        <div className="space-y-4 relative z-10">
-                            <h2 className="text-3xl font-serif font-bold italic">Resumen de Inventario</h2>
-                            <p className="text-secondary-light/40 text-xs font-medium uppercase tracking-[0.2em]">Métricas del Catálogo</p>
+                    <div className="bg-primary p-8 md:p-12 rounded-[3rem] md:rounded-[4rem] text-secondary-light space-y-8 md:space-y-10 shadow-3xl relative overflow-hidden">
+                        <div className="space-y-2 md:space-y-4 relative z-10">
+                            <h2 className="text-2xl md:text-3xl font-serif font-bold italic truncate">Resumen de Inventario</h2>
+                            <p className="text-secondary-light/40 text-[10px] md:text-xs font-medium uppercase tracking-[0.2em]">Métricas del Catálogo</p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-6 relative z-10">
-                            <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2">Total Referencias</p>
-                                <p className="text-3xl font-serif font-bold italic text-secondary">{products.length}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 relative z-10">
+                            <div className="bg-white/5 p-5 md:p-6 rounded-2xl md:rounded-[2rem] border border-white/10">
+                                <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2">Total Referencias</p>
+                                <p className="text-2xl md:text-3xl font-serif font-bold italic text-secondary">{products.length}</p>
                             </div>
-                            <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2">Valor Stock (Total)</p>
-                                <p className="text-2xl font-bold truncate">L. {Math.round(products.reduce((acc, p) => acc + (p.price * p.stock), 0)).toLocaleString()}</p>
+                            <div className="bg-white/5 p-5 md:p-6 rounded-2xl md:rounded-[2rem] border border-white/10 flex flex-col justify-center">
+                                <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2">Valor Stock Total</p>
+                                <p className="text-xl md:text-2xl font-bold text-secondary break-all sm:break-normal">L. {Math.round(products.reduce((acc, p) => acc + (p.price * p.stock), 0)).toLocaleString()}</p>
                             </div>
                         </div>
 
-                        <div className="p-8 bg-secondary/10 rounded-[2.5rem] border border-secondary/20 relative z-10">
+                        <div className="p-6 md:p-8 bg-secondary/10 rounded-[2rem] md:rounded-[2.5rem] border border-secondary/20 relative z-10">
                             <p className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                                <Package2 className="w-4 h-4" /> Lanzamientos
+                                <Package2 className="w-4 h-4 md:w-5 md:h-5" /> Lanzamientos
                             </p>
-                            <p className="text-xs italic leading-relaxed">
+                            <p className="text-xs md:text-sm italic leading-relaxed">
                                 Tienes <span className="text-secondary font-bold">{products.filter(p => p.is_coming_soon).length} productos</span> marcados como lanzamientos futuros.
                             </p>
                         </div>

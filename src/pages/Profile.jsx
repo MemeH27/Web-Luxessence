@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { motion } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
+import { Award, Check } from 'lucide-react';
 
 const Profile = () => {
     const { addToast } = useToast();
@@ -20,6 +21,7 @@ const Profile = () => {
         city: '',
         department: ''
     });
+    const [loyaltyStamps, setLoyaltyStamps] = useState(0);
 
     useEffect(() => {
         fetchProfile();
@@ -70,6 +72,17 @@ const Profile = () => {
                 city: session.user.user_metadata?.city || '',
                 department: session.user.user_metadata?.department || ''
             });
+
+            // Fetch loyalty stamps from customers table
+            const { data: customerData } = await supabase
+                .from('customers')
+                .select('loyalty_stamps')
+                .eq('email', session.user.email)
+                .single();
+
+            if (customerData) {
+                setLoyaltyStamps(customerData.loyalty_stamps || 0);
+            }
 
             fetchOrdersOnly(session.user.email);
         }
@@ -233,6 +246,46 @@ const Profile = () => {
 
                         <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-primary/3 rounded-full blur-3xl pointer-events-none" />
                     </form>
+
+                    {/* Loyalty Card */}
+                    <div className="glass-panel p-10 rounded-[3rem] space-y-8 bg-gradient-to-br from-primary to-primary-light text-secondary-light relative overflow-hidden shadow-2xl">
+                        <div className="relative z-10 flex flex-col xl:flex-row gap-6 items-center xl:items-start justify-between text-center xl:text-left">
+                            <div className="flex flex-col items-center xl:items-start space-y-3 xl:space-y-1">
+                                <div className="flex flex-col xl:flex-row items-center gap-3 xl:gap-4">
+                                    <div className="flex flex-col md:flex-row items-center gap-3 xl:gap-4">
+                                        <Award className="w-12 h-12 md:w-10 md:h-10 text-secondary shrink-0" />
+                                        <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-secondary-light leading-tight">Tarjeta Cliente Frecuente</h2>
+                                    </div>
+                                    <span className="text-6xl md:text-5xl font-black font-sans tracking-tighter text-[#E5C158] drop-shadow-[0_0_20px_rgba(229,193,88,0.4)] leading-none mt-2 xl:mt-0 xl:ml-2">
+                                        20% OFF
+                                    </span>
+                                </div>
+                                <span className="text-[12px] uppercase tracking-widest text-secondary-light/60 font-black xl:ml-[3.5rem] block text-center xl:text-left">
+                                    Un sello por cada compra
+                                </span>
+                            </div>
+                            {loyaltyStamps >= 5 && (
+                                <span className="bg-secondary text-primary px-6 py-3 md:px-4 md:py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-lg animate-pulse shrink-0 mt-4 md:mt-0 w-full md:w-auto text-center">¡Recompensa Lista!</span>
+                            )}
+                        </div>
+
+                        <div className="relative z-10 grid grid-cols-5 gap-3 md:gap-6 bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 backdrop-blur-sm">
+                            {[1, 2, 3, 4, 5].map((stamp) => (
+                                <div key={stamp} className={`aspect-square rounded-full flex flex-col items-center justify-center border-2 transition-all duration-500 relative ${loyaltyStamps >= stamp ? 'bg-transparent border-transparent scale-[1.15] drop-shadow-2xl' : 'bg-transparent border-white/20 border-dashed shadow-inner'}`}>
+                                    {loyaltyStamps >= stamp ? (
+                                        <img src="/img/sello.png" className="w-full h-full object-contain absolute opacity-90" alt="Stamped" />
+                                    ) : (
+                                        <span className="text-white/20 font-black font-sans text-xl">{stamp}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="relative z-10 pt-4 text-center border-t border-white/10">
+                            <p className="text-xs italic text-secondary-light/80">Al acumular 5 sellos, obtienes automáticamente un <strong className="text-secondary font-sans font-bold text-sm">20% de descuento</strong> en tu siguiente compra. Aplican restricciones.</p>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-secondary/10 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-black/20 rounded-full blur-3xl pointer-events-none" />
+                    </div>
                 </div>
 
                 {/* Right: Order History Summary */}

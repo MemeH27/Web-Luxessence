@@ -1,15 +1,78 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, History, LogOut, Sparkles, ChevronLeft, Menu, X, Percent, Store } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, History, LogOut, Sparkles, ChevronLeft, ChevronRight, Menu, X, Percent, Store, Clock, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../../lib/supabase';
+import NewSaleModal from './NewSaleModal';
+
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+const SESSION_WARNING_THRESHOLD = 5 * 60 * 1000; // Show warning at 5 minutes before expiry
 
 const AdminLayout = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [sessionTimeLeft, setSessionTimeLeft] = useState(null);
+    const [showSessionWarning, setShowSessionWarning] = useState(false);
+    const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
+    const [isSaleButtonExpanded, setIsSaleButtonExpanded] = useState(false);
 
-    const handleLogout = () => {
+    // Session timeout management
+    const resetSessionTimer = useCallback(() => {
+        const lastActivity = Date.now();
+        localStorage.setItem('lux_last_activity', lastActivity.toString());
+        setShowSessionWarning(false);
+        setSessionTimeLeft(null);
+    }, []);
+
+    useEffect(() => {
+        const checkSession = () => {
+            const lastActivity = localStorage.getItem('lux_last_activity');
+            if (!lastActivity) {
+                resetSessionTimer();
+                return;
+            }
+
+            const elapsed = Date.now() - parseInt(lastActivity);
+            const remaining = SESSION_TIMEOUT - elapsed;
+
+            if (remaining <= 0) {
+                // Session expired
+                handleLogout();
+            } else if (remaining <= SESSION_WARNING_THRESHOLD) { // Show warning before expiry
+                setShowSessionWarning(true);
+                setSessionTimeLeft(Math.ceil(remaining / 60000));
+            }
+        };
+
+        // Check session every minute
+        const interval = setInterval(checkSession, 60000);
+
+        // Reset on user activity
+        const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+        events.forEach(event => {
+            document.addEventListener(event, resetSessionTimer);
+        });
+
+        resetSessionTimer();
+
+        return () => {
+            clearInterval(interval);
+            events.forEach(event => {
+                document.removeEventListener(event, resetSessionTimer);
+            });
+        };
+    }, [resetSessionTimer]);
+
+    const handleLogout = async () => {
         localStorage.removeItem('lux_auth');
+        localStorage.removeItem('lux_last_activity');
+        localStorage.removeItem('lux_login_attempts');
+        localStorage.removeItem('lux_login_locked_until');
+
+        // Sign out from Supabase
+        await supabase.auth.signOut();
+
         navigate('/');
     };
 
@@ -97,6 +160,26 @@ const AdminLayout = () => {
                     </button>
                 </header>
 
+                {/* Session Warning Banner */}
+                {showSessionWarning && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-center gap-3 shrink-0"
+                    >
+                        <Clock className="w-4 h-4 text-amber-600" />
+                        <span className="text-xs font-bold text-amber-800">
+                            Tu sesión expirará en {sessionTimeLeft} minuto{sessionTimeLeft > 1 ? 's' : ''}. ¿Sigues ahí?
+                        </span>
+                        <button
+                            onClick={resetSessionTimer}
+                            className="text-xs font-bold text-amber-700 hover:text-amber-900 underline"
+                        >
+                            Extender sesión
+                        </button>
+                    </motion.div>
+                )}
+
                 <main className="flex-1 overflow-y-auto p-6 md:p-12 no-scrollbar relative min-w-0">
                     <motion.div
                         key={location.pathname}
@@ -107,6 +190,33 @@ const AdminLayout = () => {
                         <Outlet />
                     </motion.div>
                 </main>
+
+                {/* Expandable New Sale Button */}
+                <div
+                    className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center bg-green-600 border border-green-600 border-r-0 rounded-l-3xl p-1.5 md:p-2 pr-4 shadow-[-10px_0_30px_rgba(34,197,94,0.3)] gap-2 transition-transform duration-500 ease-in-out ${isSaleButtonExpanded ? 'translate-x-[0.5rem] md:translate-x-0' : 'translate-x-[calc(100%-2.2rem)] md:translate-x-[calc(100%-3rem)]'}`}
+                >
+                    <button
+                        onClick={() => setIsSaleButtonExpanded(!isSaleButtonExpanded)}
+                        className="w-8 h-12 md:w-10 md:h-14 flex items-center justify-center text-white hover:bg-green-700 transition-colors rounded-l-2xl"
+                    >
+                        {isSaleButtonExpanded ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                    </button>
+
+                    <button
+                        onClick={() => { setIsNewSaleOpen(true); setIsSaleButtonExpanded(false); }}
+                        className="bg-green-700 hover:bg-green-800 border border-green-500/50 text-white px-4 py-3 md:px-5 md:py-3.5 rounded-xl md:rounded-2xl shadow-inner transition-all hover:scale-105 active:scale-95 flex items-center gap-2 md:gap-3 w-max"
+                    >
+                        <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 mb-0.5" />
+                        <span className="font-bold text-sm tracking-wide">Nueva Venta</span>
+                    </button>
+                </div>
+
+                {/* New Sale Modal */}
+                <NewSaleModal
+                    isOpen={isNewSaleOpen}
+                    onClose={() => setIsNewSaleOpen(false)}
+                    onSaleComplete={() => window.location.reload()}
+                />
             </div>
 
             {/* Mobile Sidebar Overlay */}

@@ -78,9 +78,16 @@ const Navbar = () => {
             return;
         }
 
-        if (authMode === 'signup' && password !== confirmPassword) {
-            setError('Las contraseñas no coinciden');
-            return;
+        if (authMode === 'signup') {
+            if (password !== confirmPassword) {
+                setError('Las contraseñas no coinciden');
+                return;
+            }
+            const rawPhone = phone ? phone.replace('+504', '').replace(/\D/g, '') : '';
+            if (rawPhone.length !== 8) {
+                setError('El número de teléfono debe tener exactamente 8 dígitos');
+                return;
+            }
         }
 
         setLoading(true);
@@ -418,14 +425,20 @@ const Navbar = () => {
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Teléfono</label>
-                                                            <div className="relative">
+                                                            <div className="flex bg-white border border-primary/10 rounded-xl shadow-inner focus-within:ring-1 focus-within:ring-primary transition-all overflow-hidden items-stretch">
+                                                                <div className="bg-primary/5 px-3 flex items-center justify-center border-r border-primary/10 shrink-0">
+                                                                    <span className="text-primary font-bold text-sm">+504</span>
+                                                                </div>
                                                                 <input
                                                                     type="tel"
                                                                     required
-                                                                    placeholder="Tel: 9999-9999"
-                                                                    className="w-full bg-white border border-primary/10 rounded-xl py-3 px-4 outline-none focus:ring-1 focus:ring-primary placeholder:text-primary/10 text-primary text-sm transition-all shadow-inner"
-                                                                    value={phone}
-                                                                    onChange={(e) => setPhone(e.target.value)}
+                                                                    placeholder="0000 0000"
+                                                                    className="w-full bg-transparent py-3 px-3 outline-none text-primary text-sm transition-all"
+                                                                    value={phone ? phone.replace('+504', '').trim() : ''}
+                                                                    onChange={(e) => {
+                                                                        const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                                                        setPhone(`+504 ${digitsOnly}`);
+                                                                    }}
                                                                 />
                                                             </div>
                                                         </div>

@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
     amount DECIMAL(12,2) NOT NULL,
+    payment_method TEXT DEFAULT 'Contado' CHECK (payment_method IN ('Contado', 'Crédito')),
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

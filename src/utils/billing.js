@@ -12,13 +12,20 @@ const captureToPNG = async (element) => {
     await new Promise(resolve => setTimeout(resolve, 800));
 
     try {
+        // Get the container width to ensure consistent letter-size output
+        const containerWidth = element.offsetWidth || 816;
+
         // html-to-image is much more reliable for Tailwind 4
         // We use toPng which creates an image using a hidden SVG foreignObject
         const dataUrl = await htmlToImage.toPng(element, {
             quality: 1.0,
             pixelRatio: 2,
             backgroundColor: '#ffffff',
-            skipAutoScale: true,
+            width: containerWidth, // Force consistent width
+            style: {
+                transform: 'scale(1)',
+                transformOrigin: 'top left'
+            },
             cacheBust: true,
             // Ensure fonts are included if possible
             fontEmbedCSS: '',

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { BarChart3, Users, Package, ShoppingBag, TrendingUp, ArrowRight, Clock, DollarSign, CreditCard, Calendar, CheckCircle2, ChevronRight } from 'lucide-react';
+import { BarChart3, Users, Package, ShoppingBag, TrendingUp, ArrowRight, Clock, DollarSign, CreditCard, Calendar, CheckCircle2, ChevronRight, Plus } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
@@ -156,13 +156,6 @@ const Dashboard = () => {
                             className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-primary focus:ring-0 outline-none cursor-pointer"
                         />
                     </div>
-
-                    <button
-                        onClick={fetchDashboardData}
-                        className="p-3 md:p-4 bg-primary text-secondary-light hover:bg-primary-dark rounded-xl md:rounded-[1.2rem] transition-all active:scale-95 shadow-lg shadow-primary/20"
-                    >
-                        <Clock className="w-5 h-5" />
-                    </button>
                 </div>
             </header>
 
@@ -252,40 +245,38 @@ const Dashboard = () => {
 
                 {/* Side Panels */}
                 <div className="space-y-5 md:space-y-10">
-                    <div className="bg-primary p-8 md:p-14 rounded-[2rem] md:rounded-[4rem] text-secondary-light space-y-6 md:space-y-10 shadow-2xl relative overflow-hidden group">
-                        <div className="relative z-10 space-y-6 md:space-y-10">
-                            <div className="space-y-2 md:space-y-3">
-                                <span className="inline-block px-4 py-1.5 bg-secondary text-primary text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">Urgente</span>
-                                <h3 className="text-3xl md:text-4xl font-serif font-bold italic leading-tight">Despachos Pendientes</h3>
-                            </div>
-
-                            <div className="space-y-8">
-                                {pendingOrders.length === 0 ? (
-                                    <div className="py-12 flex flex-col items-center gap-4 opacity-40">
-                                        <CheckCircle2 className="w-12 h-12" />
-                                        <p className="text-sm italic font-medium">Todo bajo control.</p>
-                                    </div>
-                                ) : (
-                                    pendingOrders.map(order => (
-                                        <div key={order.id} className="flex items-center gap-6 group/item cursor-pointer" onClick={() => navigate('/admin/orders')}>
-                                            <div className="w-16 h-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center shrink-0 border border-white/10 group-hover/item:bg-secondary group-hover/item:text-primary transition-all duration-500 group-hover/item:scale-110">
-                                                <Package className="w-7 h-7" />
-                                            </div>
-                                            <div className="flex-1 min-w-0 space-y-1">
-                                                <p className="text-base font-bold truncate tracking-tight">{order.customers?.first_name} {order.customers?.last_name}</p>
-                                                <p className="text-[10px] text-secondary-light/40 font-black uppercase tracking-widest">ID {order.id.slice(0, 8)}</p>
-                                            </div>
-                                            <ChevronRight className="w-5 h-5 opacity-20 group-hover/item:opacity-100 group-hover/item:translate-x-2 transition-all" />
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-
-                            <button onClick={() => navigate('/admin/orders')} className="w-full py-6 bg-secondary text-primary rounded-[1.5rem] flex items-center justify-center gap-4 text-xs font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-white active:scale-95 transition-all duration-500">
-                                Gestionar Logística <ArrowRight className="w-5 h-5" />
-                            </button>
+                    <div className="bg-primary rounded-[2rem] md:rounded-[4rem] p-8 md:p-12 text-secondary-light relative overflow-hidden space-y-5 md:space-y-8 shadow-2xl group">
+                        <div className="relative z-10 space-y-2">
+                            <span className="inline-block px-4 py-1.5 bg-secondary text-primary text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">Finanzas</span>
+                            <h3 className="text-3xl md:text-4xl font-serif font-bold italic leading-tight mt-2">Rendimiento de Ventas</h3>
+                            <p className="text-secondary-light/40 text-[10px] font-black uppercase tracking-[0.2em] pt-2">Análisis financiero</p>
                         </div>
-                        {/* Abstract Background Shapes */}
+                        <div className="grid grid-cols-2 gap-4 relative z-10 w-full">
+                            <div className="bg-white/5 p-4 md:p-6 rounded-[1.5rem] border border-white/10 hover:bg-white/10 transition-colors col-span-2">
+                                <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2 flex items-center gap-2">
+                                    <TrendingUp className="w-3.5 h-3.5" /> Ingresos Totales
+                                </p>
+                                <p className="text-2xl font-serif font-bold italic text-secondary">L. {stats.revenue.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-white/5 p-4 md:p-6 rounded-[1.5rem] border border-white/10 hover:bg-white/10 transition-colors col-span-2 md:col-span-1">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-orange-400/60 mb-2 flex items-center gap-2">
+                                    <CreditCard className="w-3.5 h-3.5" /> Cuentas por Cobrar
+                                </p>
+                                <p className="text-lg md:text-xl font-serif font-bold italic text-orange-400">L. {stats.pendingCredits.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-white/5 p-4 md:p-6 rounded-[1.5rem] border border-white/10 hover:bg-white/10 transition-colors col-span-2 md:col-span-1">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-green-400/60 mb-2 flex items-center gap-2">
+                                    <DollarSign className="w-3.5 h-3.5" /> Utilidad
+                                </p>
+                                <p className="text-lg md:text-xl font-serif font-bold italic text-green-400">L. {stats.profit.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-white/5 p-4 md:p-6 rounded-[1.5rem] border border-white/10 hover:bg-white/10 transition-colors col-span-2">
+                                <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-red-400/60 mb-2 flex items-center gap-2">
+                                    <ShoppingBag className="w-3.5 h-3.5" /> Costo Mercancía
+                                </p>
+                                <p className="text-2xl font-serif font-bold italic text-red-400">L. {stats.cost.toLocaleString()}</p>
+                            </div>
+                        </div>
                         <div className="absolute top-[-20%] right-[-20%] w-60 h-60 bg-white/10 rounded-full blur-[80px] pointer-events-none group-hover:scale-150 transition-transform duration-1000" />
                         <div className="absolute bottom-[-10%] left-[-10%] w-40 h-40 bg-secondary/20 rounded-full blur-[60px] pointer-events-none" />
                     </div>
@@ -324,41 +315,7 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Sales Performance Metrics - moved from SalesHistory */}
-            <div className="bg-primary rounded-[2rem] md:rounded-[4rem] p-6 md:p-14 text-secondary-light relative overflow-hidden space-y-5 md:space-y-8">
-                <div className="relative z-10 space-y-2">
-                    <h3 className="text-2xl md:text-3xl font-serif font-bold italic">Rendimiento de Ventas</h3>
-                    <p className="text-secondary-light/40 text-[10px] font-black uppercase tracking-[0.2em]">Análisis financiero del periodo seleccionado</p>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
-                    <div className="bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors">
-                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-secondary-light/40 mb-2 flex items-center gap-2">
-                            <TrendingUp className="w-3.5 h-3.5" /> Ingresos Totales
-                        </p>
-                        <p className="text-xl md:text-3xl font-serif font-bold italic text-secondary">L. {stats.revenue.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors">
-                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-orange-400/60 mb-2 flex items-center gap-2">
-                            <CreditCard className="w-3.5 h-3.5" /> Por Cobrar
-                        </p>
-                        <p className="text-xl md:text-3xl font-serif font-bold italic text-orange-400">L. {stats.pendingCredits.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors">
-                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-green-400/60 mb-2 flex items-center gap-2">
-                            <DollarSign className="w-3.5 h-3.5" /> Utilidad Neta
-                        </p>
-                        <p className="text-xl md:text-3xl font-serif font-bold italic text-green-400">L. {stats.profit.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 hover:bg-white/10 transition-colors">
-                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-red-400/60 mb-2 flex items-center gap-2">
-                            <ShoppingBag className="w-3.5 h-3.5" /> Costo Operativo
-                        </p>
-                        <p className="text-xl md:text-3xl font-serif font-bold italic text-red-400">L. {stats.cost.toLocaleString()}</p>
-                    </div>
-                </div>
-                <div className="absolute top-0 right-0 w-60 h-60 bg-secondary/5 rounded-full blur-3xl opacity-30 pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full blur-3xl opacity-30 pointer-events-none" />
-            </div>
+
 
             {loading && (
                 <div className="fixed inset-0 bg-white/80 backdrop-blur-md z-[500] flex items-center justify-center">

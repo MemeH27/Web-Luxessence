@@ -1,18 +1,24 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, X, ShieldCheck, AlertCircle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 const SecurityModal = ({ isOpen, onClose, onConfirm, title = "Acción Sensible" }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (password === '1234') { // Contraseña maestra placeholder
-            onConfirm();
-            setPassword('');
-            setError(false);
-            onClose();
+        if (password === '1305') {
+            setLoading(true);
+            setTimeout(() => {
+                onConfirm();
+                setPassword('');
+                setError(false);
+                setLoading(false);
+                onClose();
+            }, 500);
         } else {
             setError(true);
             setTimeout(() => setError(false), 2000);
@@ -73,15 +79,17 @@ const SecurityModal = ({ isOpen, onClose, onConfirm, title = "Acción Sensible" 
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors"
+                                    disabled={loading}
+                                    className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-50"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 btn-primary !py-4 shadow-xl"
+                                    disabled={loading}
+                                    className="flex-1 btn-primary !py-4 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    VERIFICAR
+                                    {loading ? 'Verificando...' : 'VERIFICAR'}
                                 </button>
                             </div>
                         </form>
