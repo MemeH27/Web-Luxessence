@@ -87,7 +87,7 @@ const Dashboard = () => {
                 });
                 totalCost += saleCost;
 
-                const dateKey = new Date(sale.created_at).toLocaleDateString();
+                const dateKey = sale.created_at.split('T')[0];
                 if (!dataPoints[dateKey]) dataPoints[dateKey] = { name: dateKey, revenue: 0, cost: 0, profit: 0 };
                 dataPoints[dateKey].revenue += sale.total;
                 dataPoints[dateKey].cost += saleCost;

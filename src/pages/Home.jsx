@@ -60,22 +60,16 @@ const Home = () => {
     ];
 
     const [activePromos, setActivePromos] = useState([]);
+    const [dbCategories, setDbCategories] = useState([]);
     const [newArrivals, setNewArrivals] = useState([]);
     const [comingSoon, setComingSoon] = useState([]);
     const [giftOptions, setGiftOptions] = useState([]);
     const [selectedGiftTier, setSelectedGiftTier] = useState(500);
+    const [siteSettings, setSiteSettings] = useState({});
     const [loading, setLoading] = useState(true);
 
-    const categories = [
-        { name: 'Fragancias', path: '/catalog', img: 'https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&q=80&w=1000' },
-        ...(activePromos.length > 0 ? [{
-            name: activePromos[0].title,
-            path: '/catalog?promo=true',
-            img: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&q=80&w=1000'
-        }] : []),
-        { name: 'Carteras', path: '/catalog', img: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=1000' },
-        { name: 'Accesorios', path: '/catalog', img: 'https://images.unsplash.com/photo-1535633302704-b02a41af8435?auto=format&fit=crop&q=80&w=1000' },
-    ];
+    // Simplified categories logic: we'll use dbCategories instead of hardcoded ones
+    const displayCategories = dbCategories.slice(0, 3); // Limit to top 3 for layout symmetry 
 
     useEffect(() => {
         const fetchHomeData = async () => {
@@ -87,8 +81,6 @@ const Home = () => {
                 .from('promotions')
                 .select('*')
                 .eq('is_active', true)
-                .lte('start_date', today)
-                .or(`end_date.is.null,end_date.gte.${today}`)
                 .order('created_at', { ascending: false });
             setActivePromos(promos || []);
 
@@ -116,6 +108,29 @@ const Home = () => {
                 .order('price', { ascending: true });
             setGiftOptions(gifts || []);
 
+            // Fetch Site Settings
+            const { data: settings } = await supabase.from('site_settings').select('*');
+            if (settings) {
+                const s = {};
+                settings.forEach(item => { s[item.key] = item.value; });
+                setSiteSettings(s);
+            }
+
+            // Fetch Featured Categories
+            const { data: cats } = await supabase
+                .from('categories')
+                .select('*, products(image_url)')
+                .eq('is_featured', true)
+                .limit(6);
+
+            const processedCats = cats?.map(cat => ({
+                id: cat.id,
+                name: cat.name,
+                path: `/catalog?category=${cat.id}`,
+                img: cat.image_url || cat.products?.[0]?.image_url || 'https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&q=80&w=1000'
+            })) || [];
+
+            setDbCategories(processedCats);
             setLoading(false);
         };
         fetchHomeData();
@@ -127,7 +142,7 @@ const Home = () => {
             <section className="relative h-[70vh] md:h-[80vh] flex items-start justify-center overflow-hidden px-6 pt-24 md:pt-32">
                 <div className="absolute inset-0 z-0">
                     <img
-                        src="/img/banner-mandarin.png"
+                        src={siteSettings.hero_banner || "/img/banner-mandarin.png"}
                         className="w-full h-full object-cover scale-100 md:scale-105 md:object-center object-[70%] transition-transform duration-[3000ms]"
                         alt="Hero Background"
                     />
@@ -151,7 +166,7 @@ const Home = () => {
                         La distinción hecha esencia
                     </motion.p>
                     <h1 className="text-5xl md:text-8xl font-serif font-bold italic text-white leading-tight drop-shadow-2xl">
-                        Descubre tu <br /> Legado Personal
+                        {siteSettings.hero_title || 'Descubre tu Legado Personal'}
                     </h1>
                     <p className="text-white/90 text-base md:text-xl font-medium max-w-2xl mx-auto leading-relaxed drop-shadow-md">
                         Una colección curada de fragancias, carteras y accesorios diseñados para quienes entienden que el lujo es una actitud.
@@ -195,9 +210,9 @@ const Home = () => {
                     <h2 className="text-3xl md:text-5xl font-serif font-bold italic text-primary">Nuestras Categorías</h2>
                     <div className="w-16 h-1 bg-primary/20 mx-auto rounded-full" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                    {categories.map((cat, i) => (
-                        <Link key={i} to={cat.path} className="group relative h-[450px] rounded-[3rem] overflow-hidden shadow-2xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                    {dbCategories.map((cat, i) => (
+                        <Link key={cat.id || i} to={cat.path} className="group relative h-[450px] rounded-[3rem] overflow-hidden shadow-2xl">
                             <img src={cat.img} className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-125" alt={cat.name} />
                             <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-700" />
                             <div className="absolute bottom-12 left-12 space-y-3 z-10 transition-transform duration-700 group-hover:-translate-y-2">
@@ -209,6 +224,16 @@ const Home = () => {
                             <div className="absolute inset-0 border-[1rem] border-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none rounded-[3rem]" />
                         </Link>
                     ))}
+                </div>
+
+                <div className="flex justify-center pt-10">
+                    <Link
+                        to="/catalog"
+                        className="px-8 py-3.5 bg-primary/5 hover:bg-primary text-primary hover:text-secondary-light rounded-full border border-primary/5 shadow-xl transition-all duration-500 font-black text-[10px] uppercase tracking-widest flex items-center gap-3 group"
+                    >
+                        Explorar todas nuestras categorías
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
+                    </Link>
                 </div>
             </section>
 
@@ -272,7 +297,10 @@ const Home = () => {
                                     to={`/catalog?promo=true`}
                                     className="group relative h-[400px] rounded-[2.5rem] overflow-hidden shadow-xl bg-primary"
                                 >
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10 opacity-70" />
+                                    {promo.image_url && (
+                                        <img src={promo.image_url} className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-[2000ms]" />
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent z-10 opacity-70" />
                                     <div className="absolute inset-x-8 bottom-8 z-20 space-y-4">
                                         <span className="px-4 py-1.5 bg-secondary text-primary text-[10px] font-black uppercase tracking-widest rounded-full">{promo.discount_badge}</span>
                                         <h3 className="text-3xl font-serif font-bold italic text-white leading-tight">{promo.title}</h3>

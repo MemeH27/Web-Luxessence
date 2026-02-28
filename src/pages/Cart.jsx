@@ -15,8 +15,13 @@ const Cart = () => {
     });
     const [deliveryMode, setDeliveryMode] = useState('domicilio'); // 'domicilio' or 'pickup'
     const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+    const [promoCode, setPromoCode] = useState('');
+    const [appliedDiscount, setAppliedDiscount] = useState(0); // 0 or 0.05
+    const [validatingPromo, setValidatingPromo] = useState(false);
+
     const deliveryFee = deliveryMode === 'domicilio' ? 50 : 0;
-    const finalTotal = subtotal + deliveryFee;
+    const discountAmount = subtotal * appliedDiscount;
+    const finalTotal = subtotal + deliveryFee - discountAmount;
 
     useState(() => {
         const fetchUserData = async () => {
@@ -39,6 +44,81 @@ const Cart = () => {
     const handlePhoneChange = (e) => {
         const val = e.target.value.replace(/\D/g, ''); // Solo números
         setFormData({ ...formData, phone: val });
+    };
+
+    const validatePromo = async () => {
+        if (!promoCode.trim()) return;
+        setValidatingPromo(true);
+        const today = new Date().toISOString().split('T')[0];
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                setAppliedDiscount(0);
+                addToast('Para aplicar cupones, debes haber iniciado sesión con tu cuenta.', 'info');
+                setValidatingPromo(false);
+                return;
+            }
+
+            // 1. Validate coupon existence and basic status
+            const { data: promo } = await supabase
+                .from('promotions')
+                .select('*')
+                .eq('promo_code', promoCode.trim().toUpperCase())
+                .eq('promo_type', 'code')
+                .single();
+
+            if (!promo) {
+                setAppliedDiscount(0);
+                addToast('Código de cupón no válido.', 'error');
+                setValidatingPromo(false);
+                return;
+            }
+
+            if (!promo.is_active) {
+                setAppliedDiscount(0);
+                addToast('Este cupón ya no está activo.', 'error');
+                setValidatingPromo(false);
+                return;
+            }
+
+            // Validity dates check
+            if (promo.start_date && today < promo.start_date) {
+                setAppliedDiscount(0);
+                addToast('Este cupón aún no es válido.', 'info');
+                setValidatingPromo(false);
+                return;
+            }
+            if (promo.end_date && today > promo.end_date) {
+                setAppliedDiscount(0);
+                addToast('Este cupón ya ha expirado.', 'error');
+                setValidatingPromo(false);
+                return;
+            }
+
+            // 2. Check if customer used it in non-cancelled orders (More robust check)
+            const { data: userOrders } = await supabase
+                .from('orders')
+                .select('items')
+                .eq('client_email', session.user.email)
+                .neq('status', 'cancelled');
+
+            const alreadyUsed = userOrders?.some(order =>
+                Array.isArray(order.items) && order.items.some(item => item.promo_code_used === promo.promo_code)
+            );
+
+            if (alreadyUsed) {
+                setAppliedDiscount(0);
+                addToast('Este cupón es de un solo uso por cliente y ya lo has utilizado anteriormente.', 'error');
+            } else {
+                setAppliedDiscount(0.05); // 5% discount
+                addToast(`¡Cupón ${promo.promo_code} aplicado con éxito!`, 'success');
+            }
+        } catch (err) {
+            setAppliedDiscount(0);
+            addToast('Error al validar cupón.', 'error');
+        } finally {
+            setValidatingPromo(false);
+        }
     };
 
     const handleCheckout = async (e) => {
@@ -69,12 +149,16 @@ const Cart = () => {
 
             if (custError) throw custError;
 
-            // 2. Create Order
+            // 2. Create Order (with coupon metadata to prevent re-use)
+            const orderItems = appliedDiscount > 0
+                ? [...cart, { is_promo_metadata: true, promo_code_used: promoCode.trim().toUpperCase(), discount_amount: discountAmount }]
+                : cart;
+
             const { data: order, error: ordError } = await supabase
                 .from('orders')
                 .insert({
                     customer_id: customer.id,
-                    items: cart,
+                    items: orderItems,
                     total: finalTotal,
                     status: 'pending',
                     delivery_mode: deliveryMode,
@@ -102,7 +186,8 @@ const Cart = () => {
                 }).join('%0A') +
                 `%0A--------------------------%0A` +
                 (deliveryFee > 0 ? `*Envío:* L. ${deliveryFee}%0A` : '') +
-                `*TOTAL: L. ${finalTotal}*%0A` +
+                (discountAmount > 0 ? `*Descuento Cupón (5%):* -L. ${discountAmount.toFixed(2)}%0A` : '') +
+                `*TOTAL: L. ${finalTotal.toFixed(2)}*%0A` +
                 `--------------------------%0A` +
                 `_Espere nuestra confirmación para el envío._`;
 
@@ -231,11 +316,43 @@ const Cart = () => {
                                             {deliveryMode === 'pickup' ? 'No Aplica' : (deliveryFee === 0 ? 'Gratis' : `L. ${deliveryFee}`)}
                                         </span>
                                     </div>
+                                    {appliedDiscount > 0 && (
+                                        <div className="flex justify-between text-xs text-green-600 uppercase tracking-widest font-black italic">
+                                            <span>Descuento ({(appliedDiscount * 100).toFixed(0)}% Cupón)</span>
+                                            <span>-L. {discountAmount.toFixed(2)}</span>
+                                        </div>
+                                    )}
                                     <div className="pt-6 border-t border-primary/10 flex justify-between items-end">
                                         <span className="text-[10px] uppercase tracking-[0.2em] font-black text-primary/40">Total Estimado</span>
-                                        <span className="text-4xl font-sans font-bold text-primary tracking-tighter">L. {finalTotal}</span>
+                                        <span className="text-4xl font-sans font-bold text-primary tracking-tighter">L. {finalTotal.toFixed(2)}</span>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <p className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1 flex items-center gap-2">
+                                    <Plus className="w-3 h-3" /> ¿Tienes un cupón?
+                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        placeholder="CÓDIGO"
+                                        className="flex-1 bg-secondary/5 border border-secondary/20 rounded-2xl py-3 px-6 outline-none text-primary font-black tracking-widest text-sm focus:border-secondary uppercase"
+                                        value={promoCode}
+                                        onChange={(e) => setPromoCode(e.target.value)}
+                                        disabled={appliedDiscount > 0}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={validatePromo}
+                                        disabled={validatingPromo || appliedDiscount > 0}
+                                        className="bg-primary text-secondary px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                                    >
+                                        {validatingPromo ? '...' : (appliedDiscount > 0 ? 'APLICADO' : 'APLICAR')}
+                                    </button>
+                                </div>
+                                {appliedDiscount > 0 && (
+                                    <button onClick={() => { setAppliedDiscount(0); setPromoCode(''); }} className="text-[9px] text-red-500 font-black uppercase tracking-widest ml-1 underline transition-all hover:text-red-700">Remover cupón</button>
+                                )}
                             </div>
 
                             <form onSubmit={handleCheckout} className="space-y-6">

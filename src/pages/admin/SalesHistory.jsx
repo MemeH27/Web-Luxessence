@@ -37,7 +37,7 @@ const SalesHistory = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [editForm, setEditForm] = useState({ total: 0, discount: 0, payment_method: '', is_paid: false });
-    const [paymentForm, setPaymentForm] = useState({ amount: '', notes: '' });
+    const [paymentForm, setPaymentForm] = useState({ amount: '', notes: '', date: new Date().toISOString().split('T')[0] });
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
     const [deleteConfirmSale, setDeleteConfirmSale] = useState(null); // sale waiting for delete confirmation
@@ -242,6 +242,7 @@ const SalesHistory = () => {
         setSelectedSale(sale);
         setIsPaymentsModalOpen(true);
         setLoadingPayments(true);
+        setPaymentForm({ amount: '', notes: '', date: new Date().toISOString().split('T')[0] });
         const { data, error } = await supabase
             .from('payments')
             .select('*')
@@ -265,7 +266,8 @@ const SalesHistory = () => {
                 .insert([{
                     sale_id: selectedSale.id,
                     amount: Number(paymentForm.amount),
-                    notes: paymentForm.notes
+                    notes: paymentForm.notes,
+                    created_at: new Date(paymentForm.date).toISOString()
                 }]);
 
             if (error) throw error;
@@ -282,7 +284,7 @@ const SalesHistory = () => {
                 addToast('¡Venta cancelada en su totalidad!', 'success');
             }
 
-            setPaymentForm({ amount: '', notes: '' });
+            setPaymentForm({ amount: '', notes: '', date: new Date().toISOString().split('T')[0] });
             handleOpenPayments(selectedSale);
             fetchSales();
         } catch (err) {
@@ -655,6 +657,23 @@ const SalesHistory = () => {
                                         <h4 className="text-[10px] uppercase font-black text-primary/40 tracking-widest">Registrar Nuevo Pago</h4>
                                         <div className="space-y-4">
                                             <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Fecha de Pago</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="date"
+                                                        className="flex-1 p-4 rounded-xl border border-primary/10 focus:ring-1 focus:ring-primary outline-none font-bold text-sm"
+                                                        value={paymentForm.date}
+                                                        onChange={e => setPaymentForm({ ...paymentForm, date: e.target.value })}
+                                                    />
+                                                    <button
+                                                        onClick={() => setPaymentForm({ ...paymentForm, date: new Date().toISOString().split('T')[0] })}
+                                                        className="px-4 py-2 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-xl hover:bg-primary/20 transition-colors"
+                                                    >
+                                                        Hoy
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Monto a Abonar (L.)</label>
                                                 <input
                                                     type="number"
@@ -691,12 +710,35 @@ const SalesHistory = () => {
                                             ) : payments.length === 0 ? (
                                                 <div className="text-center py-10 italic text-primary/20 border-2 border-dashed border-primary/5 rounded-[2rem]">No se han registrado cuotas aún</div>
                                             ) : payments.map((p, idx) => (
-                                                <div key={idx} className="p-4 bg-white border border-primary/5 rounded-2xl flex justify-between items-center shadow-sm">
+                                                <div key={idx} className="p-4 bg-white border border-primary/5 rounded-2xl flex justify-between items-center shadow-sm group">
                                                     <div>
                                                         <p className="text-xs font-bold text-primary">{new Date(p.created_at).toLocaleDateString()}</p>
                                                         <p className="text-[9px] text-primary/40 font-black uppercase tracking-widest italic">{p.notes || 'Sin nota'}</p>
                                                     </div>
-                                                    <p className="text-lg font-black text-primary">L. {Number(p.amount).toLocaleString()}</p>
+                                                    <div className="flex items-center gap-4">
+                                                        <p className="text-lg font-black text-primary">L. {Number(p.amount).toLocaleString()}</p>
+                                                        <button 
+                                                            onClick={async () => {
+                                                                if(window.confirm('¿Eliminar este abono?')) {
+                                                                    const { error } = await supabase.from('payments').delete().eq('id', p.id);
+                                                                    if(error) addToast('Error al eliminar', 'error');
+                                                                    else {
+                                                                        addToast('Abono eliminado');
+                                                                        // Update is_paid to false if it was paid
+                                                                        if (selectedSale.is_paid) {
+                                                                            await supabase.from('sales').update({ is_paid: false }).eq('id', selectedSale.id);
+                                                                            setSales(prev => prev.map(s => s.id === selectedSale.id ? { ...s, is_paid: false } : s));
+                                                                        }
+                                                                        handleOpenPayments(selectedSale);
+                                                                        fetchSales();
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="opacity-0 group-hover:opacity-100 p-2 text-red-400 hover:text-red-600 transition-all"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>

@@ -128,7 +128,7 @@ const OrderManagement = () => {
             Cliente: `${o.customers?.first_name} ${o.customers?.last_name}`,
             Estado: o.status,
             Total: o.total,
-            Artículos: o.items.map(i => `${i.name} (x${i.quantity})`).join(', ')
+            Artículos: o.items.filter(i => !i.is_promo_metadata).map(i => `${i.name} (x${i.quantity})`).join(', ')
         }));
         exportToExcel(exportData, 'Pedidos_Luxessence', 'Pedidos');
     };
@@ -139,13 +139,17 @@ const OrderManagement = () => {
             const calculatedDiscount = useLoyaltyDiscount ? selectedOrder.total * 0.10 : Number(discount);
             const finalTotal = Math.max(0, selectedOrder.total - calculatedDiscount);
 
+            const metadataItem = selectedOrder.items.find(i => i.is_promo_metadata);
+            const couponDiscount = Number(metadataItem?.discount_amount || 0);
+            const totalDiscount = calculatedDiscount + couponDiscount;
+
             const { data: sale, error: saleError } = await supabase
                 .from('sales')
                 .insert({
                     order_id: selectedOrder.id,
                     customer_id: selectedOrder.customer_id,
                     total: finalTotal,
-                    discount: calculatedDiscount,
+                    discount: totalDiscount,
                     payment_method: paymentMethod,
                     is_paid: paymentMethod === 'Contado'
                 })
@@ -155,6 +159,7 @@ const OrderManagement = () => {
 
             // Update Stock
             for (const item of selectedOrder.items) {
+                if (item.is_promo_metadata) continue; // Skip metadata items
                 const { data: prod } = await supabase.from('products').select('stock').eq('id', item.id || item.product_id).single();
                 if (prod) {
                     const deductQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
@@ -176,7 +181,9 @@ const OrderManagement = () => {
                 await supabase.from('customers').update({ loyalty_stamps: newStamps }).eq('id', selectedOrder.customer_id);
             }
 
-            const totalCost = selectedOrder.items.reduce((acc, item) => acc + ((item.cost || 0) * item.quantity), 0);
+            const totalCost = selectedOrder.items
+                .filter(item => !item.is_promo_metadata)
+                .reduce((acc, item) => acc + ((item.cost || 0) * item.quantity), 0);
             const totalProfit = finalTotal - totalCost;
 
             await supabase.from('sales').update({
@@ -188,7 +195,7 @@ const OrderManagement = () => {
                 customer: selectedOrder.customers,
                 order: selectedOrder,
                 sale: { ...sale, total: finalTotal },
-                items: selectedOrder.items
+                items: selectedOrder.items.filter(i => !i.is_promo_metadata)
             };
 
             setLastSaleData(billingData);
@@ -311,7 +318,7 @@ const OrderManagement = () => {
                                         <div className="flex-1 min-w-0 space-y-4">
                                             <p className="text-[10px] uppercase tracking-[0.25em] text-primary/40 font-black">Detalle del Pedido</p>
                                             <div className="space-y-3 max-h-36 overflow-y-auto no-scrollbar scroll-smooth pr-2">
-                                                {order.items.map((item, i) => (
+                                                {order.items.filter(i => !i.is_promo_metadata).map((item, i) => (
                                                     <div key={i} className="flex gap-4 text-sm items-start">
                                                         <span className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center font-black text-primary text-[10px] shrink-0 border border-primary/10">x{item.quantity}</span>
                                                         <span className="text-primary/70 font-medium italic pt-1.5 leading-snug break-words">{item.name}</span>

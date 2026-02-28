@@ -71,7 +71,9 @@ const InvoiceContent = ({ sale, customer, items, payments, totalPaid, balanceDue
             <div className="space-y-4">
                 <div className="flex justify-between items-end">
                     <p className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] border-l-2 border-primary/20 pl-3 whitespace-nowrap">Detalle de Productos</p>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">{items.length} {items.length === 1 ? 'Artículo' : 'Artículos'}</p>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                        {items.filter(i => !i.is_promo_metadata).length} {items.filter(i => !i.is_promo_metadata).length === 1 ? 'Artículo' : 'Artículos'}
+                    </p>
                 </div>
                 <div className="rounded-[2rem] border border-primary/5 bg-gray-50/50 overflow-hidden shadow-sm">
                     <table className="w-full text-left">
@@ -84,7 +86,7 @@ const InvoiceContent = ({ sale, customer, items, payments, totalPaid, balanceDue
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {items.map((item, idx) => (
+                            {items.filter(i => !i.is_promo_metadata).map((item, idx) => (
                                 <tr key={idx} className="text-sm group hover:bg-white transition-colors">
                                     <td className="px-8 py-5 font-black text-gray-400">
                                         <span className="bg-gray-100 px-2 py-1 rounded-md text-[10px] text-primary/60">{item.quantity}</span>
@@ -144,8 +146,13 @@ const InvoiceContent = ({ sale, customer, items, payments, totalPaid, balanceDue
                         </div>
 
                         {sale.discount > 0 && (
-                            <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-tighter text-red-500/60">
-                                <span className="whitespace-nowrap">Descuento Especial</span>
+                            <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-tighter text-red-500/60 transition-all">
+                                <span className="whitespace-nowrap">
+                                    {items.find(i => i.is_promo_metadata)?.promo_code_used
+                                        ? `Descuento p. cupón (${items.find(i => i.is_promo_metadata).promo_code_used})`
+                                        : 'Descuento Especial'
+                                    }
+                                </span>
                                 <span className="text-sm font-sans font-bold whitespace-nowrap">- L. {sale.discount.toLocaleString()}</span>
                             </div>
                         )}

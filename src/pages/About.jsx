@@ -1,7 +1,28 @@
 import { motion } from 'framer-motion';
 import { Award, Eye, Heart, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 const About = () => {
+    const [settings, setSettings] = useState({
+        about_hero_image: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&q=80&w=2000',
+        about_story_image: 'https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&q=80&w=1000',
+        about_story_title: 'Más que una Fragancia, un Legado',
+        about_story_description: 'En Luxessence, entendemos que el perfume no es solo un aroma; es la huella invisible que dejas al caminar, el eco de tu personalidad y el sello de tu distinción. Nacimos con la visión de democratizar el acceso al lujo auténtico.'
+    });
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            const { data } = await supabase.from('site_settings').select('key, value');
+            if (data) {
+                const s = {};
+                data.forEach(item => { if (item.key.startsWith('about_')) s[item.key] = item.value; });
+                setSettings(prev => ({ ...prev, ...s }));
+            }
+        };
+        fetchSettings();
+    }, []);
+
     const values = [
         { icon: Award, title: 'Excelencia', desc: 'Cada fragancia en nuestra colección es una obra maestra de la perfumería internacional.' },
         { icon: Eye, title: 'Curaduría', desc: 'Seleccionamos minuciosamente cada pieza para asegurar que represente la máxima distinción.' },
@@ -15,7 +36,7 @@ const About = () => {
             <section className="relative h-[60vh] flex items-center justify-center overflow-hidden">
                 <div className="absolute inset-0">
                     <img
-                        src="https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&q=80&w=2000"
+                        src={settings.about_hero_image}
                         className="w-full h-full object-cover"
                         alt="Background"
                     />
@@ -55,15 +76,10 @@ const About = () => {
                     className="space-y-8"
                 >
                     <h2 className="text-4xl md:text-6xl font-serif font-bold italic text-primary leading-tight">
-                        Más que una Fragancia, <br /> un Legado
+                        {settings.about_story_title}
                     </h2>
                     <div className="space-y-6 text-luxury-black/60 text-lg leading-relaxed font-medium">
-                        <p>
-                            En Luxessence, entendemos que el perfume no es solo un aroma; es la huella invisible que dejas al caminar, el eco de tu personalidad y el sello de tu distinción.
-                        </p>
-                        <p>
-                            Nacimos con la visión de democratizar el acceso al lujo auténtico, trayendo las casas de diseño más prestigiosas del mundo directamente a tus manos, con la garantía de originalidad que nos caracteriza.
-                        </p>
+                        <p>{settings.about_story_description}</p>
                     </div>
                 </motion.div>
                 <motion.div
@@ -74,9 +90,9 @@ const About = () => {
                 >
                     <div className="aspect-[4/5] rounded-[4rem] overflow-hidden shadow-2xl relative z-10">
                         <img
-                            src="https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&q=80&w=1000"
+                            src={settings.about_story_image}
                             className="w-full h-full object-cover"
-                            alt="Luxury Perfume"
+                            alt="Luxury Piece"
                         />
                     </div>
                     <div className="absolute -top-10 -right-10 w-64 h-64 bg-secondary/20 rounded-full blur-3xl -z-0" />

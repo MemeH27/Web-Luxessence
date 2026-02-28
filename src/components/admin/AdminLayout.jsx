@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, History, LogOut, Sparkles, ChevronLeft, ChevronRight, Menu, X, Percent, Store, Clock, Plus } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, History, LogOut, Sparkles, ChevronLeft, ChevronRight, Menu, X, Percent, Store, Clock, Plus, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import NewSaleModal from './NewSaleModal';
@@ -84,6 +84,8 @@ const AdminLayout = () => {
         { name: 'Clientes', path: '/admin/customers', icon: Users },
         { name: 'Destacados', path: '/admin/featured', icon: Sparkles },
         { name: 'Promociones', path: '/admin/promotions', icon: Percent },
+        { name: 'Solicitudes', path: '/admin/requests', icon: Mail },
+        { name: 'Ajustes Visuales', path: '/admin/settings', icon: Store },
     ];
 
     return (

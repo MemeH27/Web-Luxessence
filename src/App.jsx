@@ -14,6 +14,8 @@ import SalesHistory from './pages/admin/SalesHistory';
 import CustomerManagement from './pages/admin/CustomerManagement';
 import Promotions from './pages/admin/Promotions';
 import Featured from './pages/admin/Featured';
+import SiteSettings from './pages/admin/SiteSettings';
+import Requests from './pages/admin/Requests';
 import AdminLayout from './components/admin/AdminLayout';
 import { CartProvider } from './context/CartContext';
 import { ToastProvider } from './context/ToastContext';
@@ -76,6 +78,8 @@ function App() {
               <Route path="customers" element={<CustomerManagement />} />
               <Route path="promotions" element={<Promotions />} />
               <Route path="featured" element={<Featured />} />
+              <Route path="settings" element={<SiteSettings />} />
+              <Route path="requests" element={<Requests />} />
             </Route>
           </Routes>
         </CartProvider>

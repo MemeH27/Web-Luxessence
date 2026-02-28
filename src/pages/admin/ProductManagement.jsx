@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { exportToExcel } from '../../utils/export';
-import { Plus, Edit3, Trash2, X, Upload, Search, Download, Package2, ChevronUp, ChevronDown, ListPlus, Lock, CheckCircle2, Circle, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Plus, Edit3, Trash2, X, Upload, Search, Download, Package2, ChevronUp, ChevronDown, ListPlus, Lock, CheckCircle2, Circle, ChevronLeft, ChevronRight, Clock, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SecurityModal from '../../components/admin/SecurityModal';
 import Pagination from '../../components/admin/Pagination';
 import { useToast } from '../../context/ToastContext';
+import { uploadAndOptimize } from '../../utils/image';
 
 const StepperInput = ({ label, value, onChange, min = 0, step = 1, prefix = '' }) => (
     <div className="space-y-2">
@@ -53,6 +54,8 @@ const ProductManagement = () => {
     const [uploading, setUploading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryImage, setNewCategoryImage] = useState('');
+    const [editingCategory, setEditingCategory] = useState(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     // Pagination State
@@ -64,7 +67,7 @@ const ProductManagement = () => {
     const [securityAction, setSecurityAction] = useState(null); // { type, id, data }
 
     const [form, setForm] = useState({
-        name: '', description: '', price: 0, cost: 0, stock: 0, category_id: '', image_url: '',
+        name: '', description: '', price: 0, cost: 0, stock: 0, category_id: '', image_url: '', hover_image_url: '',
         is_new_arrival: false, is_gift_option: false, is_coming_soon: false
     });
 
@@ -108,37 +111,70 @@ const ProductManagement = () => {
         if (!newCategoryName) return;
         setLoading(true);
         try {
-            const { data, error } = await supabase.from('categories').insert({ name: newCategoryName }).select().single();
+            const payload = {
+                name: newCategoryName,
+                image_url: newCategoryImage
+            };
+
+            const { data, error } = editingCategory
+                ? await supabase.from('categories').update(payload).eq('id', editingCategory.id).select().single()
+                : await supabase.from('categories').insert(payload).select().single();
+
             if (error) {
-                console.error('Error creating category:', error);
-                alert(`Error al crear categoría: ${error.message}`);
+                console.error('Error saving category:', error);
+                alert(`Error al guardar categoría: ${error.message}`);
             } else {
-                setCategories([...categories, data].sort((a, b) => a.name.localeCompare(b.name)));
-                setForm({ ...form, category_id: data.id });
+                if (editingCategory) {
+                    setCategories(categories.map(c => c.id === data.id ? data : c));
+                } else {
+                    setCategories([...categories, data].sort((a, b) => a.name.localeCompare(b.name)));
+                    setForm({ ...form, category_id: data.id });
+                }
                 setNewCategoryName('');
+                setNewCategoryImage('');
+                setEditingCategory(null);
                 setIsCategoryModalOpen(false);
+                addToast('Categoría guardada con éxito');
             }
         } catch (err) {
-            alert('Error inesperado al crear la categoría');
+            alert('Error inesperado al guardar la categoría');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleImageUpload = async (e) => {
-        setUploading(true);
-        const file = e.target.files[0];
-        const fileName = `${Date.now()}_${file.name}`;
-        const { data, error } = await supabase.storage.from('products').upload(fileName, file);
+    const handleEditCategory = (cat) => {
+        setEditingCategory(cat);
+        setNewCategoryName(cat.name);
+        setNewCategoryImage(cat.image_url || '');
+    };
 
-        if (error) {
+    const handleCategoryImageUpload = async (e) => {
+        setUploading('category_image');
+        const file = e.target.files[0];
+        try {
+            const publicUrl = await uploadAndOptimize(supabase, 'products', file, false);
+            setNewCategoryImage(publicUrl);
+        } catch (error) {
             console.error('Upload error:', error);
-            alert(`Error subiendo imagen: ${error.message}. Asegúrese de tener el bucket 'products' creado en Supabase con acceso público.`);
-        } else {
-            const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(fileName);
-            setForm({ ...form, image_url: publicUrl });
+            alert(`Error subiendo imagen: ${error.message}.`);
+        } finally {
+            setUploading(null);
         }
-        setUploading(false);
+    };
+
+    const handleImageUpload = async (e, field = 'image_url') => {
+        setUploading(field);
+        const file = e.target.files[0];
+        try {
+            const publicUrl = await uploadAndOptimize(supabase, 'products', file, true);
+            setForm({ ...form, [field]: publicUrl });
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert(`Error subiendo imagen: ${error.message}.`);
+        } finally {
+            setUploading(null);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -428,11 +464,24 @@ const ProductManagement = () => {
                                         ) : (
                                             <div className="text-center space-y-4">
                                                 <Upload className="text-primary w-12 h-12 mx-auto opacity-20" />
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">Sube la imagen del producto</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">Imagen Principal</p>
                                             </div>
                                         )}
                                         <input type="file" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
-                                        {uploading && <div className="absolute inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-30"><p className="text-secondary-light font-black uppercase tracking-widest text-xs">Cargando...</p></div>}
+                                        {uploading === 'image_url' && <div className="absolute inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-30"><p className="text-secondary-light font-black uppercase tracking-widest text-xs">Cargando...</p></div>}
+                                    </div>
+
+                                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-primary/10 rounded-[3rem] p-6 group hover:border-primary/30 transition-colors relative h-40 overflow-hidden bg-white shadow-inner">
+                                        {form.hover_image_url ? (
+                                            <img src={form.hover_image_url} className="w-full h-full object-contain" />
+                                        ) : (
+                                            <div className="text-center space-y-2">
+                                                <Plus className="text-primary w-8 h-8 mx-auto opacity-20" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">Imagen Hover (Opcional)</p>
+                                            </div>
+                                        )}
+                                        <input type="file" onChange={(e) => handleImageUpload(e, 'hover_image_url')} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
+                                        {uploading === 'hover_image_url' && <div className="absolute inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-30"><p className="text-xs text-white">...</p></div>}
                                     </div>
                                 </div>
 
@@ -493,20 +542,59 @@ const ProductManagement = () => {
             <AnimatePresence>
                 {isCategoryModalOpen && (
                     <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/40 backdrop-blur-md" onClick={() => setIsCategoryModalOpen(false)} />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-sm rounded-[2.5rem] p-10 relative z-10 shadow-2xl border border-primary/10">
-                            <h3 className="text-xl font-serif font-bold italic text-primary mb-6">Nueva Categoría</h3>
-                            <div className="space-y-4">
-                                <input
-                                    autoFocus
-                                    placeholder="Nombre del segmento..."
-                                    value={newCategoryName}
-                                    onChange={e => setNewCategoryName(e.target.value)}
-                                    className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm"
-                                />
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/40 backdrop-blur-md" onClick={() => { setIsCategoryModalOpen(false); setEditingCategory(null); }} />
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-lg rounded-[2.5rem] p-10 relative z-10 shadow-2xl border border-primary/10 max-h-[90vh] overflow-y-auto no-scrollbar">
+                            <h3 className="text-2xl font-serif font-bold italic text-primary mb-8">{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
+
+                            <div className="space-y-8">
+                                <div className="space-y-6">
+                                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-primary/10 rounded-[2.5rem] p-6 group hover:border-primary/30 transition-colors relative h-40 overflow-hidden bg-white shadow-inner">
+                                        {newCategoryImage ? (
+                                            <img src={newCategoryImage} className="w-full h-full object-contain" />
+                                        ) : (
+                                            <div className="text-center space-y-2">
+                                                <Upload className="text-primary w-8 h-8 mx-auto opacity-20" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary/40 text-center">Imagen de la Categoría</p>
+                                            </div>
+                                        )}
+                                        <input type="file" onChange={handleCategoryImageUpload} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
+                                        {uploading === 'category_image' && <div className="absolute inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-30"><Loader2 className="w-6 h-6 animate-spin text-white" /></div>}
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Nombre</label>
+                                        <input
+                                            autoFocus
+                                            placeholder="Nombre del segmento..."
+                                            value={newCategoryName}
+                                            onChange={e => setNewCategoryName(e.target.value)}
+                                            className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-bold text-primary"
+                                        />
+                                    </div>
+                                </div>
+
                                 <div className="flex gap-4">
-                                    <button onClick={() => setIsCategoryModalOpen(false)} className="flex-1 py-4 text-xs font-bold uppercase tracking-widest text-primary/40 hover:text-primary transition-colors">Cancelar</button>
-                                    <button onClick={handleCreateCategory} className="flex-1 btn-primary !py-4 text-xs">Crear</button>
+                                    <button onClick={() => { setIsCategoryModalOpen(false); setEditingCategory(null); setNewCategoryName(''); setNewCategoryImage(''); }} className="flex-1 py-4 text-xs font-bold uppercase tracking-widest text-primary/40 hover:text-primary transition-colors">Cancelar</button>
+                                    <button onClick={handleCreateCategory} className="flex-2 btn-primary !py-4 text-xs flex-1">{editingCategory ? 'Actualizar' : 'Crear'}</button>
+                                </div>
+
+                                <div className="pt-8 border-t border-primary/5">
+                                    <h4 className="text-[10px] uppercase tracking-widest text-primary/30 font-black mb-4">Categorías Existentes</h4>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {categories.map(cat => (
+                                            <div key={cat.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-primary/5 group/cat">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-lg bg-primary/5 overflow-hidden">
+                                                        {cat.image_url ? <img src={cat.image_url} className="w-full h-full object-cover" /> : <Package2 className="w-4 h-4 m-auto mt-3 text-primary/10" />}
+                                                    </div>
+                                                    <span className="text-xs font-bold text-primary">{cat.name}</span>
+                                                </div>
+                                                <button onClick={() => handleEditCategory(cat)} className="p-2 text-primary/20 hover:text-primary transition-colors">
+                                                    <Edit3 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </motion.div>

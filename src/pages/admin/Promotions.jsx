@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, X, Search, Tag, Settings, Percent, CheckCircle2, Circle, Power, Calendar, Gift, ChevronRight, Package, TrendingUp, Sparkles, AlertCircle, Activity } from 'lucide-react';
+import { Plus, Trash2, X, Search, Tag, Settings, Percent, CheckCircle2, Circle, Power, Calendar, Gift, ChevronRight, Package, TrendingUp, Sparkles, AlertCircle, Activity, Upload, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../../context/ToastContext';
 import Pagination from '../../components/admin/Pagination';
 import SecurityModal from '../../components/admin/SecurityModal';
+import { uploadAndOptimize } from '../../utils/image';
 
 const Promotions = () => {
     const { addToast } = useToast();
@@ -28,12 +29,14 @@ const Promotions = () => {
         description: '',
         discount_badge: '',
         restrictions: '',
+        image_url: '',
         product_ids: [],
         new_prices: {},
         is_active: true,
         start_date: new Date().toISOString().split('T')[0],
         end_date: '',
-        promo_type: 'discount'
+        promo_type: 'discount',
+        promo_code: ''
     });
 
     useEffect(() => {
@@ -60,12 +63,14 @@ const Promotions = () => {
                 description: '',
                 discount_badge: '',
                 restrictions: '',
+                image_url: '',
                 product_ids: [],
                 new_prices: {},
                 is_active: true,
                 start_date: new Date().toISOString().split('T')[0],
                 end_date: '',
-                promo_type: 'discount'
+                promo_type: 'discount',
+                promo_code: ''
             });
         }
         setIsModalOpen(true);
@@ -97,6 +102,23 @@ const Promotions = () => {
             const allPrices = {};
             products.forEach(p => { allPrices[p.id] = p.price; });
             setForm({ ...form, product_ids: allIds, new_prices: allPrices });
+        }
+    };
+
+    const [uploadingImage, setUploadingImage] = useState(false);
+
+    const handleImageUpload = async (e) => {
+        setUploadingImage(true);
+        const file = e.target.files[0];
+        try {
+            const publicUrl = await uploadAndOptimize(supabase, 'products', file, false); // Consistent bucket usage
+            setForm({ ...form, image_url: publicUrl });
+            addToast('Imagen de promoción cargada correctamente');
+        } catch (error) {
+            console.error('Upload error:', error);
+            addToast('Error subiendo imagen', 'error');
+        } finally {
+            setUploadingImage(false);
         }
     };
 
@@ -209,18 +231,30 @@ const Promotions = () => {
                                     key={promo.id}
                                     className={`group relative overflow-hidden bg-white rounded-[3rem] p-8 md:p-10 border transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 ${promo.is_active ? 'border-primary/10' : 'border-primary/5 grayscale opacity-60'}`}
                                 >
-                                    <div className="flex justify-between items-start mb-8">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-2 h-2 rounded-full ${promo.is_active ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-primary/20'}`} />
-                                                <span className="text-[9px] uppercase font-black tracking-widest text-primary/30">{promo.is_active ? 'Vigente' : 'Pausada'}</span>
-                                            </div>
-                                            <h3 className="text-2xl font-serif font-bold italic text-primary leading-tight group-hover:text-luxury-black transition-colors">{promo.title}</h3>
+                                    <div className="flex gap-6 mb-8">
+                                        <div className="w-24 h-24 rounded-[1.5rem] overflow-hidden bg-primary/5 shrink-0 border border-primary/5 group-hover:scale-105 transition-transform duration-500 shadow-inner">
+                                            {promo.image_url ? (
+                                                <img src={promo.image_url} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-primary/10">
+                                                    <Tag className="w-8 h-8" />
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => toggleStatus(promo)} className={`p-3 rounded-xl transition-all ${promo.is_active ? 'bg-primary text-secondary-light' : 'bg-primary/5 text-primary/40'}`}><Power className="w-4 h-4" /></button>
-                                            <button onClick={() => handleOpenModal(promo)} className="p-3 bg-primary/5 text-primary/40 hover:bg-primary hover:text-white rounded-xl transition-all"><Settings className="w-4 h-4" /></button>
-                                            <button onClick={() => handleDeletePromo(promo.id)} className="p-3 bg-red-500/5 text-red-500/40 hover:bg-red-500 hover:text-white rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                                        <div className="flex-1 min-w-0 space-y-4">
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-2 h-2 rounded-full ${promo.is_active ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.6)]' : 'bg-primary/20'}`} />
+                                                    <span className="text-[9px] uppercase font-black tracking-[0.2em] text-primary/30">{promo.is_active ? 'Vigente' : 'Pausada'}</span>
+                                                </div>
+                                                <h3 className="text-2xl font-serif font-bold italic text-primary leading-tight group-hover:text-luxury-black transition-colors line-clamp-2">{promo.title}</h3>
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <button onClick={() => toggleStatus(promo)} title="Alternar Estado" className={`p-2 rounded-xl transition-all shadow-sm ${promo.is_active ? 'bg-primary text-secondary-light' : 'bg-primary/5 text-primary/40 hover:bg-primary/10'}`}><Power className="w-3.5 h-3.5" /></button>
+                                                <button onClick={() => handleOpenModal(promo)} title="Configurar" className="p-2 bg-primary/5 text-primary/40 hover:bg-primary hover:text-white rounded-xl transition-all shadow-sm border border-primary/5"><Settings className="w-3.5 h-3.5" /></button>
+                                                <button onClick={() => handleDeletePromo(promo.id)} title="Eliminar" className="p-2 bg-red-500/5 text-red-500/40 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm border border-primary/5"><Trash2 className="w-3.5 h-3.5" /></button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -335,9 +369,24 @@ const Promotions = () => {
 
                             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto no-scrollbar grid grid-cols-1 lg:grid-cols-2 gap-12 pr-4">
                                 <div className="space-y-8">
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Eslogan o Título</label>
-                                        <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-5 px-8 outline-none transition-all shadow-sm font-serif italic text-xl text-primary focus:border-primary" />
+                                    <div className="space-y-6">
+                                        <div className="flex flex-col items-center justify-center border-2 border-dashed border-primary/10 rounded-[3rem] p-10 group hover:border-primary/30 transition-colors relative h-48 overflow-hidden bg-white shadow-inner">
+                                            {form.image_url ? (
+                                                <img src={form.image_url} className="w-full h-full object-contain" />
+                                            ) : (
+                                                <div className="text-center space-y-4">
+                                                    <Upload className="text-primary w-12 h-12 mx-auto opacity-20" />
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">Imagen de la Campaña (Landing)</p>
+                                                </div>
+                                            )}
+                                            <input type="file" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
+                                            {uploadingImage && <div className="absolute inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-30"><Loader2 className="w-6 h-6 animate-spin text-white" /></div>}
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Eslogan o Título</label>
+                                            <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-8 outline-none transition-all shadow-sm font-serif italic text-xl text-primary focus:border-primary" />
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-6">
@@ -347,12 +396,30 @@ const Promotions = () => {
                                         </div>
                                         <div className="space-y-3">
                                             <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Lógica</label>
-                                            <select value={form.promo_type} onChange={e => setForm({ ...form, promo_type: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 font-bold text-primary text-xs outline-none focus:ring-1 focus:ring-primary">
+                                            <select value={form.promo_type} onChange={e => setForm({ ...form, promo_type: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 font-bold text-primary text-xs outline-none focus:ring-1 focus:ring-primary h-[56px]">
                                                 <option value="discount">Precio Especial</option>
+                                                <option value="code">Cupon / Código</option>
+                                                <option value="special">Oferta Especial</option>
                                                 <option value="bogo">2x1 / Regalo</option>
                                             </select>
                                         </div>
                                     </div>
+
+                                    {form.promo_type === 'code' && (
+                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1 flex items-center gap-2">
+                                                <Sparkles className="w-3 h-3 text-secondary" /> CÓDIGO DEL CUPÓN
+                                            </label>
+                                            <input
+                                                required
+                                                value={form.promo_code}
+                                                onChange={e => setForm({ ...form, promo_code: e.target.value.toUpperCase() })}
+                                                placeholder="Ej: LUX5OFF"
+                                                className="w-full bg-secondary/5 border border-secondary/20 rounded-2xl py-4 px-8 outline-none shadow-sm font-black text-primary text-lg tracking-widest focus:border-secondary"
+                                            />
+                                            <p className="text-[9px] text-primary/40 italic ml-1">Este código aplicará un 5% de descuento adicional al total de la factura.</p>
+                                        </motion.div>
+                                    )}
 
                                     <div className="space-y-3">
                                         <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Restricciones o Letra Pequeña</label>
@@ -383,24 +450,26 @@ const Promotions = () => {
                                         {products.map(prod => (
                                             <div key={prod.id} className={`p-4 rounded-2xl transition-all border ${form.product_ids.includes(prod.id) ? 'bg-white border-primary/10 shadow-md' : 'bg-transparent border-transparent opacity-50'}`}>
                                                 <div className="flex items-center justify-between gap-4">
-                                                    <button type="button" onClick={() => toggleProductSelection(prod.id)} className="flex items-center gap-4 text-left flex-1">
-                                                        <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${form.product_ids.includes(prod.id) ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}>
+                                                    <button type="button" onClick={() => toggleProductSelection(prod.id)} className="flex items-center gap-4 text-left min-w-0 flex-1">
+                                                        <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${form.product_ids.includes(prod.id) ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}>
                                                             {form.product_ids.includes(prod.id) && <CheckCircle2 className="text-white w-3 h-3" />}
                                                         </div>
-                                                        <div className="min-w-0">
+                                                        <div className="min-w-0 flex-1">
                                                             <p className="text-xs font-black text-primary truncate leading-none mb-1">{prod.name}</p>
                                                             <p className="text-[8px] font-bold text-primary/30 uppercase tracking-widest italic">Normal: L. {prod.price}</p>
                                                         </div>
                                                     </button>
 
                                                     {form.product_ids.includes(prod.id) && form.promo_type === 'discount' && (
-                                                        <div className="w-28 relative">
-                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-primary/20">L.</span>
+                                                        <div className="w-36 shrink-0 relative">
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-primary/30 italic">L.</span>
                                                             <input
                                                                 type="number"
+                                                                step="0.01"
                                                                 value={form.new_prices[prod.id]}
                                                                 onChange={(e) => setForm({ ...form, new_prices: { ...form.new_prices, [prod.id]: e.target.value } })}
-                                                                className="w-full bg-primary/[0.03] border-none rounded-xl py-2 pl-7 pr-3 text-[10px] font-black text-primary outline-none focus:ring-1 focus:ring-primary"
+                                                                className="w-full bg-primary/5 border border-primary/20 rounded-xl py-3 pl-8 pr-4 text-sm font-black text-primary outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                                                                placeholder="0.00"
                                                             />
                                                         </div>
                                                     )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useCart } from '../context/CartContext';
-import { Search, Plus, Minus, ShoppingCart, Grid, List, Filter, Tag, ChevronLeft, X, Sparkles } from 'lucide-react';
+import { Search, Plus, Minus, ShoppingCart, Grid, List, Filter, Tag, ChevronLeft, X, Sparkles, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
@@ -37,9 +37,7 @@ const Catalog = () => {
             const { data: prodData } = await supabase.from('products').select('*, categories(*)').order('created_at', { ascending: false });
             const { data: promoData } = await supabase.from('promotions')
                 .select('*')
-                .eq('is_active', true)
-                .lte('start_date', today)
-                .or(`end_date.is.null,end_date.gte.${today}`);
+                .eq('is_active', true);
 
             setCategories(catData || []);
             setProducts(prodData || []);
@@ -85,6 +83,7 @@ const Catalog = () => {
         const matchesCategory = selectedCategory === 'All'
             || (selectedCategory === 'Promo' && p.promo_badge)
             || (selectedCategory === 'ComingSoon' && p.is_coming_soon)
+            || (selectedCategory === 'NewArrival' && p.is_new_arrival)
             || p.categories?.id === selectedCategory;
 
         const matchesStock = !showOnlyInStock || p.stock > 0;
@@ -206,9 +205,17 @@ const Catalog = () => {
                                     {activePromos.length > 0 && (
                                         <button
                                             onClick={() => setSelectedCategory('Promo')}
-                                            className={`text-sm text-left transition-colors flex items-center gap-2 ${selectedCategory === 'Promo' ? 'text-secondary font-bold' : 'text-primary/60 hover:text-primary'}`}
+                                            className={`text-sm text-left transition-colors flex items-center gap-2 ${selectedCategory === 'Promo' ? 'text-red-600 font-bold' : 'text-primary/60 hover:text-primary'}`}
                                         >
-                                            <Tag className="w-3 h-3" /> Liquidaciones
+                                            <Tag className="w-4 h-4 text-red-500 fill-red-500/10" /> Promociones
+                                        </button>
+                                    )}
+                                    {products.some(p => p.is_new_arrival) && (
+                                        <button
+                                            onClick={() => setSelectedCategory('NewArrival')}
+                                            className={`text-sm text-left transition-colors flex items-center gap-2 ${selectedCategory === 'NewArrival' ? 'text-primary font-bold' : 'text-primary/60 hover:text-primary'}`}
+                                        >
+                                            <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500/10" /> New Arrivals
                                         </button>
                                     )}
                                     {products.some(p => p.is_coming_soon) && (
@@ -216,7 +223,7 @@ const Catalog = () => {
                                             onClick={() => setSelectedCategory('ComingSoon')}
                                             className={`text-sm text-left transition-colors flex items-center gap-2 ${selectedCategory === 'ComingSoon' ? 'text-amber-600 font-bold' : 'text-primary/60 hover:text-primary'}`}
                                         >
-                                            <Sparkles className="w-3 h-3 text-amber-500" /> Próximamente
+                                            <Clock className="w-4 h-4 text-amber-600" /> Próximamente
                                         </button>
                                     )}
                                     {categories.map(cat => (
@@ -352,11 +359,20 @@ const Catalog = () => {
                                         className={`group overflow-hidden ${viewMode === 'list' ? 'flex gap-8 items-center border-b border-primary/5 pb-8' : 'flex flex-col h-full'}`}
                                     >
                                         <div className={`relative overflow-hidden bg-primary/5 rounded-2xl ${viewMode === 'list' ? 'w-32 h-32 md:w-64 md:h-64 shrink-0' : 'aspect-[4/5] mb-4'}`}>
-                                            <img
-                                                src={product.image_url || '/img/logo.svg'}
-                                                alt={product.name}
-                                                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                                            />
+                                            <div className="w-full h-full relative">
+                                                <img
+                                                    src={product.image_url || '/img/logo.svg'}
+                                                    alt={product.name}
+                                                    className={`w-full h-full object-cover transition-all duration-1000 ${product.hover_image_url ? 'group-hover:opacity-0' : 'group-hover:scale-110'}`}
+                                                />
+                                                {product.hover_image_url && (
+                                                    <img
+                                                        src={product.hover_image_url}
+                                                        alt={`${product.name} - Detalle`}
+                                                        className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-1000 scale-110 group-hover:scale-100"
+                                                    />
+                                                )}
+                                            </div>
 
                                             <div
                                                 className="absolute inset-0 cursor-pointer"
@@ -366,13 +382,18 @@ const Catalog = () => {
                                             {/* Badges */}
                                             <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 pointer-events-none">
                                                 {product.is_new_arrival && (
-                                                    <span className="absolute top-4 left-4 px-3 py-1 bg-primary text-secondary-light text-[8px] font-black uppercase tracking-widest rounded-full z-10">
+                                                    <span className="px-3 py-1 bg-primary text-secondary-light text-[8px] font-black uppercase tracking-widest rounded-full shadow-lg whitespace-nowrap">
                                                         Nuevo
                                                     </span>
                                                 )}
                                                 {product.is_coming_soon && (
-                                                    <span className="absolute top-4 left-4 px-3 py-1 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full z-10">
+                                                    <span className="px-3 py-1 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full shadow-lg whitespace-nowrap">
                                                         Próximamente
+                                                    </span>
+                                                )}
+                                                {product.stock <= 0 && (
+                                                    <span className="bg-red-500 text-white text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">
+                                                        Sin Stock
                                                     </span>
                                                 )}
                                                 {product.promo_badge && (
@@ -621,12 +642,28 @@ const Catalog = () => {
                                                 >
                                                     Todos
                                                 </button>
+                                                {activePromos.length > 0 && (
+                                                    <button
+                                                        onClick={() => setSelectedCategory('Promo')}
+                                                        className={`text-sm text-left flex items-center gap-2 ${selectedCategory === 'Promo' ? 'text-red-600 font-bold' : 'text-primary/60'}`}
+                                                    >
+                                                        <Tag className="w-4 h-4 text-red-500 fill-red-500/10" /> Promociones
+                                                    </button>
+                                                )}
+                                                {products.some(p => p.is_new_arrival) && (
+                                                    <button
+                                                        onClick={() => setSelectedCategory('NewArrival')}
+                                                        className={`text-sm text-left flex items-center gap-2 ${selectedCategory === 'NewArrival' ? 'text-primary font-bold' : 'text-primary/60'}`}
+                                                    >
+                                                        <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500/10" /> New Arrivals
+                                                    </button>
+                                                )}
                                                 {products.some(p => p.is_coming_soon) && (
                                                     <button
                                                         onClick={() => setSelectedCategory('ComingSoon')}
-                                                        className={`text-sm text-left ${selectedCategory === 'ComingSoon' ? 'text-amber-600 font-bold' : 'text-primary/60'}`}
+                                                        className={`text-sm text-left flex items-center gap-2 ${selectedCategory === 'ComingSoon' ? 'text-amber-600 font-bold' : 'text-primary/60'}`}
                                                     >
-                                                        Próximamente
+                                                        <Clock className="w-4 h-4 text-amber-600" /> Próximamente
                                                     </button>
                                                 )}
                                                 {categories.map(cat => (

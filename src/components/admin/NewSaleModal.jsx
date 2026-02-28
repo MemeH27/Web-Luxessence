@@ -49,6 +49,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
     const [discountType, setDiscountType] = useState('fixed'); // 'fixed' or 'percentage'
     const [paymentMethod, setPaymentMethod] = useState('Contado');
     const [useLoyaltyDiscount, setUseLoyaltyDiscount] = useState(false);
+    const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
 
     useEffect(() => {
         if (isOpen) {
@@ -56,6 +57,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
             fetchProducts();
             fetchCategories();
             resetState();
+            setSaleDate(new Date().toISOString().split('T')[0]);
         }
     }, [isOpen]);
 
@@ -88,13 +90,24 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
     };
 
     const filteredCustomers = useMemo(() => {
-        if (!searchCustomer) return [];
+        if (!searchCustomer) return customers;
         return customers.filter(c =>
             c.first_name?.toLowerCase().includes(searchCustomer.toLowerCase()) ||
             c.last_name?.toLowerCase().includes(searchCustomer.toLowerCase()) ||
             c.phone?.includes(searchCustomer)
         );
     }, [customers, searchCustomer]);
+
+    // Click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showCustomerDropdown && !event.target.closest('.customer-search-container')) {
+                setShowCustomerDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showCustomerDropdown]);
 
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
@@ -209,8 +222,20 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
     const handleCreateCustomer = async (e) => {
         e.preventDefault();
         try {
-            const { data, error } = await supabase.from('customers').insert(newCustomer).select().single();
+            const rawPhone = newCustomer.phone ? newCustomer.phone.replace('+504', '').replace(/\D/g, '') : '';
+            if (rawPhone.length !== 8) {
+                addToast('El número debe tener 8 dígitos', 'error');
+                return;
+            }
+
+            const formattedCustomer = {
+                ...newCustomer,
+                phone: `+504 ${rawPhone}`
+            };
+
+            const { data, error } = await supabase.from('customers').insert(formattedCustomer).select().single();
             if (error) throw error;
+
             setCustomers([...customers, data]);
             setSelectedCustomer(data);
             setIsNewCustomerModalOpen(false);
@@ -245,6 +270,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 total: total,
                 items: orderItems,
                 delivery_mode: 'mostrador',
+                created_at: new Date(saleDate).toISOString()
             }).select().single();
 
             if (orderError) throw orderError;
@@ -256,7 +282,8 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 total: total,
                 discount: discountAmount,
                 payment_method: paymentMethod,
-                is_paid: paymentMethod === 'Contado'
+                is_paid: paymentMethod === 'Contado',
+                created_at: new Date(saleDate).toISOString()
             }).select().single();
 
             if (saleError) throw saleError;
@@ -277,7 +304,8 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                     sale_id: sale.id,
                     amount: total,
                     payment_method: paymentMethod,
-                    notes: 'Venta presencial'
+                    notes: 'Venta presencial',
+                    created_at: new Date(saleDate).toISOString()
                 });
             }
 
@@ -446,45 +474,74 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                         {/* Billing Controls */}
                         <div className="p-4 space-y-4 bg-white">
 
-                            {/* Customer Select */}
+                            {/* Sale Date Picker */}
                             <div>
-                                <label className="text-xs font-semibold text-gray-600 mb-1 block">Cliente</label>
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <label className="text-xs font-semibold text-gray-600 mb-1 block">Fecha de Venta</label>
+                                <div className="flex gap-2">
                                     <input
-                                        type="text"
-                                        placeholder="Buscar o Consumidor Final..."
-                                        value={searchCustomer}
-                                        onChange={(e) => { setSearchCustomer(e.target.value); setShowCustomerDropdown(true); }}
-                                        onFocus={() => setShowCustomerDropdown(true)}
-                                        className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary"
+                                        type="date"
+                                        value={saleDate}
+                                        onChange={(e) => setSaleDate(e.target.value)}
+                                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary"
                                     />
-                                    {selectedCustomer.id && (
-                                        <button onClick={() => { setSelectedCustomer(CONSUMIDOR_FINAL); setSearchCustomer(''); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={() => setSaleDate(new Date().toISOString().split('T')[0])}
+                                        className="px-3 py-2 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
+                                    >
+                                        Hoy
+                                    </button>
+                                </div>
+                            </div>
 
-                                    {showCustomerDropdown && (searchCustomer || filteredCustomers.length > 0) && (
-                                        <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
-                                            {filteredCustomers.length > 0 ? (
-                                                filteredCustomers.map(c => (
-                                                    <button key={c.id} onClick={() => { setSelectedCustomer(c); setSearchCustomer(`${c.first_name} ${c.last_name}`); setShowCustomerDropdown(false); setUseLoyaltyDiscount(false); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0 flex justify-between items-center" >
-                                                        <div>
-                                                            <div className="font-medium text-gray-900">{c.first_name} {c.last_name}</div>
-                                                            <div className="text-xs text-gray-500">{c.phone}</div>
-                                                        </div>
-                                                        <span className="text-[10px] font-black uppercase text-secondary bg-secondary/10 px-2 py-0.5 rounded border border-secondary/20">Sellos {c.loyalty_stamps || 0}/5</span>
-                                                    </button>
-                                                ))
-                                            ) : (
-                                                <div className="p-3 text-center">
-                                                    <p className="text-xs text-gray-500 mb-2">No encontrado</p>
-                                                    <button onClick={() => { setIsNewCustomerModalOpen(true); setShowCustomerDropdown(false); }} className="text-xs bg-primary text-white px-3 py-1.5 rounded-md w-full" > Crear Cliente </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                            {/* Customer Select */}
+                            <div className="customer-search-container">
+                                <label className="text-xs font-semibold text-gray-600 mb-1 block">Cliente</label>
+                                <div className="flex gap-2 relative">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar o Consumidor Final..."
+                                            value={searchCustomer}
+                                            onChange={(e) => { setSearchCustomer(e.target.value); setShowCustomerDropdown(true); }}
+                                            onFocus={() => setShowCustomerDropdown(true)}
+                                            className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all"
+                                        />
+                                        {selectedCustomer.id && (
+                                            <button onClick={() => { setSelectedCustomer(CONSUMIDOR_FINAL); setSearchCustomer(''); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        )}
+
+                                        {showCustomerDropdown && (
+                                            <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                                                {filteredCustomers.length > 0 ? (
+                                                    filteredCustomers.map(c => (
+                                                        <button key={c.id} onClick={() => { setSelectedCustomer(c); setSearchCustomer(`${c.first_name} ${c.last_name}`); setShowCustomerDropdown(false); setUseLoyaltyDiscount(false); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0 flex justify-between items-center" >
+                                                            <div>
+                                                                <div className="font-medium text-gray-900">{c.first_name} {c.last_name}</div>
+                                                                <div className="text-xs text-gray-500">{c.phone}</div>
+                                                            </div>
+                                                            <span className="text-[10px] font-black uppercase text-secondary bg-secondary/10 px-2 py-0.5 rounded border border-secondary/20">Sellos {c.loyalty_stamps || 0}/5</span>
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-3 text-center">
+                                                        <p className="text-xs text-gray-500 mb-2">No encontrado</p>
+                                                        <button onClick={() => { setIsNewCustomerModalOpen(true); setShowCustomerDropdown(false); }} className="text-xs bg-primary text-white px-3 py-1.5 rounded-md w-full" > Crear Cliente </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsNewCustomerModalOpen(true)}
+                                        className="p-2.5 bg-primary text-secondary-light rounded-lg hover:bg-primary/90 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                                        title="Registrar Nuevo Cliente"
+                                    >
+                                        <UserPlus className="w-4 h-4" />
+                                    </button>
                                 </div>
                                 {selectedCustomer.id && (
                                     <div className="mt-2 p-2 bg-secondary/5 rounded-lg border border-secondary/20 flex justify-between items-center">
@@ -626,19 +683,56 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
             <AnimatePresence>
                 {isNewCustomerModalOpen && (
                     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-black/50" onClick={() => setIsNewCustomerModalOpen(false)} />
-                        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 relative z-10" >
-                            <h3 className="text-lg font-bold text-gray-900 mb-4">Nuevo Cliente</h3>
-                            <form onSubmit={handleCreateCustomer} className="space-y-3 pb-2">
-                                <div className="flex gap-3">
-                                    <input type="text" placeholder="Nombre" value={newCustomer.first_name} onChange={e => setNewCustomer({ ...newCustomer, first_name: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm focus:border-primary focus:outline-none" required />
-                                    <input type="text" placeholder="Apellido" value={newCustomer.last_name} onChange={e => setNewCustomer({ ...newCustomer, last_name: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm focus:border-primary focus:outline-none" required />
+                        <div className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setIsNewCustomerModalOpen(false)} />
+                        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="bg-white rounded-[3rem] shadow-3xl w-full max-w-md p-10 relative z-10 border border-primary/10" >
+                            <div className="flex justify-between items-center mb-8">
+                                <div className="space-y-1">
+                                    <h3 className="text-2xl font-serif font-bold italic text-primary">Nuevo Cliente</h3>
+                                    <p className="text-[10px] text-primary/30 uppercase tracking-[0.2em] font-black italic">Registro Rápido</p>
                                 </div>
-                                <input type="tel" placeholder="Teléfono" value={newCustomer.phone} onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm focus:border-primary focus:outline-none" required />
-                                <input type="text" placeholder="Dirección" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm focus:border-primary focus:outline-none" />
-                                <div className="flex gap-2 pt-2">
-                                    <button type="button" onClick={() => setIsNewCustomerModalOpen(false)} className="flex-1 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
-                                    <button type="submit" className="flex-[1.5] py-2 text-sm text-white bg-primary rounded-lg hover:bg-primary/90">Guardar</button>
+                                <button onClick={() => setIsNewCustomerModalOpen(false)} className="p-2 hover:bg-primary/5 rounded-full text-primary/30 transition-all"><X className="w-5 h-5" /></button>
+                            </div>
+
+                            <form onSubmit={handleCreateCustomer} className="space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] uppercase tracking-widest text-primary/40 font-black ml-2">Nombre</label>
+                                        <input type="text" placeholder="Ej. Ana" value={newCustomer.first_name} onChange={e => setNewCustomer({ ...newCustomer, first_name: e.target.value })} className="w-full px-5 py-3 border border-primary/10 rounded-xl text-sm focus:border-primary focus:outline-none bg-gray-50/50" required />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] uppercase tracking-widest text-primary/40 font-black ml-2">Apellido</label>
+                                        <input type="text" placeholder="Ej. Pérez" value={newCustomer.last_name} onChange={e => setNewCustomer({ ...newCustomer, last_name: e.target.value })} className="w-full px-5 py-3 border border-primary/10 rounded-xl text-sm focus:border-primary focus:outline-none bg-gray-50/50" required />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] uppercase tracking-widest text-primary/40 font-black ml-2">Teléfono</label>
+                                    <div className="flex bg-gray-50/50 border border-primary/10 rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-primary transition-all">
+                                        <div className="bg-primary/5 px-4 flex items-center justify-center border-r border-primary/10">
+                                            <span className="text-primary/40 font-bold text-xs">+504</span>
+                                        </div>
+                                        <input
+                                            type="tel"
+                                            placeholder="0000 0000"
+                                            value={newCustomer.phone ? newCustomer.phone.replace('+504', '').trim() : ''}
+                                            onChange={e => {
+                                                const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                                setNewCustomer({ ...newCustomer, phone: `+504 ${digitsOnly}` });
+                                            }}
+                                            className="w-full bg-transparent py-3 px-4 outline-none text-sm font-medium"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] uppercase tracking-widest text-primary/40 font-black ml-2">Dirección (Opcional)</label>
+                                    <textarea placeholder="Dirección de entrega..." value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} rows="2" className="w-full px-5 py-3 border border-primary/10 rounded-xl text-sm focus:border-primary focus:outline-none bg-gray-50/50 resize-none italic" />
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <button type="button" onClick={() => setIsNewCustomerModalOpen(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-primary/40 border border-primary/5 rounded-2xl hover:bg-gray-50 transition-all">Cancelar</button>
+                                    <button type="submit" className="flex-[1.5] py-4 text-[10px] font-black uppercase tracking-widest text-white bg-primary rounded-2xl hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all">Guardar Cliente</button>
                                 </div>
                             </form>
                         </motion.div>
