@@ -68,7 +68,8 @@ const ProductManagement = () => {
 
     const [form, setForm] = useState({
         name: '', description: '', price: 0, cost: 0, stock: 0, category_id: '', image_url: '', hover_image_url: '',
-        is_new_arrival: false, is_gift_option: false, is_coming_soon: false
+        is_new_arrival: false, is_gift_option: false, is_coming_soon: false,
+        variants: []
     });
 
     useEffect(() => {
@@ -101,7 +102,8 @@ const ProductManagement = () => {
             setForm({
                 name: '', description: '', price: 0, cost: 0, stock: 0,
                 category_id: categories[0]?.id || '', image_url: '',
-                is_new_arrival: false, is_gift_option: false, is_coming_soon: false
+                is_new_arrival: false, is_gift_option: false, is_coming_soon: false,
+                variants: []
             });
         }
         setIsModalOpen(true);
@@ -163,12 +165,18 @@ const ProductManagement = () => {
         }
     };
 
-    const handleImageUpload = async (e, field = 'image_url') => {
-        setUploading(field);
+    const handleImageUpload = async (e, field = 'image_url', isVariant = false, variantIndex = null) => {
+        setUploading(isVariant ? `variant_${variantIndex}` : field);
         const file = e.target.files[0];
         try {
             const publicUrl = await uploadAndOptimize(supabase, 'products', file, true);
-            setForm({ ...form, [field]: publicUrl });
+            if (isVariant) {
+                const newVariants = [...form.variants];
+                newVariants[variantIndex] = { ...newVariants[variantIndex], image_url: publicUrl };
+                setForm({ ...form, variants: newVariants });
+            } else {
+                setForm({ ...form, [field]: publicUrl });
+            }
         } catch (error) {
             console.error('Upload error:', error);
             alert(`Error subiendo imagen: ${error.message}.`);
@@ -177,11 +185,43 @@ const ProductManagement = () => {
         }
     };
 
+    const addVariant = () => {
+        setForm({
+            ...form,
+            variants: [...(form.variants || []), { id: crypto.randomUUID(), name: '', stock: 0, image_url: '' }]
+        });
+    };
+
+    const removeVariant = (id) => {
+        setForm({
+            ...form,
+            variants: form.variants.filter(v => v.id !== id)
+        });
+    };
+
+    const updateVariant = (index, field, value) => {
+        const newVariants = [...form.variants];
+        newVariants[index] = { ...newVariants[index], [field]: value };
+        setForm({ ...form, variants: newVariants });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         const { categories: _, ...cleanForm } = form;
-        const payload = { ...cleanForm, price: Number(form.price), cost: Number(form.cost), stock: Number(form.stock) };
+
+        // Ensure price & stock are numbers
+        const totalStock = form.variants?.length > 0
+            ? form.variants.reduce((acc, v) => acc + Number(v.stock), 0)
+            : Number(form.stock);
+
+        const payload = {
+            ...cleanForm,
+            price: Number(form.price),
+            cost: Number(form.cost),
+            stock: totalStock,
+            variants: form.variants || []
+        };
 
         try {
             const { error } = editingProduct
@@ -526,7 +566,84 @@ const ProductManagement = () => {
 
                                 <div className="md:col-span-2 space-y-3">
                                     <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Notas del Producto</label>
-                                    <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="3" className="w-full bg-white border border-primary/10 rounded-[2rem] py-5 px-8 outline-none transition-all shadow-sm resize-none text-sm italic focus:border-primary" />
+                                    <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="2" className="w-full bg-white border border-primary/10 rounded-[2rem] py-5 px-8 outline-none transition-all shadow-sm resize-none text-sm italic focus:border-primary" />
+                                </div>
+
+                                {/* Variants Section */}
+                                <div className="md:col-span-2 space-y-6 pt-6 border-t border-primary/5">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <h4 className="text-xl font-serif font-bold italic text-primary">Fragrancias / Variantes</h4>
+                                            <p className="text-[9px] text-primary/30 uppercase tracking-[0.2em] font-black">Manejo de opciones individuales</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={addVariant}
+                                            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:text-secondary-dark transition-colors px-4 py-2 bg-primary/5 rounded-full"
+                                        >
+                                            <Plus className="w-4 h-4" /> Agregar Variante
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {form.variants?.map((variant, idx) => (
+                                            <div key={variant.id} className="bg-white border border-primary/10 rounded-3xl p-4 flex gap-4 items-center relative group">
+                                                <div className="w-20 h-20 rounded-2xl bg-primary/5 overflow-hidden relative shrink-0">
+                                                    {variant.image_url ? (
+                                                        <img src={variant.image_url} className="w-full h-full object-cover" alt={variant.name} />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-primary/10">
+                                                            <Upload className="w-6 h-6" />
+                                                        </div>
+                                                    )}
+                                                    <input
+                                                        type="file"
+                                                        onChange={(e) => handleImageUpload(e, null, true, idx)}
+                                                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                                    />
+                                                    {uploading === `variant_${idx}` && (
+                                                        <div className="absolute inset-0 bg-primary/40 flex items-center justify-center z-20">
+                                                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex-1 space-y-2">
+                                                    <input
+                                                        placeholder="Nombre (Ej: Japanese Cherry)"
+                                                        value={variant.name}
+                                                        onChange={(e) => updateVariant(idx, 'name', e.target.value)}
+                                                        className="w-full bg-transparent border-b border-primary/5 focus:border-primary text-sm font-bold outline-none pb-1"
+                                                    />
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-primary/20">Stock:</span>
+                                                        <input
+                                                            type="number"
+                                                            value={variant.stock}
+                                                            onChange={(e) => updateVariant(idx, 'stock', Number(e.target.value))}
+                                                            className="w-16 bg-primary/5 rounded px-2 py-1 text-xs font-bold outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeVariant(variant.id)}
+                                                    className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {form.variants?.length > 0 && (
+                                        <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-2xl">
+                                            <p className="text-[10px] text-amber-600 font-bold italic">
+                                                * El stock total del producto se calculará automáticamente sumando las variantes.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button type="submit" className="md:col-span-2 btn-primary !py-6 mt-4 font-black uppercase tracking-[0.3em] text-xs">

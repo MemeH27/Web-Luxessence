@@ -24,6 +24,16 @@ const Catalog = () => {
     const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
     const [sortBy, setSortBy] = useState('newest');
     const [showOnlyInStock, setShowOnlyInStock] = useState(true);
+    const [selectedVariant, setSelectedVariant] = useState(null);
+    const [multiVariantQuantities, setMultiVariantQuantities] = useState({});
+
+    // Keep multiVariantQuantities in sync with focus if needed, but actually we'll handle it separately
+    // No need for the previous useEffect that reset quantities, we WANT it to persist in the modal session
+    useEffect(() => {
+        if (!isProductModalOpen) {
+            setMultiVariantQuantities({});
+        }
+    }, [isProductModalOpen]);
 
     useEffect(() => {
         fetchData();
@@ -110,6 +120,7 @@ const Catalog = () => {
 
     const openProductDetails = (product) => {
         setSelectedProductDetails(product);
+        setSelectedVariant(product.variants?.length > 0 ? product.variants[0] : null);
         if (!productQuantities[product.id]) {
             setProductQuantities(prev => ({ ...prev, [product.id]: 1 }));
         }
@@ -117,35 +128,81 @@ const Catalog = () => {
     };
 
     const handleAddToCart = (product) => {
-        const qty = productQuantities[product.id] || 1;
-
-        if (product.stock <= 0) {
-            addToast('No hay stock disponible. Pronto tendremos restock.', 'error');
-            return;
-        }
-
-        if (qty > product.stock) {
-            addToast(`Solo hay ${product.stock} unidades disponibles`, 'error');
-            return;
-        }
-
         const isJibbitz = product.categories?.name?.toLowerCase().includes('jibbitz');
         if (isJibbitz) {
             setSelectedJibbitz(product);
             setComboQuantities({});
             setIsComboModalOpen(true);
+            return;
+        }
+
+        const hasVariants = product.variants?.length > 0;
+
+        if (hasVariants) {
+            const itemsToAdd = Object.entries(multiVariantQuantities)
+                .filter(([_, qty]) => qty > 0)
+                .map(([vId, qty]) => {
+                    const variant = product.variants.find(v => v.id === vId);
+                    return { variant, qty };
+                });
+
+            if (itemsToAdd.length === 0) {
+                // If nothing selected in multi, maybe they just want the focused one?
+                if (selectedVariant) {
+                    const focusedQty = productQuantities[product.id] || 1;
+                    if (selectedVariant.stock < focusedQty) {
+                        addToast(`Solo hay ${selectedVariant.stock} de ${selectedVariant.name}`, 'error');
+                        return;
+                    }
+                    itemsToAdd.push({ variant: selectedVariant, qty: focusedQty });
+                } else {
+                    addToast('Selecciona al menos una fragancia/variante.', 'warning');
+                    return;
+                }
+            }
+
+            itemsToAdd.forEach(({ variant, qty }) => {
+                const config = {
+                    id: variant.id,
+                    label: variant.name,
+                    image_url: variant.image_url,
+                    price: product.price
+                };
+                addToCart(product, config, qty);
+            });
+
+            addToast(`Sus productos se han agregado con éxito al carrito (${itemsToAdd.reduce((acc, item) => acc + item.qty, 0)} items)`, 'success');
+            setIsProductModalOpen(false);
         } else {
+            const qty = productQuantities[product.id] || 1;
+            if (product.stock < qty) {
+                addToast(`Stock insuficiente (Solo ${product.stock} disp.)`, 'error');
+                return;
+            }
             addToCart(product, null, qty);
-            addToast(`${qty} x ${product.name} añadido al carrito`);
+            addToast(`Sus productos se han agregado con éxito al carrito`, 'success');
+            setIsProductModalOpen(false);
         }
     };
 
-    const updateProductQty = (productId, delta, stock) => {
-        setProductQuantities(prev => {
-            const current = prev[productId] || 1;
-            const next = Math.max(1, Math.min(stock, current + delta));
-            return { ...prev, [productId]: next };
-        });
+    const updateProductQty = (productId, delta, stock, variantId = null) => {
+        if (variantId) {
+            setMultiVariantQuantities(prev => {
+                const current = prev[variantId] || 0;
+                const next = Math.max(0, Math.min(stock, current + delta));
+                return { ...prev, [variantId]: next };
+            });
+            // Also sync the "main" display quantity if this is the focused variant
+            if (selectedVariant?.id === variantId) {
+                setProductQuantities(prev => ({ ...prev, [productId]: Math.max(1, (prev[variantId] || 0) + delta) }));
+            }
+        } else {
+            setProductQuantities(prev => {
+                const current = prev[productId] || 1;
+                const next = Math.max(1, Math.min(stock, current + delta));
+                return { ...prev, [productId]: next };
+            });
+        }
     };
 
     const confirmJibbitzCombos = () => {
@@ -523,7 +580,7 @@ const Catalog = () => {
                                     {/* Mobile Floating Close - Only visible on scroll or fixed */}
                                     <button
                                         onClick={() => setIsProductModalOpen(false)}
-                                        className="absolute top-6 right-6 z-50 p-4 bg-primary text-secondary-light rounded-full hover:scale-110 active:scale-95 transition-all shadow-xl md:flex"
+                                        className="absolute top-10 md:top-6 right-6 z-50 p-4 bg-primary text-secondary-light rounded-full hover:scale-110 active:scale-95 transition-all shadow-xl md:flex"
                                     >
                                         <X className="w-6 h-6" />
                                     </button>
@@ -531,16 +588,16 @@ const Catalog = () => {
                                     {/* Image Section - Larger on mobile */}
                                     <div className="w-full md:w-1/2 h-[50vh] md:h-auto bg-primary/5 flex items-center justify-center shrink-0">
                                         <img
-                                            src={selectedProductDetails.image_url || '/img/logo.svg'}
+                                            src={selectedVariant?.image_url || selectedProductDetails.image_url || '/img/logo.svg'}
                                             className="w-full h-full object-contain p-4 md:p-12 transition-transform duration-700 hover:scale-105"
-                                            alt={selectedProductDetails.name}
+                                            alt={selectedVariant?.name || selectedProductDetails.name}
                                         />
                                     </div>
 
                                     {/* Info Section */}
                                     <div className="flex-1 flex flex-col relative overflow-hidden">
                                         {/* Scrollable Content */}
-                                        <div className="flex-1 overflow-y-auto no-scrollbar p-8 md:p-16 pb-32 md:pb-16">
+                                        <div className="flex-1 overflow-y-auto no-scrollbar p-8 md:p-16 pb-48 md:pb-64">
                                             <div className="space-y-8">
                                                 <div className="space-y-4">
                                                     <div className="flex items-center gap-4">
@@ -570,35 +627,135 @@ const Catalog = () => {
                                                         {selectedProductDetails.description || 'Una expresión curada de distinción Luxessence, diseñada para elevar tu estilo personal con elegancia atemporal.'}
                                                     </p>
                                                 </div>
+
+                                                {/* Variant Selection */}
+                                                {selectedProductDetails.variants?.length > 0 && (
+                                                    <div className="space-y-6 pt-8 border-t border-primary/5">
+                                                        <div className="flex items-center justify-between">
+                                                            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/30">Seleccionar Fragancia</h4>
+                                                            <span className="text-[9px] font-bold text-primary/20 italic">
+                                                                {selectedProductDetails.variants.length} opciones disponibles
+                                                            </span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 xs:grid-cols-3 gap-3">
+                                                            {selectedProductDetails.variants.map((v) => {
+                                                                const isFocused = selectedVariant?.id === v.id;
+                                                                const isOutOfStock = v.stock <= 0;
+                                                                const currentQty = multiVariantQuantities[v.id] || 0;
+
+                                                                return (
+                                                                    <div
+                                                                        key={v.id}
+                                                                        onClick={() => setSelectedVariant(v)}
+                                                                        className={`group relative p-4 rounded-3xl transition-all duration-500 text-left border overflow-hidden cursor-pointer
+                                                                            ${isFocused
+                                                                                ? 'border-primary ring-2 ring-primary/20 bg-primary/5 shadow-xl scale-[1.02]'
+                                                                                : currentQty > 0
+                                                                                    ? 'bg-primary/5 border-primary/40'
+                                                                                    : isOutOfStock
+                                                                                        ? 'bg-primary/[0.02] border-primary/5 opacity-50 cursor-not-allowed'
+                                                                                        : 'bg-white border-primary/10 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-1'}`}
+                                                                    >
+                                                                        {/* Status Indicators */}
+                                                                        <div className="absolute top-0 right-0 p-2 flex gap-1 items-center z-20">
+                                                                            {isFocused && (
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                                                            )}
+                                                                        </div>
+
+                                                                        <div className="space-y-1 relative z-10 pb-10">
+                                                                            <p className={`text-[8px] font-black uppercase tracking-widest transition-colors
+                                                                                ${isFocused ? 'text-primary' : isOutOfStock ? 'text-red-400' : 'text-primary/30'}`}>
+                                                                                {isOutOfStock ? 'Agotado' : `${v.stock} disp.`}
+                                                                            </p>
+                                                                            <p className={`text-[10px] font-bold leading-tight line-clamp-2 transition-colors
+                                                                                ${isFocused ? 'text-primary' : 'text-primary/70'}`}>
+                                                                                {v.name}
+                                                                            </p>
+                                                                        </div>
+
+                                                                        {/* Individual Quantity Controls positioned at the bottom of the card */}
+                                                                        {!isOutOfStock && (
+                                                                            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-white/80 backdrop-blur-md rounded-2xl p-1 border border-primary/5 shadow-sm z-30" onClick={(e) => e.stopPropagation()}>
+                                                                                <button
+                                                                                    onClick={() => updateProductQty(selectedProductDetails.id, -1, v.stock, v.id)}
+                                                                                    className={`w-7 h-7 flex items-center justify-center rounded-xl transition-all ${currentQty > 0 ? 'text-primary hover:bg-primary/10' : 'text-primary/10'}`}
+                                                                                    disabled={currentQty === 0}
+                                                                                >
+                                                                                    <Minus className="w-3.5 h-3.5" />
+                                                                                </button>
+
+                                                                                <span className={`text-xs font-black transition-all ${currentQty > 0 ? 'text-primary scale-110' : 'text-primary/20'}`}>
+                                                                                    {currentQty}
+                                                                                </span>
+
+                                                                                <button
+                                                                                    onClick={() => updateProductQty(selectedProductDetails.id, 1, v.stock, v.id)}
+                                                                                    className="w-7 h-7 flex items-center justify-center rounded-xl text-primary hover:bg-primary/10 transition-all"
+                                                                                    disabled={currentQty >= v.stock}
+                                                                                >
+                                                                                    <Plus className="w-3.5 h-3.5" />
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Hover glass effect */}
+                                                                        {!isFocused && !isOutOfStock && (
+                                                                            <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
                                         {/* Actions Footer */}
-                                        <div className="md:relative p-6 md:p-16 md:pt-0 bg-gradient-to-t from-white via-white to-transparent md:bg-none absolute bottom-0 left-0 right-0">
+                                        <div className="absolute bottom-0 left-0 right-0 z-50 p-6 pb-12 md:p-16 md:pt-0 bg-gradient-to-t from-white via-white/95 to-transparent backdrop-blur-md md:backdrop-blur-none">
                                             <div className="flex gap-4 max-w-lg mx-auto md:max-w-none">
-                                                <div className="flex items-center bg-primary/5 border border-primary/10 p-1.5 rounded-2xl shadow-sm">
+                                                <div className="flex items-center bg-white border border-primary/10 p-1.5 rounded-2xl shadow-xl backdrop-blur-xl">
                                                     <button
-                                                        onClick={() => updateProductQty(selectedProductDetails.id, -1, selectedProductDetails.stock)}
+                                                        onClick={() => {
+                                                            if (selectedVariant) {
+                                                                updateProductQty(selectedProductDetails.id, -1, selectedVariant.stock, selectedVariant.id);
+                                                            } else {
+                                                                updateProductQty(selectedProductDetails.id, -1, selectedProductDetails.stock);
+                                                            }
+                                                        }}
                                                         className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
                                                     >
                                                         <Minus className="w-5 h-5" />
                                                     </button>
                                                     <span className="w-8 md:w-10 text-center text-lg md:text-xl font-black text-primary">
-                                                        {productQuantities[selectedProductDetails.id] || 1}
+                                                        {selectedProductDetails.variants?.length > 0
+                                                            ? Object.values(multiVariantQuantities).reduce((a, b) => a + b, 0)
+                                                            : (productQuantities[selectedProductDetails.id] || 1)}
                                                     </span>
                                                     <button
-                                                        onClick={() => updateProductQty(selectedProductDetails.id, 1, selectedProductDetails.stock)}
+                                                        onClick={() => {
+                                                            if (selectedVariant) {
+                                                                updateProductQty(selectedProductDetails.id, 1, selectedVariant.stock, selectedVariant.id);
+                                                            } else {
+                                                                updateProductQty(selectedProductDetails.id, 1, selectedProductDetails.stock);
+                                                            }
+                                                        }}
                                                         className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
                                                     >
                                                         <Plus className="w-5 h-5" />
                                                     </button>
                                                 </div>
                                                 <button
-                                                    onClick={() => { handleAddToCart(selectedProductDetails); setIsProductModalOpen(false); }}
+                                                    onClick={() => { handleAddToCart(selectedProductDetails); if (!selectedProductDetails.variants?.length) setIsProductModalOpen(false); }}
                                                     className="flex-1 btn-primary !py-4 md:!py-5 flex items-center justify-center gap-3 text-xs md:text-sm shadow-2xl active:scale-95 transition-all"
                                                 >
                                                     <ShoppingCart className="w-5 h-5" />
-                                                    <span className="hidden xs:inline">AÑADIR A LA BOLSA</span>
+                                                    <span className="hidden xs:inline">
+                                                        {selectedProductDetails.variants?.length > 0
+                                                            ? `AÑADIR ${Object.values(multiVariantQuantities).reduce((a, b) => a + b, 0) || ''} A LA BOLSA`
+                                                            : 'AÑADIR A LA BOLSA'}
+                                                    </span>
                                                     <span className="xs:hidden">AÑADIR</span>
                                                 </button>
                                             </div>
@@ -623,7 +780,7 @@ const Catalog = () => {
                                     initial={{ x: '100%' }}
                                     animate={{ x: 0 }}
                                     exit={{ x: '100%' }}
-                                    className="bg-white w-full max-w-xs h-screen relative z-10 shadow-2xl flex flex-col"
+                                    className="bg-white w-full max-w-xs h-[100dvh] relative z-10 shadow-2xl flex flex-col"
                                 >
                                     <div className="p-6 flex items-center justify-between border-b border-primary/5">
                                         <h2 className="text-lg font-serif font-black italic text-primary">Filtros</h2>

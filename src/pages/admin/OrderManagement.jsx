@@ -79,10 +79,20 @@ const OrderManagement = () => {
             if (orderToDelete.status === 'processed') {
                 // Processed order: restock ONCE here, then delete linked sale and payments
                 for (const item of orderToDelete.items) {
-                    const { data: prod } = await supabase.from('products').select('stock').eq('id', item.id || item.product_id).single();
+                    const baseId = item.id || item.product_id;
+                    const { data: prod } = await supabase.from('products').select('stock, variants').eq('id', baseId).single();
                     if (prod) {
                         const revertQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
-                        await supabase.from('products').update({ stock: prod.stock + revertQty }).eq('id', item.id || item.product_id);
+
+                        if (item.is_variant && item.variant_id) {
+                            const updatedVariants = prod.variants.map(v =>
+                                v.id === item.variant_id ? { ...v, stock: v.stock + item.quantity } : v
+                            );
+                            const newTotalStock = updatedVariants.reduce((acc, v) => acc + v.stock, 0);
+                            await supabase.from('products').update({ stock: newTotalStock, variants: updatedVariants }).eq('id', baseId);
+                        } else {
+                            await supabase.from('products').update({ stock: prod.stock + revertQty }).eq('id', baseId);
+                        }
                     }
                 }
                 // Delete linked payments first (FK constraint)
@@ -160,11 +170,21 @@ const OrderManagement = () => {
             // Update Stock
             for (const item of selectedOrder.items) {
                 if (item.is_promo_metadata) continue; // Skip metadata items
-                const { data: prod } = await supabase.from('products').select('stock').eq('id', item.id || item.product_id).single();
+                const baseId = item.id || item.product_id;
+                const { data: prod } = await supabase.from('products').select('stock, variants').eq('id', baseId).single();
+
                 if (prod) {
-                    const deductQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
-                    const newStock = Math.max(0, prod.stock - deductQty);
-                    await supabase.from('products').update({ stock: newStock }).eq('id', item.id || item.product_id);
+                    if (item.is_variant && item.variant_id) {
+                        const updatedVariants = prod.variants.map(v =>
+                            v.id === item.variant_id ? { ...v, stock: Math.max(0, v.stock - item.quantity) } : v
+                        );
+                        const newTotalStock = updatedVariants.reduce((acc, v) => acc + v.stock, 0);
+                        await supabase.from('products').update({ stock: newTotalStock, variants: updatedVariants }).eq('id', baseId);
+                    } else {
+                        const deductQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
+                        const newStock = Math.max(0, prod.stock - deductQty);
+                        await supabase.from('products').update({ stock: newStock }).eq('id', baseId);
+                    }
                 }
             }
 

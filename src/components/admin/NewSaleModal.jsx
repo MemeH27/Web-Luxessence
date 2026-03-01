@@ -51,6 +51,11 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
     const [useLoyaltyDiscount, setUseLoyaltyDiscount] = useState(false);
     const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
 
+    // Variant Selection
+    const [variantModalOpen, setVariantModalOpen] = useState(false);
+    const [productForVariant, setProductForVariant] = useState(null);
+    const [variantQuantities, setVariantQuantities] = useState({});
+
     useEffect(() => {
         if (isOpen) {
             fetchCustomers();
@@ -128,9 +133,62 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
             setSelectedJibbitz(product);
             setJibbitzSelection({});
             setJibbitzModalOpen(true);
+        } else if (product.variants?.length > 0) {
+            setProductForVariant(product);
+            setVariantQuantities({});
+            setVariantModalOpen(true);
         } else {
             addToCart(product);
         }
+    };
+
+    const addVariantToCart = () => {
+        let added = false;
+        const newCart = [...cart];
+
+        Object.entries(variantQuantities).forEach(([variantId, qty]) => {
+            if (qty > 0) {
+                const variant = productForVariant.variants.find(v => v.id === variantId);
+                const uniqueId = `${productForVariant.id}-${variant.id}`;
+                const existingIndex = newCart.findIndex(item => item.id === uniqueId);
+
+                if (existingIndex >= 0) {
+                    newCart[existingIndex].quantity += qty;
+                } else {
+                    newCart.push({
+                        id: uniqueId,
+                        baseProductId: productForVariant.id,
+                        variantId: variant.id,
+                        name: `${productForVariant.name} (${variant.name})`,
+                        price: productForVariant.price,
+                        quantity: qty,
+                        stock: variant.stock,
+                        image: variant.image_url || productForVariant.image_url,
+                        isVariant: true
+                    });
+                }
+                added = true;
+            }
+        });
+
+        if (added) {
+            setCart(newCart);
+            addToast('Opciones agregadas', 'success');
+        }
+        setVariantModalOpen(false);
+    };
+
+    const updateVariantSelection = (variantId, delta, maxStock) => {
+        setVariantQuantities(prev => {
+            const current = prev[variantId] || 0;
+            const next = current + delta;
+            if (next < 0) return prev;
+            if (next > maxStock && delta > 0) {
+                addToast(`Solo hay ${maxStock} en stock`, 'warning');
+                return prev;
+            }
+            return { ...prev, [variantId]: next };
+        });
     };
 
     const addToCart = (product) => {
@@ -200,9 +258,9 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
         setJibbitzModalOpen(false);
     };
 
-    const updateQuantity = (id, isCombo, amount) => {
+    const updateQuantity = (id, isCombo, isVariant, amount) => {
         setCart(cart.map(item => {
-            if (item.id === id && item.isCombo === isCombo) {
+            if (item.id === id && item.isCombo === isCombo && item.isVariant === isVariant) {
                 const newQty = item.quantity + amount;
                 if (newQty < 1) return null;
                 if (newQty > item.stock && amount > 0) {
@@ -215,8 +273,8 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
         }).filter(Boolean));
     };
 
-    const removeFromCart = (id, isCombo) => {
-        setCart(cart.filter(item => !(item.id === id && item.isCombo === isCombo)));
+    const removeFromCart = (id, isCombo, isVariant) => {
+        setCart(cart.filter(item => !(item.id === id && item.isCombo === isCombo && item.isVariant === isVariant)));
     };
 
     const handleCreateCustomer = async (e) => {
@@ -253,11 +311,13 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
         setProcessing(true);
         try {
             const orderItems = cart.map(item => ({
-                product_id: item.isCombo ? item.baseProductId : item.id,
+                product_id: (item.isCombo || item.isVariant) ? item.baseProductId : item.id,
+                variant_id: item.variantId || null,
                 name: item.name,
                 quantity: item.quantity,
                 price: item.price,
                 is_combo: item.isCombo || false,
+                is_variant: item.isVariant || false,
                 combo_jibbitz_count: item.singleJibbitzCount || 1
             }));
 
@@ -290,11 +350,20 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
 
             // Deduct Stock
             for (const item of cart) {
-                const baseId = item.isCombo ? item.baseProductId : item.id;
-                const qtyToDeduct = item.isCombo ? (item.quantity * item.singleJibbitzCount) : item.quantity;
-                const { data: prod } = await supabase.from('products').select('stock').eq('id', baseId).single();
+                const baseId = (item.isCombo || item.isVariant) ? item.baseProductId : item.id;
+                const { data: prod } = await supabase.from('products').select('stock, variants').eq('id', baseId).single();
+
                 if (prod) {
-                    await supabase.from('products').update({ stock: prod.stock - qtyToDeduct }).eq('id', baseId);
+                    if (item.isVariant) {
+                        const updatedVariants = prod.variants.map(v =>
+                            v.id === item.variantId ? { ...v, stock: v.stock - item.quantity } : v
+                        );
+                        const newStock = updatedVariants.reduce((acc, v) => acc + v.stock, 0);
+                        await supabase.from('products').update({ stock: newStock, variants: updatedVariants }).eq('id', baseId);
+                    } else {
+                        const qtyToDeduct = item.isCombo ? (item.quantity * item.singleJibbitzCount) : item.quantity;
+                        await supabase.from('products').update({ stock: prod.stock - qtyToDeduct }).eq('id', baseId);
+                    }
                 }
             }
 
@@ -338,7 +407,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
         <div className="fixed inset-0 z-50 flex justify-center items-center md:py-8 px-0 md:px-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-            <div className="relative bg-white w-full max-w-6xl h-full md:h-[90vh] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="relative bg-white w-full max-w-6xl h-[100dvh] md:h-[90vh] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
                 {/* Header (Compact) */}
                 <div className="bg-primary text-secondary-light px-6 py-4 flex justify-between items-center shrink-0">
@@ -354,7 +423,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-gray-50/50">
 
                     {/* Left: Product Catalog */}
-                    <div className={`flex-[2] flex flex-col min-w-0 border-r border-gray-200 bg-white ${step === 2 ? 'hidden lg:flex' : 'flex'}`}>
+                    <div className={`flex-[2] flex flex-col min-h-0 min-w-0 border-r border-gray-200 bg-white ${step === 2 ? 'hidden lg:flex' : 'flex'}`}>
 
                         {/* Search & Categories */}
                         <div className="p-4 border-b border-gray-100 space-y-3 shrink-0">
@@ -453,15 +522,15 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-start">
                                                 <h5 className="text-xs font-semibold text-gray-900 truncate pr-2" title={item.name}>{item.name}</h5>
-                                                <button onClick={() => removeFromCart(item.id, item.isCombo)} className="text-gray-400 hover:text-red-500">
+                                                <button onClick={() => removeFromCart(item.id, item.isCombo, item.isVariant)} className="text-gray-400 hover:text-red-500">
                                                     <X className="w-4 h-4" />
                                                 </button>
                                             </div>
                                             <div className="flex items-center justify-between mt-2">
                                                 <div className="flex items-center bg-gray-50 border border-gray-200 rounded">
-                                                    <button onClick={() => updateQuantity(item.id, item.isCombo, -1)} className="px-2 py-1 hover:text-primary"><Minus className="w-3 h-3" /></button>
+                                                    <button onClick={() => updateQuantity(item.id, item.isCombo, item.isVariant, -1)} className="px-2 py-1 hover:text-primary"><Minus className="w-3 h-3" /></button>
                                                     <span className="text-xs font-medium w-6 text-center">{item.quantity}</span>
-                                                    <button onClick={() => updateQuantity(item.id, item.isCombo, 1)} className="px-2 py-1 hover:text-primary"><Plus className="w-3 h-3" /></button>
+                                                    <button onClick={() => updateQuantity(item.id, item.isCombo, item.isVariant, 1)} className="px-2 py-1 hover:text-primary"><Plus className="w-3 h-3" /></button>
                                                 </div>
                                                 <span className="text-sm font-bold text-gray-900">L{item.price * item.quantity}</span>
                                             </div>
@@ -735,6 +804,63 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                                     <button type="submit" className="flex-[1.5] py-4 text-[10px] font-black uppercase tracking-widest text-white bg-primary rounded-2xl hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all">Guardar Cliente</button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Variant Selection Modal */}
+            <AnimatePresence>
+                {variantModalOpen && productForVariant && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setVariantModalOpen(false)} />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg relative z-10 max-h-[80vh] flex flex-col" >
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 className="font-bold text-xl text-gray-900">{productForVariant.name}</h4>
+                                    <p className="text-sm text-gray-500 italic">Selecciona las fragancias y cantidades</p>
+                                </div>
+                                <button onClick={() => setVariantModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto space-y-3 mb-6 no-scrollbar pr-1">
+                                {productForVariant.variants.map(variant => {
+                                    const qty = variantQuantities[variant.id] || 0;
+                                    return (
+                                        <div key={variant.id} className="flex gap-4 items-center p-3 border border-gray-100 rounded-xl bg-gray-50/50 hover:bg-white hover:border-primary/20 transition-all" >
+                                            <div className="w-14 h-14 bg-white rounded-lg overflow-hidden border border-gray-100 shrink-0">
+                                                {variant.image_url ? (
+                                                    <img src={variant.image_url} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Package className="w-6 h-6 m-auto mt-4 text-gray-200" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-sm text-gray-900 truncate">{variant.name}</p>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest ${variant.stock > 0 ? 'text-primary/40' : 'text-red-500'}`}>
+                                                    Stock: {variant.stock}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm">
+                                                <button onClick={() => updateVariantSelection(variant.id, -1, variant.stock)} className="px-3 py-1.5 hover:text-primary text-gray-400 transition-colors"><Minus className="w-4 h-4" /></button>
+                                                <span className="w-8 text-center text-sm font-bold text-primary">{qty}</span>
+                                                <button onClick={() => updateVariantSelection(variant.id, 1, variant.stock)} className="px-3 py-1.5 hover:text-primary text-gray-400 transition-colors"><Plus className="w-4 h-4" /></button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <button
+                                onClick={addVariantToCart}
+                                disabled={Object.values(variantQuantities).every(q => !q || q === 0)}
+                                className={`w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg ${Object.values(variantQuantities).every(q => !q || q === 0)
+                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                                    : 'bg-primary text-white hover:bg-primary/90 hover:scale-[1.02] active:scale-95'
+                                    }`}
+                            >
+                                Confirmar selección
+                            </button>
                         </motion.div>
                     </div>
                 )}

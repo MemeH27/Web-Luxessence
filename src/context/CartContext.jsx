@@ -21,7 +21,13 @@ export const CartProvider = ({ children }) => {
 
             if (existing) {
                 return prev.map((item) =>
-                    item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + quantity } : item
+                    item.cartItemId === cartItemId
+                        ? {
+                            ...item,
+                            quantity: item.quantity + quantity,
+                            ...(config?.image_url ? { image_url: config.image_url } : {})
+                        }
+                        : item
                 );
             }
 
@@ -32,6 +38,7 @@ export const CartProvider = ({ children }) => {
                 ...(config ? {
                     price: config.price,
                     name: `${product.name} (${config.label})`,
+                    image_url: config.image_url || product.image_url,
                     isCombo: true,
                     comboConfig: config
                 } : {})
