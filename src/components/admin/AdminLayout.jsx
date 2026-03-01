@@ -89,7 +89,7 @@ const AdminLayout = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-secondary-light flex overflow-hidden">
+        <div className="min-h-[100dvh] bg-secondary-light flex overflow-hidden">
             {/* Desktop Sidebar */}
             <aside className="w-80 bg-primary p-12 flex flex-col hidden lg:flex sticky top-0 h-screen shadow-[10px_0_50px_rgba(0,0,0,0.2)] overflow-y-auto no-scrollbar border-r border-white/5 relative z-50">
                 {/* Subtle Ambient Glow */}
@@ -147,9 +147,12 @@ const AdminLayout = () => {
             </aside>
 
             {/* Main Content Area */}
-            <div className="flex-1 h-screen flex flex-col min-w-0">
+            <div className="flex-1 h-[100dvh] flex flex-col min-w-0">
                 {/* Mobile Header */}
-                <header className="lg:hidden flex justify-between items-center p-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] bg-primary shadow-xl shrink-0 z-50">
+                <header
+                    className="lg:hidden flex justify-between items-center p-6 bg-primary shadow-xl shrink-0 z-50"
+                    style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
+                >
                     <div className="flex items-center gap-3">
                         <img src="/img/logo.svg" className="w-10 h-10" />
                         <h2 className="text-xl font-serif font-black italic text-secondary-light leading-none">Admin <span className="opacity-50">Suite</span></h2>
@@ -237,7 +240,8 @@ const AdminLayout = () => {
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: '100%', opacity: 0.5 }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="fixed right-0 top-0 bottom-0 w-[85%] max-w-[400px] bg-primary z-[110] flex flex-col p-8 pt-safe lg:hidden shadow-[-20px_0_60px_-15px_rgba(0,0,0,0.5)] border-l border-white/5"
+                            className="fixed right-0 top-0 bottom-0 w-[85%] max-w-[400px] bg-primary z-[110] flex flex-col p-8 lg:hidden shadow-[-20px_0_60px_-15px_rgba(0,0,0,0.5)] border-l border-white/5"
+                            style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2rem)' }}
                         >
                             <div className="flex items-center justify-between mb-12">
                                 <div className="flex items-center gap-3">
