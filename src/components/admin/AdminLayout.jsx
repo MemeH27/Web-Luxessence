@@ -150,7 +150,7 @@ const AdminLayout = () => {
             <div className="flex-1 h-[100dvh] flex flex-col min-w-0">
                 {/* Mobile Header */}
                 <header
-                    className="lg:hidden flex justify-between items-center p-6 bg-primary shadow-xl shrink-0 z-50"
+                    className="lg:hidden flex justify-between items-center p-6 bg-primary shadow-xl shrink-0"
                     style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}
                 >
                     <div className="flex items-center gap-3">

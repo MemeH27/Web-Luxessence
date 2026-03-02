@@ -5,6 +5,7 @@ import { Menu, X, ShoppingBag, User, LogOut, Mail, Lock, UserCircle, ArrowRight,
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
+import { ADMIN_EMAIL } from '../lib/constants';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -129,7 +130,7 @@ const Navbar = () => {
                 }
             } else {
                 addToast(authMode === 'login' ? 'Bienvenido de nuevo' : 'Cuenta creada con éxito');
-                if (result.data.user?.email === 'luxessence504@gmail.com') {
+                if (result.data.user?.email === ADMIN_EMAIL) {
                     navigate('/admin/dashboard');
                 } else {
                     navigate('/profile');
@@ -204,7 +205,7 @@ const Navbar = () => {
 
                         {user ? (
                             <div className="flex items-center gap-4">
-                                <Link to={user.email === 'luxessence504@gmail.com' ? "/admin/dashboard" : "/profile"} className="text-secondary/60 hover:text-secondary-light transition-colors p-2">
+                                <Link to={user.email === ADMIN_EMAIL ? "/admin/dashboard" : "/profile"} className="text-secondary/60 hover:text-secondary-light transition-colors p-2">
                                     <User className="w-5 h-5" />
                                 </Link>
                                 <button onClick={handleLogout} className="text-secondary/40 hover:text-white p-2">
@@ -289,12 +290,12 @@ const Navbar = () => {
                                         className="space-y-6"
                                     >
                                         <Link
-                                            to={user.email === 'luxessence504@gmail.com' ? "/admin/dashboard" : "/profile"}
+                                            to={user.email === ADMIN_EMAIL ? "/admin/dashboard" : "/profile"}
                                             onClick={() => setIsOpen(false)}
                                             className="flex items-center gap-4 text-secondary/80 text-lg font-bold"
                                         >
                                             <UserCircle className="w-8 h-8 text-secondary" />
-                                            <span>{user.email === 'luxessence504@gmail.com' ? 'Panel Administrativo' : 'Mi Perfil'}</span>
+                                            <span>{user.email === ADMIN_EMAIL ? 'Panel Administrativo' : 'Mi Perfil'}</span>
                                         </Link>
                                         <button
                                             onClick={() => { handleLogout(); setIsOpen(false); }}

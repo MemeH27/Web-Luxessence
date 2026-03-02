@@ -21,25 +21,46 @@ import { CartProvider } from './context/CartContext';
 import { ToastProvider } from './context/ToastContext';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from './lib/supabase';
+import { ADMIN_EMAIL } from './lib/constants';
 
-// High-end Auth Guard (Supabase Session based)
+// High-end Auth Guard (Supabase Session based with Admin Role verification)
 const ProtectedRoute = ({ children }) => {
   const [session, setSession] = useState(undefined);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loadingAdmin, setLoadingAdmin] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      // Verify admin status based on email
+      const userEmail = session?.user?.email;
+      const adminStatus = userEmail === ADMIN_EMAIL;
+      setIsAdmin(adminStatus);
+      setLoadingAdmin(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      // Verify admin status based on email
+      const userEmail = session?.user?.email;
+      const adminStatus = userEmail === ADMIN_EMAIL;
+      setIsAdmin(adminStatus);
+      setLoadingAdmin(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  if (session === undefined) return <div className="min-h-screen bg-secondary-light flex items-center justify-center font-serif italic text-primary animate-pulse text-2xl">Cargando Lux HQ...</div>;
-  return session ? children : <Navigate to="/" />;
+  if (session === undefined || loadingAdmin) {
+    return <div className="min-h-screen bg-secondary-light flex items-center justify-center font-serif italic text-primary animate-pulse text-2xl">Cargando Lux HQ...</div>;
+  }
+
+  // CRITICAL: Verify user is admin before granting access
+  if (!session || !isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
 };
 
 

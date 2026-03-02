@@ -3,9 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User, Sparkles, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
+import { ADMIN_EMAIL, MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION } from '../../lib/constants';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -71,19 +69,31 @@ const Login = () => {
             setAttempts(newAttempts);
             localStorage.setItem('lux_login_attempts', newAttempts.toString());
 
-            if (newAttempts >= MAX_ATTEMPTS) {
+            if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
                 const lockUntil = Date.now() + LOCKOUT_DURATION;
                 setLockedUntil(lockUntil);
                 localStorage.setItem('lux_login_locked_until', lockUntil.toString());
                 setError(`Demasiados intentos fallidos. Cuenta bloqueada por 15 minutos.`);
             } else {
-                const remaining = MAX_ATTEMPTS - newAttempts;
+                const remaining = MAX_LOGIN_ATTEMPTS - newAttempts;
                 setError(`Credenciales inválidas. Te quedan ${remaining} intentos.`);
                 setShowAttempts(true);
                 setTimeout(() => setShowAttempts(false), 3000);
             }
         } else {
-            // Successful login - reset attempts
+            // Successful login - verify admin status before allowing access
+            const userEmail = data.user?.email;
+
+            // CRITICAL: Verify user is the admin
+            if (userEmail !== ADMIN_EMAIL) {
+                // Sign out non-admin users immediately
+                await supabase.auth.signOut();
+                setError('Acceso denegado. Solo el administrador puede acceder a esta área.');
+                setLoading(false);
+                return;
+            }
+
+            // Successful admin login - reset attempts
             localStorage.removeItem('lux_login_attempts');
             localStorage.removeItem('lux_login_locked_until');
             setAttempts(0);
