@@ -8,16 +8,38 @@ const BottomNav = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isAuthOpen, setIsAuthOpen] = useState(document.body.classList.contains('auth-open'));
+    const [isOverDark, setIsOverDark] = useState(false);
 
     useEffect(() => {
         const handleAuthChange = (e) => setIsAuthOpen(e.detail.open);
         window.addEventListener('auth-modal-change', handleAuthChange);
-
-        // Also check on mount in case it was already open
         setIsAuthOpen(document.body.classList.contains('auth-open'));
 
-        return () => window.removeEventListener('auth-modal-change', handleAuthChange);
-    }, []);
+        const checkFooterOverlap = () => {
+            if (window.innerWidth >= 768) return;
+            const navElement = document.getElementById('bottom-nav-container');
+            const footerElement = document.querySelector('footer');
+            if (!navElement || !footerElement) return;
+
+            const navRect = navElement.getBoundingClientRect();
+            const footerRect = footerElement.getBoundingClientRect();
+
+            // Detect overlap with footer (dark area)
+            const isOverlapping = navRect.bottom > footerRect.top && navRect.top < footerRect.bottom;
+            setIsOverDark(isOverlapping);
+        };
+
+        window.addEventListener('scroll', checkFooterOverlap);
+        window.addEventListener('resize', checkFooterOverlap);
+        const timeout = setTimeout(checkFooterOverlap, 300);
+
+        return () => {
+            window.removeEventListener('auth-modal-change', handleAuthChange);
+            window.removeEventListener('scroll', checkFooterOverlap);
+            window.removeEventListener('resize', checkFooterOverlap);
+            clearTimeout(timeout);
+        };
+    }, [location.pathname]);
 
     const tabs = [
         { id: 'home', path: '/', icon: Home, label: 'Inicio' },
@@ -34,24 +56,36 @@ const BottomNav = () => {
         isAuthOpen
     ) return null;
 
+    const navColor = isOverDark ? 'text-white' : 'text-primary';
+    const navMuteColor = isOverDark ? 'text-white/40' : 'text-primary/30';
+    const navActiveBg = isOverDark ? 'bg-white/10' : 'bg-primary/5';
+
     return (
-        <div className="md:hidden fixed bottom-10 left-0 right-0 z-[200] flex justify-center px-4 pointer-events-none">
+        <div id="bottom-nav-container" className="md:hidden fixed bottom-10 left-0 right-0 z-[200] flex justify-center px-4 pointer-events-none transition-transform duration-500">
             <motion.div
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 className="pointer-events-auto"
             >
                 <GlassSurface
-                    borderRadius={44}
-                    height={80}
+                    borderRadius={48}
+                    height={86}
                     width="auto"
-                    className="px-2 shadow-[0_20px_50px_rgba(0,0,0,0.15)]"
-                    backgroundOpacity={0.25}
-                    blur={30}
-                    saturation={1.8}
-                    borderWidth={0.02}
+                    className={`px-4 shadow-[0_30px_70px_-20px_rgba(0,0,0, ${isOverDark ? '0.5' : '0.25'})] border-white/50 transition-all duration-700`}
+                    backgroundOpacity={isOverDark ? 0.05 : 0.12}
+                    brightness={isOverDark ? 10 : 90}
+                    blur={45}
+                    saturation={isOverDark ? 0.8 : 2.8}
+                    borderWidth={0.01}
+                    displace={6}
+                    distortionScale={-220}
+                    mixBlendMode={isOverDark ? 'multiply' : 'plus-lighter'}
                 >
-                    <div className="flex items-center h-full gap-1">
+                    <div className="flex items-center h-full gap-2 relative">
+                        {/* Dynamic Liquid Highlight */}
+                        <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-full">
+                            <div className={`absolute -top-[100%] -left-[100%] w-[300%] h-[300%] bg-gradient-to-br transition-opacity duration-1000 ${isOverDark ? 'from-white/0 via-transparent to-white/5 opacity-50' : 'from-gold/5 via-transparent to-white/10 opacity-100'} animate-[spin_10s_linear_infinite]`} />
+                        </div>
                         {tabs.map((tab) => {
                             const isActive = location.pathname === tab.path;
 
@@ -68,9 +102,9 @@ const BottomNav = () => {
                                                 y: isActive ? -4 : 0
                                             }}
                                             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                                            className={`w-15 h-15 rounded-full flex items-center justify-center transition-all duration-500 shadow-xl ${isActive
-                                                ? 'bg-primary text-secondary shadow-[0_15px_30px_rgba(113,17,22,0.4)]'
-                                                : 'bg-primary/5 text-primary border border-primary/5'
+                                            className={`w-15 h-15 rounded-full flex items-center justify-center transition-all duration-700 shadow-xl ${isActive
+                                                ? (isOverDark ? 'bg-white text-primary shadow-[0_15px_30px_rgba(255,255,255,0.2)]' : 'bg-primary text-secondary shadow-[0_15px_30px_rgba(113,17,22,0.4)]')
+                                                : (isOverDark ? 'bg-white/5 text-white border border-white/10' : 'bg-primary/5 text-primary border border-primary/5')
                                                 }`}
                                         >
                                             <tab.icon className={`w-7 h-7 ${isActive ? 'stroke-[2.5px]' : 'stroke-[1.5px]'}`} />
@@ -80,8 +114,7 @@ const BottomNav = () => {
                                                 opacity: isActive ? 1 : 0.6,
                                                 scale: isActive ? 1.05 : 0.9
                                             }}
-                                            className={`text-[8px] font-black uppercase tracking-widest mt-1.5 ${isActive ? 'text-primary' : 'text-primary'
-                                                }`}
+                                            className={`text-[8px] font-black uppercase tracking-widest mt-1.5 transition-colors duration-700 ${navColor}`}
                                         >
                                             {tab.label}
                                         </motion.span>
@@ -98,13 +131,12 @@ const BottomNav = () => {
                                     {isActive && (
                                         <motion.div
                                             layoutId="nav-bg"
-                                            className="absolute inset-x-1 inset-y-2.5 bg-primary/5 rounded-[2rem] -z-10"
+                                            className={`absolute inset-x-1 inset-y-2.5 rounded-[2rem] -z-10 transition-colors duration-700 ${navActiveBg}`}
                                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                                         />
                                     )}
 
-                                    <div className={`p-2 transition-all duration-300 ${isActive ? 'text-primary' : 'text-primary/30 group-hover:text-primary/60'
-                                        }`}>
+                                    <div className={`p-2 transition-all duration-700 ${isActive ? navColor : `${navMuteColor} group-hover:${navColor}`}`}>
                                         <tab.icon className={`w-5.5 h-5.5 stroke-[1.5px] transition-transform duration-500 ${isActive ? 'scale-110' : ''}`} />
                                     </div>
 
@@ -113,8 +145,7 @@ const BottomNav = () => {
                                             opacity: isActive ? 1 : 0.5,
                                             y: isActive ? 0 : 2
                                         }}
-                                        className={`text-[8px] font-extrabold uppercase tracking-tighter transition-all ${isActive ? 'text-primary' : 'text-primary/40'
-                                            }`}
+                                        className={`text-[8px] font-extrabold uppercase tracking-tighter transition-colors duration-700 ${isActive ? navColor : navMuteColor}`}
                                     >
                                         {tab.label}
                                     </motion.span>

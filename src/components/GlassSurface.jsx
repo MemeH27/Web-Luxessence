@@ -119,10 +119,16 @@ const GlassSurface = ({
 
     const supportsBackdropFilter = () => {
         if (typeof window === 'undefined') return false;
-        return CSS.supports('backdrop-filter', 'blur(10px)');
+        return (
+            CSS.supports('backdrop-filter', 'blur(10px)') ||
+            CSS.supports('-webkit-backdrop-filter', 'blur(10px)')
+        );
     };
 
     const getContainerStyles = () => {
+        const backdropFilterSupported = supportsBackdropFilter();
+        const bgBase = isDarkMode ? `0 0% 0%` : `0 0% 100%`;
+
         const baseStyles = {
             ...style,
             width: typeof width === 'number' ? `${width}px` : width,
@@ -131,24 +137,26 @@ const GlassSurface = ({
             '--glass-frost': backgroundOpacity,
             '--glass-saturation': saturation
         };
-        const backdropFilterSupported = supportsBackdropFilter();
+
         if (svgSupported) {
             return {
                 ...baseStyles,
-                background: isDarkMode ? `hsl(0 0% 0% / ${backgroundOpacity})` : `hsl(0 0% 100% / ${backgroundOpacity})`,
+                background: `hsl(${bgBase} / ${backgroundOpacity})`,
                 backdropFilter: `url(#${filterId}) saturate(${saturation})`,
                 boxShadow: `0 0 2px 1px color-mix(in oklch, white, transparent 65%) inset,
-          0 0 10px 4px color-mix(in oklch, white, transparent 85%) inset,
-          0px 4px 16px rgba(17,17,26,0.05), 0px 8px 24px rgba(17,17,26,0.05)`
+                            0 0 10px 4px color-mix(in oklch, white, transparent 85%) inset,
+                            0px 4px 16px rgba(17,17,26,0.05), 0px 8px 24px rgba(17,17,26,0.05)`
             };
         } else {
+            // iOS Fallback (Using props for consistency)
+            const filterString = `blur(${blur}px) saturate(${saturation}) brightness(${brightness / 50})`;
             return {
                 ...baseStyles,
-                background: 'rgba(255,255,255,0.12)',
-                backdropFilter: backdropFilterSupported ? 'blur(16px) saturate(1.8) brightness(1.1)' : undefined,
-                WebkitBackdropFilter: backdropFilterSupported ? 'blur(16px) saturate(1.8) brightness(1.1)' : undefined,
-                border: '1px solid rgba(255,255,255,0.18)',
-                boxShadow: `0 8px 32px 0 rgba(31,38,135,0.18), inset 0 1px 0 0 rgba(255,255,255,0.3), inset 0 -1px 0 0 rgba(255,255,255,0.1)`
+                background: `hsl(${bgBase} / ${backgroundOpacity})`,
+                backdropFilter: backdropFilterSupported ? filterString : undefined,
+                WebkitBackdropFilter: backdropFilterSupported ? filterString : undefined,
+                border: `${borderWidth * 100}px solid rgba(255,255,255,0.2)`,
+                boxShadow: `0 8px 32px 0 rgba(0,0,0,0.1), inset 0 1px 0 0 rgba(255,255,255,0.1)`
             };
         }
     };
