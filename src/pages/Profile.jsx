@@ -182,7 +182,7 @@ const Profile = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">
+        <div className="max-w-7xl mx-auto px-6 py-12 pt-24 space-y-12">
             <header className="space-y-6 flex flex-col md:flex-row md:items-end justify-between">
                 <div className="space-y-4">
                     <h1 className="text-5xl font-serif font-bold italic text-primary">Mi Perfil</h1>

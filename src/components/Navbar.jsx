@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, ShoppingBag, User, LogOut, Mail, Lock, UserCircle, ArrowRight, ChevronDown, Search, ShoppingCart, Eye, EyeOff } from 'lucide-react';
@@ -6,6 +6,164 @@ import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { ADMIN_EMAIL } from '../lib/constants';
+
+// Glass-surface pill — implements glass-surface.txt displacement filter directly
+const NavGlassPill = ({ navLinks, location, user, cartCount, handleLogout, setIsAuthOpen, ADMIN_EMAIL, isSolid = false }) => {
+    const containerRef = useRef(null);
+    const feImageRef = useRef(null);
+    const uid = useId().replace(/:/g, '-');
+    const filterId = `nav-glass-${uid}`;
+    const redGradId = `ng-red-${uid}`;
+    const blueGradId = `ng-blue-${uid}`;
+
+    const generateMap = () => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        const w = rect?.width || 400;
+        const h = rect?.height || 60;
+        const br = 9999; // full pill
+        const edgeSize = Math.min(w, h) * 0.035;
+        const svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="${redGradId}" x1="100%" y1="0%" x2="0%" y2="0%">
+              <stop offset="0%" stop-color="#0000"/>
+              <stop offset="100%" stop-color="red"/>
+            </linearGradient>
+            <linearGradient id="${blueGradId}" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#0000"/>
+              <stop offset="100%" stop-color="blue"/>
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width="${w}" height="${h}" fill="black"/>
+          <rect x="0" y="0" width="${w}" height="${h}" rx="${br}" fill="url(#${redGradId})"/>
+          <rect x="0" y="0" width="${w}" height="${h}" rx="${br}" fill="url(#${blueGradId})" style="mix-blend-mode:difference"/>
+          <rect x="${edgeSize}" y="${edgeSize}" width="${w - edgeSize * 2}" height="${h - edgeSize * 2}" rx="${br}" fill="hsl(0 0% 30% / 0.92)" style="filter:blur(11px)"/>
+        </svg>`;
+        return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    };
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        // Set SVG filter feImage href
+        const feImg = document.getElementById(`${filterId}-img`);
+        if (feImg) feImg.setAttribute('href', generateMap());
+        // Resize observer
+        const ro = new ResizeObserver(() => {
+            const feImg2 = document.getElementById(`${filterId}-img`);
+            if (feImg2) feImg2.setAttribute('href', generateMap());
+        });
+        ro.observe(containerRef.current);
+        return () => ro.disconnect();
+    }, []);
+
+    // Primary color badge style for logo/icons pill
+    const badgeStyle = {
+        background: isSolid ? 'transparent' : 'rgba(113, 17, 22, 0.42)',
+        backdropFilter: isSolid ? 'none' : 'blur(18px) saturate(1.6)',
+        WebkitBackdropFilter: isSolid ? 'none' : 'blur(18px) saturate(1.6)',
+        boxShadow: isSolid ? 'none' : '0 0 22px rgba(113, 17, 22, 0.38), inset 0 1px 0 rgba(255,255,255,0.07)',
+        transition: 'background 0.5s ease, box-shadow 0.5s ease',
+    };
+    const linksBadgeStyle = {
+        background: isSolid ? 'transparent' : 'rgba(113, 17, 22, 0.35)',
+        backdropFilter: isSolid ? 'none' : 'blur(20px) saturate(1.6)',
+        WebkitBackdropFilter: isSolid ? 'none' : 'blur(20px) saturate(1.6)',
+        boxShadow: isSolid ? 'none' : '0 0 26px rgba(113, 17, 22, 0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
+        transition: 'background 0.5s ease, box-shadow 0.5s ease',
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            className="relative w-full overflow-hidden"
+            style={{
+                borderRadius: '9999px',
+                backdropFilter: isSolid ? 'blur(20px) saturate(1.8)' : `url(#${filterId}) saturate(1.2)`,
+                WebkitBackdropFilter: isSolid ? 'blur(20px) saturate(1.8)' : `url(#${filterId}) saturate(1.2)`,
+                background: isSolid ? 'rgba(113, 17, 22, 0.95)' : 'hsl(0 0% 100% / 0)',
+                border: isSolid ? '1px solid rgba(255,255,255,0.10)' : '1px solid rgba(255,255,255,0.18)',
+                boxShadow: isSolid
+                    ? '0 4px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07)'
+                    : '0 0 2px 1px color-mix(in oklch, white, transparent 65%) inset, 0 0 10px 4px color-mix(in oklch, white, transparent 85%) inset, 0 8px 32px rgba(0,0,0,0.28)',
+                transition: 'background 0.5s ease, box-shadow 0.5s ease, border-color 0.5s ease',
+            }}
+        >
+            {/* Invisible SVG that defines the filter — must be in-DOM for backdropFilter url() to work */}
+            <svg
+                style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }}
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <defs>
+                    <filter id={filterId} colorInterpolationFilters="sRGB" x="0%" y="0%" width="100%" height="100%">
+                        <feImage id={`${filterId}-img`} x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map" />
+                        <feDisplacementMap in="SourceGraphic" in2="map" scale="-180" xChannelSelector="R" yChannelSelector="G" result="dispRed" />
+                        <feColorMatrix in="dispRed" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red" />
+                        <feDisplacementMap in="SourceGraphic" in2="map" scale="-170" xChannelSelector="R" yChannelSelector="G" result="dispGreen" />
+                        <feColorMatrix in="dispGreen" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green" />
+                        <feDisplacementMap in="SourceGraphic" in2="map" scale="-160" xChannelSelector="R" yChannelSelector="G" result="dispBlue" />
+                        <feColorMatrix in="dispBlue" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue" />
+                        <feBlend in="red" in2="green" mode="screen" result="rg" />
+                        <feBlend in="rg" in2="blue" mode="screen" result="output" />
+                        <feGaussianBlur in="output" stdDeviation="0.7" />
+                    </filter>
+                </defs>
+            </svg>
+
+            <div className="relative z-10 w-full px-4 md:px-6 py-2.5 flex justify-between items-center gap-3">
+
+                {/* Logo badge */}
+                <Link to="/" className="flex items-center group shrink-0 rounded-full px-3 py-1.5" style={badgeStyle}>
+                    <img src="/img/logo-blanco.png" alt="Luxessence" className="h-7 md:h-9 w-auto object-contain transition-transform duration-500 group-hover:scale-105" />
+                </Link>
+
+                {/* Desktop nav links badge */}
+                <div className="hidden md:flex items-center gap-6 rounded-full px-5 py-1.5" style={linksBadgeStyle}>
+                    {navLinks.map((link) => (
+                        <Link
+                            key={link.path}
+                            to={link.path}
+                            className={`text-[10px] font-black tracking-widest uppercase transition-all hover:text-white ${location.pathname === link.path ? 'text-white' : 'text-white/65'}`}
+                        >
+                            {link.name}
+                        </Link>
+                    ))}
+                </div>
+
+                {/* Icons badge */}
+                <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={badgeStyle}>
+                    <div className="hidden md:flex items-center gap-1">
+                        <button className="text-white/65 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10">
+                            <Search className="w-4 h-4" />
+                        </button>
+                        {user ? (
+                            <>
+                                <Link to={user.email === ADMIN_EMAIL ? '/admin/dashboard' : '/profile'} className="text-white/65 hover:text-white p-1.5 rounded-full hover:bg-white/10">
+                                    <User className="w-4 h-4" />
+                                </Link>
+                                <button onClick={handleLogout} className="text-white/45 hover:text-white p-1.5 rounded-full hover:bg-white/10">
+                                    <LogOut className="w-4 h-4" />
+                                </button>
+                            </>
+                        ) : (
+                            <button onClick={() => setIsAuthOpen(true)} className="text-white/65 hover:text-white p-1.5 rounded-full hover:bg-white/10">
+                                <User className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                    <Link to="/cart" className="relative p-1.5 text-white/80 hover:text-white transition-colors">
+                        <ShoppingCart className="w-5 h-5" />
+                        {cartCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-white text-[#500a1e] text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-md">
+                                {cartCount}
+                            </span>
+                        )}
+                    </Link>
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -33,7 +191,11 @@ const Navbar = () => {
     const { addToast } = useToast();
 
     useEffect(() => {
-        const handleScroll = () => setScrolled(window.scrollY > 20);
+        const handleScroll = () => {
+            // heroGone = true when the hero section (85vh) has fully scrolled past
+            const heroHeight = window.innerHeight * 0.85;
+            setScrolled(window.scrollY > heroHeight);
+        };
         window.addEventListener('scroll', handleScroll);
 
         // Check Auth
@@ -179,78 +341,25 @@ const Navbar = () => {
 
     return (
         <>
-            <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 pt-safe ${scrolled
-                ? 'py-3 bg-primary/95 m-4 rounded-full shadow-2xl backdrop-blur-md border border-secondary/10'
-                : 'py-6 bg-primary'
-                }`}>
-                <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-                    {/* Logo Responsive */}
-                    <Link to="/" className="flex items-center group">
-                        <img
-                            src="/img/logo-blanco.png"
-                            alt="Luxessence"
-                            className="h-10 md:h-12 w-auto object-contain transition-transform duration-500 group-hover:scale-105"
-                        />
-                    </Link>
-
-                    {/* Desktop Links */}
-                    <div className="hidden md:flex items-center gap-10">
-                        {navLinks.map((link) => (
-                            <Link
-                                key={link.path}
-                                to={link.path}
-                                className={`text-sm font-bold tracking-widest uppercase transition-all hover:text-secondary-light ${location.pathname === link.path ? 'text-secondary-light' : 'text-secondary/60'
-                                    }`}
-                            >
-                                {link.name}
-                            </Link>
-                        ))}
-                    </div>
-
-                    {/* Desktop Actions */}
-                    <div className="hidden md:flex items-center gap-6">
-                        <button className="text-secondary/60 hover:text-secondary-light transition-colors p-2">
-                            <Search className="w-5 h-5" />
-                        </button>
-
-                        {user ? (
-                            <div className="flex items-center gap-4">
-                                <Link to={user.email === ADMIN_EMAIL ? "/admin/dashboard" : "/profile"} className="text-secondary/60 hover:text-secondary-light transition-colors p-2">
-                                    <User className="w-5 h-5" />
-                                </Link>
-                                <button onClick={handleLogout} className="text-secondary/40 hover:text-white p-2">
-                                    <LogOut className="w-5 h-5" />
-                                </button>
-                            </div>
-                        ) : (
-                            <button onClick={() => setIsAuthOpen(true)} className="text-secondary/60 hover:text-secondary-light transition-colors p-2">
-                                <User className="w-5 h-5" />
-                            </button>
-                        )}
-
-                        <Link to="/cart" className="relative p-2 bg-secondary/10 rounded-full hover:bg-secondary/20 transition-all border border-secondary/10 group">
-                            <ShoppingCart className="w-5 h-5 text-secondary group-hover:scale-110 transition-transform" />
-                            {cartCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-secondary text-primary text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md">
-                                    {cartCount}
-                                </span>
-                            )}
-                        </Link>
-                    </div>
-
-                    {/* Mobile Actions */}
-                    <div className="flex md:hidden items-center gap-2">
-                        <Link to="/cart" className="relative p-2 text-secondary">
-                            <ShoppingCart className="w-6 h-6" />
-                            {cartCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-secondary text-primary text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                                    {cartCount}
-                                </span>
-                            )}
-                        </Link>
-                    </div>
-                </div>
-            </nav>
+            {/* Main Navbar — glass-surface.txt effect via NavGlassPill */}
+            <motion.nav
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+                className="fixed left-3 right-3 z-[100]"
+                style={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
+            >
+                <NavGlassPill
+                    navLinks={navLinks}
+                    location={location}
+                    user={user}
+                    cartCount={cartCount}
+                    handleLogout={handleLogout}
+                    setIsAuthOpen={setIsAuthOpen}
+                    ADMIN_EMAIL={ADMIN_EMAIL}
+                    isSolid={scrolled || location.pathname !== '/'}
+                />
+            </motion.nav>
 
             {/* Custom Auth Modal */}
             <AnimatePresence>

@@ -147,20 +147,18 @@ const Home = () => {
                     transition={{ duration: 1.5, ease: "easeOut" }}
                     className="absolute inset-0 z-0"
                 >
-                    {/* Animated Luxury Silk Background (Replaces Image) */}
-                    <div className="absolute inset-0 w-full h-full bg-primary overflow-hidden">
+                    {/* Animated Luxury Silk Background */}
+                    <div className="absolute inset-0 w-full h-full bg-[#1a0510] overflow-hidden">
                         <Silk
-                            speed={3}
-                            scale={0.8}
-                            color="#4a1226"
-                            noiseIntensity={1.0}
-                            rotation={15}
+                            speed={5}
+                            scale={1.4}
+                            color="#8B1A3A"
+                            noiseIntensity={1.8}
+                            rotation={12}
                         />
 
-                        {/* Sophisticated Dark Gradient Overlays */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/30 to-black/20 z-10 pointer-events-none" />
-                        <div className="absolute inset-0 bg-black/30 mix-blend-multiply z-10 pointer-events-none" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-transparent to-primary/90 opacity-60 z-10 pointer-events-none" />
+                        {/* Subtle gradient at bottom for text readability only */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 z-10 pointer-events-none" />
                     </div>
                 </motion.div>
 

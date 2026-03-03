@@ -25,7 +25,7 @@ const Contact = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-6 space-y-24 pb-24">
+        <div className="max-w-7xl mx-auto px-6 space-y-24 pb-24 pt-24">
             {/* Header */}
             <div className="text-center space-y-6 max-w-2xl mx-auto pt-10">
                 <motion.p
