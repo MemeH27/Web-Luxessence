@@ -179,36 +179,66 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT fals
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
                     {/* Featured Categories Selector */}
-                    <div className="bg-white p-10 rounded-[3.5rem] border border-primary/5 shadow-xl space-y-8 flex flex-col">
+                    <div className="bg-white p-10 rounded-[3.5rem] border border-primary/5 shadow-xl space-y-8 flex flex-col min-h-[600px]">
                         <div className="space-y-2">
-                            <h3 className="text-2xl font-serif font-bold italic text-primary">Categorías en Landing</h3>
-                            <p className="text-xs text-primary/40 italic leading-relaxed">Marca las categorías que deseas mostrar en la sección principal del Home.</p>
+                            <h3 className="text-2xl font-serif font-bold italic text-primary">Gestión de Categorías</h3>
+                            <p className="text-xs text-primary/40 italic leading-relaxed">Actualiza las portadas y personaliza qué categorías se destacan en el menú principal.</p>
                         </div>
-                        <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-4 custom-scrollbar">
+                        <div className="space-y-4 flex-1 overflow-y-auto pr-4 custom-scrollbar">
                             {dbCategories.map(cat => (
-                                <div key={cat.id} className="flex items-center justify-between p-4 bg-primary/5 rounded-3xl border border-primary/5 hover:border-primary/20 transition-all group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white border border-primary/5 shadow-inner relative group shrink-0">
-                                            {cat.image_url ? <img src={cat.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-primary/10 font-black">{cat.name[0]}</div>}
-                                            <div className="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 flex items-center justify-center backdrop-blur-sm transition-all cursor-pointer">
-                                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCategoryImageUpload(e, cat.id)} />
-                                                {uploading === 'cat_' + cat.id ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <ImageIcon className="w-5 h-5 text-white" />}
+                                <div key={cat.id} className="relative group">
+                                    <div className="flex items-center gap-6 p-5 bg-primary/[0.02] rounded-[2.5rem] border border-primary/5 group-hover:border-gold/30 transition-all duration-500">
+                                        <div className="relative w-24 h-24 rounded-[1.5rem] overflow-hidden bg-white border border-primary/5 shadow-inner shrink-0">
+                                            {cat.image_url ? (
+                                                <img src={cat.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={cat.name} />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-primary/20 text-3xl font-serif italic">{cat.name[0]}</div>
+                                            )}
+
+                                            <label className="absolute inset-0 bg-primary/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center backdrop-blur-sm transition-all cursor-pointer z-20">
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                    onChange={(e) => handleCategoryImageUpload(e, cat.id)}
+                                                />
+                                                {uploading === 'cat_' + cat.id ? (
+                                                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                                                ) : (
+                                                    <>
+                                                        <ImageIcon className="w-8 h-8 text-white mb-1" />
+                                                        <span className="text-[8px] text-white font-black uppercase tracking-widest">Cambiar Foto</span>
+                                                    </>
+                                                )}
+                                            </label>
+                                        </div>
+
+                                        <div className="flex-1 space-y-1">
+                                            <p className="text-lg font-serif font-bold italic text-primary">{cat.name}</p>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => toggleFeatured(cat.id, cat.is_featured)}
+                                                    disabled={updatingCat === cat.id}
+                                                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${cat.is_featured
+                                                            ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200'
+                                                            : 'bg-primary/5 text-primary/30 border border-primary/5'
+                                                        }`}
+                                                >
+                                                    {cat.is_featured ? 'Destacada' : 'No destacada'}
+                                                </button>
+                                                {uploading === 'cat_' + cat.id && <span className="text-[8px] text-gold animate-pulse font-black uppercase">Subiendo...</span>}
                                             </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-primary">{cat.name}</p>
-                                            <p className={`text-[9px] font-black uppercase tracking-widest ${cat.is_featured ? 'text-secondary' : 'text-primary/30'}`}>
-                                                {cat.is_featured ? 'Destacada' : 'No destacada'}
-                                            </p>
+
+                                        <div className="pr-2">
+                                            <button
+                                                onClick={() => toggleFeatured(cat.id, cat.is_featured)}
+                                                className={`w-14 h-7 rounded-full transition-all relative ${cat.is_featured ? 'bg-gold' : 'bg-primary/10'}`}
+                                            >
+                                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-md ${cat.is_featured ? 'right-1' : 'left-1'}`} />
+                                            </button>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => toggleFeatured(cat.id, cat.is_featured)}
-                                        disabled={updatingCat === cat.id}
-                                        className={`w-14 h-7 rounded-full transition-all relative ${cat.is_featured ? 'bg-emerald-600' : 'bg-primary/10'}`}
-                                    >
-                                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-md ${cat.is_featured ? 'right-1' : 'left-1'}`} />
-                                    </button>
                                 </div>
                             ))}
                         </div>

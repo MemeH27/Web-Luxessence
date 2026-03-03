@@ -11,6 +11,10 @@
   --color-secondary-light: #fafafa;
   --color-secondary-dark: #e5e5e5;
 
+  --color-gold: #D4AF37;
+  --color-gold-light: #F9E2AF;
+  --color-gold-dark: #A57C1B;
+
   --color-luxury-black: #1A1A1A;
   --color-luxury-border: rgba(113, 17, 22, 0.1);
 
@@ -19,6 +23,10 @@
 
   --radius-xl: 1.5rem;
   --radius-2xl: 2rem;
+  --radius-3xl: 3.5rem;
+
+  --shadow-premium: 0 32px 64px -16px rgba(0, 0, 0, 0.1);
+  --shadow-premium-hover: 0 48px 80px -16px rgba(113, 17, 22, 0.15);
 }
 
 @layer base {
@@ -44,19 +52,42 @@
 
 @layer components {
   .glass-panel {
-    @apply bg-white/70 backdrop-blur-xl border border-luxury-border shadow-sm;
+    @apply bg-white/70 backdrop-blur-xl border border-luxury-border shadow-2xl;
   }
 
   .glass-card {
-    @apply bg-white/40 backdrop-blur-lg border border-luxury-border hover:bg-white/60 transition-all duration-300 shadow-sm;
+    @apply bg-white/40 backdrop-blur-lg border border-luxury-border hover:bg-white/60 transition-all duration-500 shadow-sm;
+  }
+
+  .glass-card-premium {
+    @apply bg-white/60 backdrop-blur-2xl border border-white/20 shadow-premium hover:shadow-premium-hover transition-all duration-700;
   }
 
   .btn-primary {
-    @apply bg-primary text-secondary-light font-bold px-8 py-3 rounded-full hover:bg-primary-light active:scale-95 transition-all shadow-lg shadow-primary/20;
+    @apply bg-primary text-secondary-light font-bold px-8 py-4 rounded-2xl hover:bg-primary-light active:scale-95 transition-all shadow-xl shadow-primary/20;
+  }
+
+  .btn-premium {
+    @apply relative overflow-hidden bg-primary text-white font-black uppercase tracking-[0.2em] px-10 py-5 rounded-2xl shadow-2xl hover:shadow-primary/30 transition-all duration-500 hover:-translate-y-1;
+  }
+
+  .btn-premium::after {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:animate-[shimmer_2s_infinite];
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
   }
 
   .text-gradient-primary {
     @apply bg-gradient-to-r from-primary via-primary-light to-primary-dark bg-clip-text text-transparent;
+  }
+
+  .text-gold-gradient {
+    @apply bg-gradient-to-br from-gold via-gold-light to-gold-dark bg-clip-text text-transparent;
   }
 
   .pt-safe {

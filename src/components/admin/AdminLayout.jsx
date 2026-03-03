@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, History, LogOut, Sparkles, ChevronLeft, ChevronRight, Menu, X, Percent, Store, Clock, Plus, Mail } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, History, LogOut, Sparkles, ChevronLeft, ChevronRight, Menu, X, Percent, Store, Clock, Plus, Mail, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import NewSaleModal from './NewSaleModal';
@@ -107,8 +107,23 @@ const AdminLayout = () => {
                     </Link>
                 </div>
 
+                <div className="px-4 mb-10 relative z-10">
+                    <button
+                        onClick={() => setIsNewSaleOpen(true)}
+                        className="w-full bg-secondary hover:bg-white text-primary rounded-[2rem] py-5 px-8 flex items-center justify-between group transition-all duration-500 shadow-[0_20px_40px_rgba(212,175,55,0.2)] hover:shadow-secondary/30"
+                    >
+                        <div className="flex items-center gap-4">
+                            <Plus className="w-5 h-5 group-hover:rotate-180 transition-transform duration-700" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Nueva Venta</span>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <ArrowRight className="w-4 h-4" />
+                        </div>
+                    </button>
+                </div>
+
                 <nav className="flex-1 space-y-4 relative z-10">
-                    <p className="text-[8px] font-black uppercase tracking-[0.4em] text-secondary-light/10 mb-6 pl-6">Navegación Oficial</p>
+                    <p className="text-[8px] font-black uppercase tracking-[0.4em] text-secondary-light/10 mb-6 pl-6">Módulos LuxOS</p>
                     {menuItems.map((item) => {
                         const isActive = location.pathname === item.path;
                         return (
@@ -155,14 +170,22 @@ const AdminLayout = () => {
                 >
                     <div className="flex items-center gap-3">
                         <img src="/img/logo.svg" className="w-10 h-10" />
-                        <h2 className="text-xl font-serif font-black italic text-secondary-light leading-none">Admin <span className="opacity-50">Suite</span></h2>
+                        <h2 className="text-xl font-serif font-black italic text-secondary-light leading-none tracking-tighter">LuxOS <span className="opacity-40 font-sans text-xs uppercase font-black">Admin</span></h2>
                     </div>
-                    <button
-                        onClick={() => setIsMenuOpen(true)}
-                        className="p-4 bg-secondary-light/10 text-secondary-light rounded-2xl active:scale-90 transition-all shadow-lg"
-                    >
-                        <Menu className="w-6 h-6" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setIsNewSaleOpen(true)}
+                            className="p-4 bg-secondary text-primary rounded-2xl active:scale-90 transition-all shadow-lg"
+                        >
+                            <Plus className="w-6 h-6" />
+                        </button>
+                        <button
+                            onClick={() => setIsMenuOpen(true)}
+                            className="p-4 bg-secondary-light/10 text-secondary-light rounded-2xl active:scale-90 transition-all shadow-lg"
+                        >
+                            <Menu className="w-6 h-6" />
+                        </button>
+                    </div>
                 </header>
 
                 {/* Session Warning Banner */}
@@ -192,29 +215,11 @@ const AdminLayout = () => {
                         animate={{ opacity: 1, y: 0 }}
                         className="max-w-7xl mx-auto"
                     >
-                        <Outlet />
+                        <Outlet context={{ setIsNewSaleOpen }} />
                     </motion.div>
                 </main>
 
-                {/* Expandable New Sale Button */}
-                <div
-                    className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center bg-green-600 border border-green-600 border-r-0 rounded-l-3xl p-1.5 md:p-2 pr-4 shadow-[-10px_0_30px_rgba(34,197,94,0.3)] gap-2 transition-transform duration-500 ease-in-out ${isSaleButtonExpanded ? 'translate-x-[0.5rem] md:translate-x-0' : 'translate-x-[calc(100%-2.2rem)] md:translate-x-[calc(100%-3rem)]'}`}
-                >
-                    <button
-                        onClick={() => setIsSaleButtonExpanded(!isSaleButtonExpanded)}
-                        className="w-8 h-12 md:w-10 md:h-14 flex items-center justify-center text-white hover:bg-green-700 transition-colors rounded-l-2xl"
-                    >
-                        {isSaleButtonExpanded ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-                    </button>
 
-                    <button
-                        onClick={() => { setIsNewSaleOpen(true); setIsSaleButtonExpanded(false); }}
-                        className="bg-green-700 hover:bg-green-800 border border-green-500/50 text-white px-4 py-3 md:px-5 md:py-3.5 rounded-xl md:rounded-2xl shadow-inner transition-all hover:scale-105 active:scale-95 flex items-center gap-2 md:gap-3 w-max"
-                    >
-                        <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 mb-0.5" />
-                        <span className="font-bold text-sm tracking-wide">Nueva Venta</span>
-                    </button>
-                </div>
 
                 {/* New Sale Modal */}
                 <NewSaleModal
@@ -296,6 +301,13 @@ const AdminLayout = () => {
 
                                 <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }} className="pt-8 mt-4 border-t border-white/5">
                                     <div className="text-[8px] font-black uppercase tracking-[0.3em] text-secondary-light/20 mb-6 pl-4">Accesos Directos</div>
+                                    <button
+                                        onClick={() => { setIsNewSaleOpen(true); setIsMenuOpen(false); }}
+                                        className="w-full flex items-center gap-4 p-6 bg-secondary text-primary rounded-[2rem] transition-all border border-secondary shadow-lg mb-4"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                        <span className="text-xs font-black uppercase tracking-widest leading-none">Nueva Venta</span>
+                                    </button>
                                     <button
                                         onClick={() => { navigate('/'); setIsMenuOpen(false); }}
                                         className="w-full flex items-center gap-4 p-6 text-secondary-light/40 hover:text-secondary-light bg-white/5 rounded-[2rem] transition-all border border-white/5 mb-3"
