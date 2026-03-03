@@ -329,7 +329,7 @@ const Catalog = () => {
                             onChange={(e) => setSortBy(e.target.value)}
                             className="w-full h-full appearance-none bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-primary px-4 text-center focus:ring-0"
                         >
-                            <option value="newest">Ordenar por v</option>
+                            <option value="newest">Ordenar por</option>
                             <option value="price_asc">Precio: Menor a Mayor</option>
                             <option value="price_desc">Precio: Mayor a Menor</option>
                             <option value="name_asc">Nombre: A-Z</option>

@@ -83,6 +83,24 @@ const SiteSettings = () => {
         }
     };
 
+    const handleCategoryImageUpload = async (e, catId) => {
+        setUploading('cat_' + catId);
+        try {
+            const file = e.target.files[0];
+            const url = await uploadAndOptimize(supabase, 'categories', file, true);
+
+            const { error } = await supabase.from('categories').update({ image_url: url }).eq('id', catId);
+            if (error) throw error;
+
+            setDbCategories(prev => prev.map(c => c.id === catId ? { ...c, image_url: url } : c));
+            addToast('Portada actualizada', 'success');
+        } catch (err) {
+            addToast('Error al subir portada', 'error');
+        } finally {
+            setUploading(null);
+        }
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
@@ -170,8 +188,12 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT fals
                             {dbCategories.map(cat => (
                                 <div key={cat.id} className="flex items-center justify-between p-4 bg-primary/5 rounded-3xl border border-primary/5 hover:border-primary/20 transition-all group">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white border border-primary/5 shadow-inner">
+                                        <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white border border-primary/5 shadow-inner relative group shrink-0">
                                             {cat.image_url ? <img src={cat.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-primary/10 font-black">{cat.name[0]}</div>}
+                                            <div className="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 flex items-center justify-center backdrop-blur-sm transition-all cursor-pointer">
+                                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleCategoryImageUpload(e, cat.id)} />
+                                                {uploading === 'cat_' + cat.id ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <ImageIcon className="w-5 h-5 text-white" />}
+                                            </div>
                                         </div>
                                         <div>
                                             <p className="text-sm font-bold text-primary">{cat.name}</p>
@@ -183,7 +205,7 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT fals
                                     <button
                                         onClick={() => toggleFeatured(cat.id, cat.is_featured)}
                                         disabled={updatingCat === cat.id}
-                                        className={`w-14 h-7 rounded-full transition-all relative ${cat.is_featured ? 'bg-secondary' : 'bg-primary/10'}`}
+                                        className={`w-14 h-7 rounded-full transition-all relative ${cat.is_featured ? 'bg-emerald-600' : 'bg-primary/10'}`}
                                     >
                                         <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-md ${cat.is_featured ? 'right-1' : 'left-1'}`} />
                                     </button>
@@ -234,29 +256,24 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT fals
 
                     {/* Landing Banner */}
                     <div className="bg-white p-10 rounded-[3.5rem] border border-primary/5 shadow-xl space-y-8 xl:col-span-2">
-                        <h3 className="text-2xl font-serif font-bold italic text-primary">Banner Principal (Landing)</h3>
-                        <div className="flex flex-col lg:flex-row gap-10">
-                            <div className="flex-1 space-y-3">
-                                <div className="aspect-[21/9] rounded-[3rem] overflow-hidden bg-primary/5 relative border border-primary/5 group shadow-inner">
-                                    {settings.hero_banner && <img src={settings.hero_banner} className="w-full h-full object-cover" />}
-                                    <div className="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 flex items-center justify-center backdrop-blur-md transition-all">
-                                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'hero_banner')} />
-                                        <div className="bg-white text-primary px-10 py-3 rounded-full font-black text-[10px] uppercase tracking-widest shadow-2xl">Cambiar Banner</div>
-                                    </div>
-                                    {uploading === 'hero_banner' && <div className="absolute inset-0 bg-primary/60 flex items-center justify-center backdrop-blur-sm"><Loader2 className="w-10 h-10 animate-spin text-white" /></div>}
-                                </div>
+                        <div className="space-y-2">
+                            <h3 className="text-2xl font-serif font-bold italic text-primary">Textos del Hero (Página Inicial)</h3>
+                            <p className="text-xs text-primary/40 italic leading-relaxed">Personaliza el mensaje que ven tus clientes al entrar a la tienda.</p>
+                        </div>
+                        <div className="flex flex-col gap-6 w-full">
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-1">Título Principal</label>
+                                <input value={settings.hero_title || ''} onChange={e => setSettings({ ...settings, hero_title: e.target.value })} placeholder="Descubre tu Legado" className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-5 px-8 text-xl font-serif italic text-primary font-bold outline-none" />
                             </div>
-                            <div className="w-full lg:w-96 space-y-6">
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-1">Título Hero</label>
-                                    <input value={settings.hero_title || ''} onChange={e => setSettings({ ...settings, hero_title: e.target.value })} className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-5 px-8 text-xl font-serif italic text-primary font-bold outline-none" />
-                                </div>
-                                <div className="p-6 bg-blue-500/5 rounded-[2rem] border border-blue-500/10 flex gap-4 items-start">
-                                    <Info className="w-5 h-5 text-blue-500 mt-1" />
-                                    <p className="text-[11px] text-blue-900/60 leading-relaxed italic">
-                                        Este título aparece en letras grandes sobre el banner principal. Recomendado: Máx 40 caracteres.
-                                    </p>
-                                </div>
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-primary/40 ml-1">Mensaje o Subtítulo</label>
+                                <textarea rows="3" value={settings.hero_text || ''} onChange={e => setSettings({ ...settings, hero_text: e.target.value })} placeholder="Una colección curada de fragancias..." className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 text-primary text-sm font-medium resize-none outline-none" />
+                            </div>
+                            <div className="p-6 bg-blue-500/5 rounded-[2rem] border border-blue-500/10 flex gap-4 items-start">
+                                <Info className="w-5 h-5 text-blue-500 mt-1" />
+                                <p className="text-[11px] text-blue-900/60 leading-relaxed italic">
+                                    El fondo animado tipo seda siempre estará visible. Estos campos cambian exclusivamente los títulos frontales de bienvenida.
+                                </p>
                             </div>
                         </div>
                     </div>

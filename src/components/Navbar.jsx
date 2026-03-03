@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ShoppingBag, User, LogOut, Mail, Lock, UserCircle, ArrowRight, ChevronDown, Search, ShoppingCart } from 'lucide-react';
+import { Menu, X, ShoppingBag, User, LogOut, Mail, Lock, UserCircle, ArrowRight, ChevronDown, Search, ShoppingCart, Eye, EyeOff } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
@@ -16,6 +16,8 @@ const Navbar = () => {
     const [resetEmailSent, setResetEmailSent] = useState(false);
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [city, setCity] = useState('');
@@ -46,9 +48,17 @@ const Navbar = () => {
             }
         });
 
+        // Listen for open auth modal event
+        const handleOpenAuth = () => {
+            setIsAuthOpen(true);
+            setAuthMode('login');
+        };
+        window.addEventListener('open-auth-modal', handleOpenAuth);
+
         return () => {
             window.removeEventListener('scroll', handleScroll);
             subscription.unsubscribe();
+            window.removeEventListener('open-auth-modal', handleOpenAuth);
         };
     }, []);
 
@@ -58,6 +68,9 @@ const Navbar = () => {
         } else {
             document.body.classList.remove('auth-open');
         }
+        // Notify other components about auth modal visibility
+        window.dispatchEvent(new CustomEvent('auth-modal-change', { detail: { open: isAuthOpen } }));
+
         return () => document.body.classList.remove('auth-open');
     }, [isAuthOpen]);
 
@@ -172,15 +185,12 @@ const Navbar = () => {
                 }`}>
                 <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
                     {/* Logo Responsive */}
-                    <Link to="/" className="flex items-center gap-3 group">
+                    <Link to="/" className="flex items-center group">
                         <img
-                            src="/img/logo.svg"
+                            src="/img/logo-blanco.png"
                             alt="Luxessence"
-                            className="h-10 md:h-12 w-auto object-contain"
+                            className="h-10 md:h-12 w-auto object-contain transition-transform duration-500 group-hover:scale-105"
                         />
-                        <span className="text-2xl font-serif font-bold tracking-tight text-secondary hidden lg:block">
-                            Luxessence
-                        </span>
                     </Link>
 
                     {/* Desktop Links */}
@@ -228,8 +238,8 @@ const Navbar = () => {
                         </Link>
                     </div>
 
-                    {/* Mobile Toggle */}
-                    <div className="flex md:hidden items-center gap-4">
+                    {/* Mobile Actions */}
+                    <div className="flex md:hidden items-center gap-2">
                         <Link to="/cart" className="relative p-2 text-secondary">
                             <ShoppingCart className="w-6 h-6" />
                             {cartCount > 0 && (
@@ -238,92 +248,8 @@ const Navbar = () => {
                                 </span>
                             )}
                         </Link>
-                        <button onClick={() => setIsOpen(!isOpen)} className="text-secondary p-2">
-                            {isOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
-                        </button>
                     </div>
                 </div>
-
-                {/* Mobile Menu Overlay */}
-                <AnimatePresence>
-                    {isOpen && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="fixed inset-0 top-0 left-0 w-full h-screen bg-primary z-[90] md:hidden flex flex-col pt-32 px-10"
-                        >
-                            {/* Close Button UI */}
-                            <button
-                                onClick={() => setIsOpen(false)}
-                                className="absolute top-8 right-8 w-12 h-12 bg-secondary/10 rounded-full flex items-center justify-center text-secondary-light hover:bg-secondary/20 transition-all border border-secondary/10"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-
-                            <div className="flex flex-col gap-8 text-left">
-                                {navLinks.map((link, i) => (
-                                    <motion.div
-                                        key={link.path}
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: i * 0.1 }}
-                                    >
-                                        <Link
-                                            to={link.path}
-                                            onClick={() => setIsOpen(false)}
-                                            className="text-4xl font-serif text-secondary font-bold hover:text-secondary-light transition-colors flex items-center justify-between group"
-                                        >
-                                            {link.name}
-                                            <ArrowRight className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        </Link>
-                                    </motion.div>
-                                ))}
-
-                                <div className="h-px bg-secondary/10 my-8 w-1/4" />
-
-                                {user ? (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 0.5 }}
-                                        className="space-y-6"
-                                    >
-                                        <Link
-                                            to={user.email === ADMIN_EMAIL ? "/admin/dashboard" : "/profile"}
-                                            onClick={() => setIsOpen(false)}
-                                            className="flex items-center gap-4 text-secondary/80 text-lg font-bold"
-                                        >
-                                            <UserCircle className="w-8 h-8 text-secondary" />
-                                            <span>{user.email === ADMIN_EMAIL ? 'Panel Administrativo' : 'Mi Perfil'}</span>
-                                        </Link>
-                                        <button
-                                            onClick={() => { handleLogout(); setIsOpen(false); }}
-                                            className="text-white/40 text-sm font-black uppercase tracking-widest hover:text-white transition-colors"
-                                        >
-                                            Finalizar Sesión
-                                        </button>
-                                    </motion.div>
-                                ) : (
-                                    <motion.button
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 0.5 }}
-                                        onClick={() => { setIsAuthOpen(true); setIsOpen(false); }}
-                                        className="btn-primary w-full !py-6 flex items-center justify-center gap-3"
-                                    >
-                                        <User className="w-5 h-5" /> ACCESO CLIENTE
-                                    </motion.button>
-                                )}
-                            </div>
-
-                            {/* Decorative Background for Mobile Menu */}
-                            <div className="absolute bottom-10 right-10 opacity-5 grayscale pointer-events-none">
-                                <img src="/img/logo-blanco.png" className="w-40" alt="Luxessence" />
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </nav>
 
             {/* Custom Auth Modal */}
@@ -501,13 +427,20 @@ const Navbar = () => {
                                                             <div className="relative">
                                                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
                                                                 <input
-                                                                    type="password"
+                                                                    type={showPassword ? "text" : "password"}
                                                                     required
                                                                     placeholder="••••••••"
-                                                                    className="w-full bg-white border border-primary/10 rounded-xl py-3 pl-11 pr-4 outline-none focus:ring-1 focus:ring-primary placeholder:text-primary/10 text-primary text-sm transition-all"
+                                                                    className="w-full bg-white border border-primary/10 rounded-xl py-3 pl-11 pr-12 outline-none focus:ring-1 focus:ring-primary placeholder:text-primary/10 text-primary text-sm transition-all"
                                                                     value={password}
                                                                     onChange={(e) => setPassword(e.target.value)}
                                                                 />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowPassword(!showPassword)}
+                                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/30 hover:text-primary transition-colors focus:outline-none"
+                                                                >
+                                                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                                </button>
                                                             </div>
                                                         </div>
 
@@ -517,13 +450,20 @@ const Navbar = () => {
                                                                 <div className="relative">
                                                                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
                                                                     <input
-                                                                        type="password"
+                                                                        type={showConfirmPassword ? "text" : "password"}
                                                                         required
                                                                         placeholder="••••••••"
-                                                                        className="w-full bg-white border border-primary/10 rounded-xl py-3 pl-11 pr-4 outline-none focus:ring-1 focus:ring-primary placeholder:text-primary/10 text-primary text-sm transition-all"
+                                                                        className="w-full bg-white border border-primary/10 rounded-xl py-3 pl-11 pr-12 outline-none focus:ring-1 focus:ring-primary placeholder:text-primary/10 text-primary text-sm transition-all"
                                                                         value={confirmPassword}
                                                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                                                     />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/30 hover:text-primary transition-colors focus:outline-none"
+                                                                    >
+                                                                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                                    </button>
                                                                 </div>
                                                             </div>
                                                         )}

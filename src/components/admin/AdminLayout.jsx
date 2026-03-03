@@ -256,29 +256,45 @@ const AdminLayout = () => {
                                 </button>
                             </div>
 
-                            <nav className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-8">
-                                <div className="text-[8px] font-black uppercase tracking-[0.3em] text-secondary-light/20 mb-6 pl-4">Navegación Principal</div>
+                            <motion.nav
+                                initial="hidden"
+                                animate="visible"
+                                exit="hidden"
+                                variants={{
+                                    hidden: { opacity: 0 },
+                                    visible: {
+                                        opacity: 1,
+                                        transition: { staggerChildren: 0.1 }
+                                    }
+                                }}
+                                className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-8"
+                            >
+                                <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }} className="text-[8px] font-black uppercase tracking-[0.3em] text-secondary-light/20 mb-6 pl-4">Navegación Principal</motion.div>
                                 {menuItems.map((item) => {
                                     const isActive = location.pathname === item.path;
                                     return (
-                                        <Link
-                                            key={item.path}
-                                            to={item.path}
-                                            onClick={() => setIsMenuOpen(false)}
-                                            className={`flex items-center justify-between p-6 rounded-[2rem] transition-all group ${isActive
-                                                ? 'bg-secondary-light text-primary font-bold shadow-xl'
-                                                : 'text-secondary-light/40 hover:text-secondary-light hover:bg-white/5 border border-white/5'}`}
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <item.icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px]' : ''}`} />
-                                                <span className="text-xs font-black uppercase tracking-widest leading-none">{item.name}</span>
-                                            </div>
-                                            {isActive && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                                        </Link>
+                                        <motion.div key={item.path} variants={{ hidden: { x: -30, opacity: 0 }, visible: { x: 0, opacity: 1, transition: { type: 'spring', stiffness: 300, damping: 24 } } }}>
+                                            <Link
+                                                to={item.path}
+                                                onClick={() => setIsMenuOpen(false)}
+                                                className={`relative flex items-center justify-between p-6 rounded-[2rem] transition-all group overflow-hidden border ${isActive
+                                                    ? 'text-primary font-bold shadow-xl border-secondary-light/20'
+                                                    : 'text-secondary-light/40 hover:text-primary border-white/5 hover:border-secondary-light/30'}`}
+                                            >
+                                                {/* Silk Background Effect (Active & Hover) */}
+                                                <div className={`absolute inset-0 silk-bg transition-opacity duration-500 rounded-[2rem] -z-10 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+
+                                                <div className="flex items-center gap-4 relative z-10">
+                                                    <item.icon className={`w-5 h-5 transition-colors duration-300 ${isActive ? 'stroke-[2.5px] text-primary' : 'group-hover:text-primary'}`} />
+                                                    <span className={`text-xs font-black uppercase tracking-widest leading-none transition-colors duration-300 ${isActive ? 'text-primary' : 'group-hover:text-primary'}`}>{item.name}</span>
+                                                </div>
+                                                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-primary relative z-10" />}
+                                            </Link>
+                                        </motion.div>
                                     );
                                 })}
 
-                                <div className="pt-8 mt-4 border-t border-white/5">
+                                <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }} className="pt-8 mt-4 border-t border-white/5">
                                     <div className="text-[8px] font-black uppercase tracking-[0.3em] text-secondary-light/20 mb-6 pl-4">Accesos Directos</div>
                                     <button
                                         onClick={() => { navigate('/'); setIsMenuOpen(false); }}
@@ -294,8 +310,8 @@ const AdminLayout = () => {
                                         <LogOut className="w-5 h-5" />
                                         <span className="text-xs font-black uppercase tracking-widest leading-none">Cerrar Sesión</span>
                                     </button>
-                                </div>
-                            </nav>
+                                </motion.div>
+                            </motion.nav>
 
                             <div className="pt-6 border-t border-white/5 flex items-center justify-center">
                                 <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/10 italic">Luxessence v1.0.2</p>
@@ -307,6 +323,21 @@ const AdminLayout = () => {
 
             {/* Ambient Decorative */}
             <div className="fixed top-0 right-0 w-[400px] h-[400px] bg-primary/2 rounded-full blur-[120px] pointer-events-none -z-10" />
+
+            <style jsx>{`
+                .silk-bg {
+                    background: linear-gradient(-45deg, #d4af37, #f3e5ab, #aa8529, #fff9e6);
+                    background-size: 400% 400%;
+                    animation: silkFlow 8s ease infinite;
+                    mix-blend-mode: screen;
+                }
+                
+                @keyframes silkFlow {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+            `}</style>
         </div>
     );
 };

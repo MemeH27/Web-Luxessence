@@ -3,6 +3,7 @@ import { ShoppingBag, Sparkles, ShieldCheck, Heart, ArrowRight } from 'lucide-re
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import Silk from '../components/Silk';
 
 const ProductGridItem = ({ product }) => (
     <motion.div
@@ -138,48 +139,82 @@ const Home = () => {
 
     return (
         <div className="space-y-12 md:space-y-16 pb-0">
-            {/* Cinematic Hero */}
-            <section className="relative h-[70vh] md:h-[80vh] flex items-start justify-center overflow-hidden px-6 pt-24 md:pt-32">
-                <div className="absolute inset-0 z-0">
-                    <img
-                        src={siteSettings.hero_banner || "/img/banner-mandarin.png"}
-                        className="w-full h-full object-cover scale-100 md:scale-105 md:object-center object-[70%] transition-transform duration-[3000ms]"
-                        alt="Hero Background"
-                    />
-                    {/* Refined Premium Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/40" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent opacity-100" />
-                </div>
+            {/* Cinematic Premium Hero */}
+            <section className="relative h-[85vh] md:h-[90vh] flex justify-center items-center overflow-hidden px-6 md:px-12 pt-24 md:pt-0">
+                <motion.div
+                    initial={{ scale: 1.1 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 1.5, ease: "easeOut" }}
+                    className="absolute inset-0 z-0"
+                >
+                    {/* Animated Luxury Silk Background (Replaces Image) */}
+                    <div className="absolute inset-0 w-full h-full bg-primary overflow-hidden">
+                        <Silk
+                            speed={3}
+                            scale={0.8}
+                            color="#4a1226"
+                            noiseIntensity={1.0}
+                            rotation={15}
+                        />
+
+                        {/* Sophisticated Dark Gradient Overlays */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/30 to-black/20 z-10 pointer-events-none" />
+                        <div className="absolute inset-0 bg-black/30 mix-blend-multiply z-10 pointer-events-none" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-transparent to-primary/90 opacity-60 z-10 pointer-events-none" />
+                    </div>
+                </motion.div>
 
                 <motion.div
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 50 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 1 }}
-                    className="relative z-10 text-center space-y-8 max-w-4xl"
+                    transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
+                    className="relative z-10 flex flex-col items-center text-center space-y-6 md:space-y-8 max-w-5xl w-full -mt-16 md:mt-0"
                 >
-                    <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.5 }}
-                        className="text-secondary-light tracking-[0.5em] uppercase text-[9px] md:text-xs font-black bg-white/10 backdrop-blur-md py-1.5 px-5 rounded-full inline-block border border-white/20 shadow-xl mb-2"
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.8, duration: 0.8 }}
+                        className="flex flex-col items-center gap-2"
                     >
-                        La distinción hecha esencia
-                    </motion.p>
-                    <h1 className="text-5xl md:text-8xl font-serif font-bold italic text-white leading-tight drop-shadow-2xl">
-                        {siteSettings.hero_title || 'Descubre tu Legado Personal'}
+                        <span className="text-secondary-light tracking-[0.5em] uppercase text-[9px] md:text-[11px] font-black bg-white/5 backdrop-blur-xl py-2 px-6 rounded-full inline-block border border-white/10 shadow-2xl">
+                            Luxessence Experience
+                        </span>
+                        <div className="w-12 h-px bg-gradient-to-r from-transparent via-secondary-light/50 to-transparent mt-2" />
+                    </motion.div>
+
+                    <h1 className="text-5xl md:text-7xl lg:text-[6rem] font-serif font-bold italic text-white leading-[1.1] drop-shadow-2xl px-4">
+                        {siteSettings.hero_title || 'Descubre tu Legado'}
                     </h1>
-                    <p className="text-white/90 text-base md:text-xl font-medium max-w-2xl mx-auto leading-relaxed drop-shadow-md">
-                        Una colección curada de fragancias, carteras y accesorios diseñados para quienes entienden que el lujo es una actitud.
+
+                    <p className="text-white/80 text-sm md:text-lg lg:text-xl font-medium max-w-2xl leading-relaxed drop-shadow-md pb-4">
+                        {siteSettings.hero_text || 'Una colección curada de fragancias, carteras y accesorios diseñados para quienes entienden que el lujo es una actitud.'}
                     </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-4">
-                        <Link to="/catalog" className="btn-primary !bg-secondary !text-primary hover:!bg-white flex items-center gap-3 shadow-2xl">
-                            Explorar Colección <ShoppingBag className="w-5 h-5" />
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 pt-4 w-full sm:w-auto">
+                        <Link
+                            to="/catalog"
+                            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-secondary text-primary px-10 py-4 rounded-full text-xs font-black uppercase tracking-[0.2em] shadow-[0_10px_40px_rgba(212,175,55,0.2)] hover:shadow-[0_15px_50px_rgba(212,175,55,0.3)] hover:scale-105 hover:bg-white transition-all duration-500 group"
+                        >
+                            Explorar Colección
+                            <ShoppingBag className="w-4 h-4 group-hover:rotate-12 transition-transform" />
                         </Link>
-                        <Link to="/about" className="text-white font-bold tracking-widest uppercase text-xs hover:text-secondary flex items-center gap-2 drop-shadow-lg transition-colors">
-                            Nuestra Historia <ArrowRight className="w-4 h-4" />
+
+                        <Link
+                            to="/about"
+                            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-white/5 backdrop-blur-md border border-white/20 text-white px-10 py-4 rounded-full text-xs font-black uppercase tracking-[0.2em] hover:bg-white/10 hover:border-white/40 transition-all duration-500 group"
+                        >
+                            Nuestra Historia
+                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </Link>
                     </div>
                 </motion.div>
+
+                {/* Ambient floating flare effect */}
+                <motion.div
+                    animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.2, 1] }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute top-1/4 right-1/4 w-[30vw] h-[30vw] min-w-[300px] min-h-[300px] bg-secondary-light/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen"
+                />
             </section>
 
             {/* Brand Values */}

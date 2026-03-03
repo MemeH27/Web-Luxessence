@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
-import { motion } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
-import { Award, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown, Award, LogOut, Sparkles, Star, Gift, LayoutDashboard } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ADMIN_EMAIL } from '../lib/constants';
 
 const Profile = () => {
     const { addToast } = useToast();
@@ -26,27 +26,18 @@ const Profile = () => {
     useEffect(() => {
         fetchProfile();
 
-        // Real-time listener for orders
-        const setupOrdersListener = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
+        // Listen for auth changes to update Profile state
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session) {
+                setUser(session.user);
+                fetchProfile();
+            } else {
+                setUser(null);
+                setLoading(false);
+            }
+        });
 
-            const channel = supabase
-                .channel(`profile_orders_${session.user.id}`)
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'orders',
-                    filter: `client_email=eq.${session.user.email}`
-                }, () => {
-                    fetchOrdersOnly(session.user.email);
-                })
-                .subscribe();
-
-            return () => supabase.removeChannel(channel);
-        };
-
-        setupOrdersListener();
+        return () => subscription.unsubscribe();
     }, []);
 
     const fetchOrdersOnly = async (email) => {
@@ -85,6 +76,8 @@ const Profile = () => {
             }
 
             fetchOrdersOnly(session.user.email);
+        } else {
+            setUser(null);
         }
         setLoading(false);
     };
@@ -113,6 +106,16 @@ const Profile = () => {
         }
     };
 
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        addToast('Sesión cerrada correctamente');
+        window.location.reload();
+    };
+
+    const openLogin = () => {
+        window.dispatchEvent(new CustomEvent('open-auth-modal'));
+    };
+
     if (loading) {
         return (
             <div className="min-h-[60vh] flex items-center justify-center">
@@ -121,12 +124,92 @@ const Profile = () => {
         );
     }
 
+    if (!user) {
+        return (
+            <div className="max-w-4xl mx-auto px-6 py-20 text-center">
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass-panel p-10 md:p-16 rounded-[4rem] space-y-8 relative overflow-hidden flex flex-col items-center"
+                >
+                    <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mb-4">
+                        <User className="w-12 h-12 text-primary/30" strokeWidth={1} />
+                    </div>
+
+                    <div className="space-y-4 max-w-lg">
+                        <h1 className="text-4xl md:text-5xl font-serif font-bold italic text-primary">Descubre Tu Mundo Luxessence</h1>
+                        <p className="text-primary/60 text-lg">Inicia sesión para desbloquear una experiencia de compra personalizada y beneficios exclusivos.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl text-left">
+                        <div className="bg-white/50 p-6 rounded-3xl border border-primary/5 flex gap-4 items-start">
+                            <Star className="w-6 h-6 text-primary shrink-0" />
+                            <div>
+                                <h3 className="font-bold text-primary italic uppercase tracking-widest text-xs">Tarjeta de Sellos</h3>
+                                <p className="text-[10px] text-primary/60 mt-1 uppercase font-black">Obtén 20% OFF en tu 5ta compra automáticamente.</p>
+                            </div>
+                        </div>
+                        <div className="bg-white/50 p-6 rounded-3xl border border-primary/5 flex gap-4 items-start">
+                            <Clock className="w-6 h-6 text-primary shrink-0" />
+                            <div>
+                                <h3 className="font-bold text-primary italic uppercase tracking-widest text-xs">Historial VIP</h3>
+                                <p className="text-[10px] text-primary/60 mt-1 uppercase font-black">Rastrea tus pedidos exclusivos en tiempo real.</p>
+                            </div>
+                        </div>
+                        <div className="bg-white/50 p-6 rounded-3xl border border-primary/5 flex gap-4 items-start md:col-span-2">
+                            <Gift className="w-6 h-6 text-primary shrink-0" />
+                            <div>
+                                <h3 className="font-bold text-primary italic uppercase tracking-widest text-xs">Acceso Anticipado</h3>
+                                <p className="text-[10px] text-primary/60 mt-1 uppercase font-black">Sé el primero en adquirir nuestras piezas de edición limitada.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={openLogin}
+                        className="btn-primary !px-12 !py-5 flex items-center gap-3 shadow-2xl mt-4 group"
+                    >
+                        INICIAR SESIÓN AHORA
+                        <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                    </button>
+
+                    {/* Decorative Background */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/3 rounded-full blur-[100px] pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/3 rounded-full blur-[100px] pointer-events-none" />
+                </motion.div>
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">
-            <header className="space-y-4">
-                <h1 className="text-5xl font-serif font-bold italic text-primary">Mi Perfil</h1>
-                <p className="text-primary/40 tracking-[0.3em] uppercase text-xs font-black italic">Gestión de membresía exclusiva</p>
-                <div className="w-20 h-1 bg-primary/20 rounded-full" />
+            <header className="space-y-6 flex flex-col md:flex-row md:items-end justify-between">
+                <div className="space-y-4">
+                    <h1 className="text-5xl font-serif font-bold italic text-primary">Mi Perfil</h1>
+                    <p className="text-primary/40 tracking-[0.3em] uppercase text-xs font-black italic">Gestión de membresía exclusiva</p>
+                    <div className="w-20 h-1 bg-primary/20 rounded-full" />
+                </div>
+
+                <div className="flex flex-row items-center gap-3 pt-6 md:pt-0 w-full md:max-w-md">
+                    {user?.email === ADMIN_EMAIL && (
+                        <Link
+                            to="/admin/dashboard"
+                            className="flex-1 relative overflow-hidden group flex items-center justify-center gap-2 bg-gradient-to-tr from-primary to-primary-light text-secondary-light py-3.5 px-2 rounded-[1.25rem] text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_10px_20px_rgba(113,17,22,0.15)] hover:shadow-[0_15px_30px_rgba(113,17,22,0.25)] hover:-translate-y-0.5 active:translate-y-0"
+                        >
+                            <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
+                            <LayoutDashboard className="w-4 h-4 relative z-10" />
+                            <span className="relative z-10 leading-none mt-0.5">Gestión VIP</span>
+                        </Link>
+                    )}
+                    <button
+                        onClick={handleLogout}
+                        className="flex-1 relative overflow-hidden group flex items-center justify-center gap-2 bg-white/70 backdrop-blur-xl border border-primary/10 text-primary py-3.5 px-2 rounded-[1.25rem] text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_10px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.06)] hover:bg-white hover:border-primary/20 hover:-translate-y-0.5 active:translate-y-0"
+                    >
+                        <div className="absolute inset-0 bg-primary/5 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
+                        <LogOut className="w-4 h-4 text-primary/40 group-hover:text-primary transition-colors relative z-10" />
+                        <span className="relative z-10 leading-none mt-0.5">Cerrar Sesión</span>
+                    </button>
+                </div>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">

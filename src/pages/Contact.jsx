@@ -49,7 +49,7 @@ const Contact = () => {
                     className="text-luxury-black/40 leading-relaxed font-medium"
                 >
                     Si buscas una pieza de lujo o accesorio exclusivo que no está en nuestro catálogo, nosotros lo encontramos por ti.
-                    Nuestro equipo se especializa en conseguir tesoros de alta gama alrededor del mundo.
+                    Nuestro equipo se especializa en conseguir productos originales de las tiendas mas reconocidas de Estados Unidos.
                 </motion.p>
             </div>
 

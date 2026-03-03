@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import BottomNav from './BottomNav';
+import Footer from './Footer';
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
@@ -58,6 +59,7 @@ const Layout = ({ children }) => {
                 </motion.main>
             </AnimatePresence>
 
+            <Footer />
             <BottomNav />
 
             {/* Decorative Brand Colors */}
