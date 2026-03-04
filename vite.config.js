@@ -22,7 +22,7 @@ export default defineConfig({
       },
       manifest: {
         name: 'Luxessence',
-        short_name: 'Luxessence',
+        short_name: 'luxessence',
         description: 'Luxessence - Professional Fragrance Store',
         theme_color: '#B8860B',
         background_color: '#1A1A1A',

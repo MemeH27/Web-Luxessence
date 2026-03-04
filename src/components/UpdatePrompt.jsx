@@ -57,7 +57,7 @@ function UpdatePrompt() {
                         </svg>
                     </div>
                     <div>
-                        <h4 className="font-serif text-[#B8860B] text-xl leading-tight font-bold">
+                        <h4 className="font-serif text-[#B8860B] text-2xl leading-tight font-bold">
                             Luxessence update
                         </h4>
                         <p className="text-gray-400 text-sm mt-1">
@@ -69,25 +69,34 @@ function UpdatePrompt() {
                 </div>
 
                 <div className="flex gap-3 w-full sm:w-auto">
-                    {needUpdate && (
+                    {needUpdate ? (
+                        <>
+                            <button
+                                onClick={() => {
+                                    updateServiceWorker?.(true);
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 500);
+                                }}
+                                className="bg-[#B8860B] hover:bg-[#966d09] text-black px-6 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 flex-1 sm:flex-none whitespace-nowrap"
+                            >
+                                Actualizar ahora
+                            </button>
+                            <button
+                                onClick={close}
+                                className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-2.5 rounded-xl text-sm transition-all flex-1 sm:flex-none"
+                            >
+                                Después
+                            </button>
+                        </>
+                    ) : (
                         <button
-                            onClick={() => {
-                                updateServiceWorker?.(true);
-                                setTimeout(() => {
-                                    window.location.reload();
-                                }, 500);
-                            }}
-                            className="bg-[#B8860B] hover:bg-[#966d09] text-black px-6 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 flex-1 sm:flex-none"
+                            onClick={close}
+                            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-2.5 rounded-xl text-sm transition-all flex-1 sm:flex-none w-full sm:w-auto"
                         >
-                            Actualizar Ahora
+                            Entendido
                         </button>
                     )}
-                    <button
-                        onClick={close}
-                        className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-2.5 rounded-xl text-sm transition-all flex-1 sm:flex-none"
-                    >
-                        {needUpdate ? 'Después' : 'Entendido'}
-                    </button>
                 </div>
             </div>
         </div>
