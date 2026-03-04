@@ -6,9 +6,23 @@ import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
 import { ADMIN_EMAIL } from '../lib/constants';
+import { useUpdate } from '../context/UpdateContext';
 
 // Glass-surface pill — implements glass-surface.txt displacement filter directly
-const NavGlassPill = ({ navLinks, location, user, cartCount, handleLogout, setIsAuthOpen, ADMIN_EMAIL, isSolid = false }) => {
+const NavGlassPill = ({
+    navLinks,
+    location,
+    user,
+    cartCount,
+    handleLogout,
+    setIsAuthOpen,
+    ADMIN_EMAIL,
+    isSolid = false,
+    updateAvailable,
+    isDismissed,
+    setIsDismissed,
+    setShowModal
+}) => {
     const containerRef = useRef(null);
     const feImageRef = useRef(null);
     const uid = useId().replace(/:/g, '-');
@@ -131,6 +145,26 @@ const NavGlassPill = ({ navLinks, location, user, cartCount, handleLogout, setIs
                 {/* Icons badge */}
                 <div className="flex items-center gap-2 rounded-full px-3 py-1.5" style={badgeStyle}>
                     <div className="hidden md:flex items-center gap-1">
+                        {updateAvailable && isDismissed && (
+                            <button
+                                onClick={() => {
+                                    setIsDismissed(false);
+                                    setShowModal(true);
+                                }}
+                                className="relative p-1.5 transition-colors group"
+                            >
+                                <motion.div
+                                    animate={{ rotate: 360 }}
+                                    transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+                                >
+                                    <svg className="w-4.5 h-4.5 text-[#B8860B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </motion.div>
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-[#B8860B] rounded-full animate-ping" />
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-[#B8860B] rounded-full" />
+                            </button>
+                        )}
                         <button className="text-white/65 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10">
                             <Search className="w-4 h-4" />
                         </button>
@@ -189,6 +223,7 @@ const Navbar = () => {
     const navigate = useNavigate();
     const { cart } = useCart();
     const { addToast } = useToast();
+    const { updateAvailable, isDismissed, setIsDismissed, setShowModal } = useUpdate();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -358,6 +393,10 @@ const Navbar = () => {
                     setIsAuthOpen={setIsAuthOpen}
                     ADMIN_EMAIL={ADMIN_EMAIL}
                     isSolid={scrolled || location.pathname !== '/'}
+                    updateAvailable={updateAvailable}
+                    isDismissed={isDismissed}
+                    setIsDismissed={setIsDismissed}
+                    setShowModal={setShowModal}
                 />
             </motion.nav>
 

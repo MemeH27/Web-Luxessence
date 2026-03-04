@@ -23,6 +23,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from './lib/supabase';
 import { ADMIN_EMAIL } from './lib/constants';
 import UpdatePrompt from './components/UpdatePrompt';
+import { UpdateProvider } from './context/UpdateContext';
 
 // High-end Auth Guard (Supabase Session based with Admin Role verification)
 const ProtectedRoute = ({ children }) => {
@@ -70,43 +71,45 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 function App() {
   return (
     <Router>
-      <ToastProvider>
-        <CartProvider>
-          <UpdatePrompt />
-          <Routes>
-            {/* Storefront Routes */}
-            <Route path="/" element={<Layout><Home /></Layout>} />
-            <Route path="/catalog" element={<Layout><Catalog /></Layout>} />
-            <Route path="/cart" element={<Layout><Cart /></Layout>} />
-            <Route path="/reset-password" element={<Layout><Suspense fallback={null}><ResetPassword /></Suspense></Layout>} />
-            <Route path="/contact" element={<Layout><Contact /></Layout>} />
-            <Route path="/profile" element={<Layout><Profile /></Layout>} />
-            <Route path="/about" element={<Layout><About /></Layout>} />
+      <UpdateProvider>
+        <ToastProvider>
+          <CartProvider>
+            <UpdatePrompt />
+            <Routes>
+              {/* Storefront Routes */}
+              <Route path="/" element={<Layout><Home /></Layout>} />
+              <Route path="/catalog" element={<Layout><Catalog /></Layout>} />
+              <Route path="/cart" element={<Layout><Cart /></Layout>} />
+              <Route path="/reset-password" element={<Layout><Suspense fallback={null}><ResetPassword /></Suspense></Layout>} />
+              <Route path="/contact" element={<Layout><Contact /></Layout>} />
+              <Route path="/profile" element={<Layout><Profile /></Layout>} />
+              <Route path="/about" element={<Layout><About /></Layout>} />
 
-            {/* Admin Routes */}
-            <Route path="/admin" element={<Login />} />
-            <Route
-              path="/admin/*"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="orders" element={<OrderManagement />} />
-              <Route path="inventory" element={<ProductManagement />} />
-              <Route path="sales" element={<SalesHistory />} />
-              <Route path="customers" element={<CustomerManagement />} />
-              <Route path="promotions" element={<Promotions />} />
-              <Route path="featured" element={<Featured />} />
-              <Route path="settings" element={<SiteSettings />} />
-              <Route path="requests" element={<Requests />} />
-            </Route>
-          </Routes>
-        </CartProvider>
-      </ToastProvider>
+              {/* Admin Routes */}
+              <Route path="/admin" element={<Login />} />
+              <Route
+                path="/admin/*"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="orders" element={<OrderManagement />} />
+                <Route path="inventory" element={<ProductManagement />} />
+                <Route path="sales" element={<SalesHistory />} />
+                <Route path="customers" element={<CustomerManagement />} />
+                <Route path="promotions" element={<Promotions />} />
+                <Route path="featured" element={<Featured />} />
+                <Route path="settings" element={<SiteSettings />} />
+                <Route path="requests" element={<Requests />} />
+              </Route>
+            </Routes>
+          </CartProvider>
+        </ToastProvider>
+      </UpdateProvider>
     </Router>
   );
 }

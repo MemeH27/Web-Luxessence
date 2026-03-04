@@ -3,10 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Grid, Users, Send, User } from 'lucide-react';
 import GlassSurface from './GlassSurface';
+import { useUpdate } from '../context/UpdateContext';
 
 const BottomNav = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { updateAvailable, isDismissed, setIsDismissed, setShowModal } = useUpdate();
     const [isAuthOpen, setIsAuthOpen] = useState(document.body.classList.contains('auth-open'));
     const [isOverDark, setIsOverDark] = useState(false);
 
@@ -91,34 +93,58 @@ const BottomNav = () => {
 
                             if (tab.isCenter) {
                                 return (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => navigate(tab.path)}
-                                        className="relative flex flex-col items-center justify-center mx-1 z-20"
-                                    >
-                                        <motion.div
-                                            animate={{
-                                                scale: isActive ? 1.15 : 1,
-                                                y: isActive ? -4 : 0
-                                            }}
-                                            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                                            className={`w-15 h-15 rounded-full flex items-center justify-center transition-all duration-700 shadow-xl ${isActive
-                                                ? (isOverDark ? 'bg-white text-primary shadow-[0_15px_30px_rgba(255,255,255,0.2)]' : 'bg-primary text-secondary shadow-[0_15px_30px_rgba(113,17,22,0.4)]')
-                                                : (isOverDark ? 'bg-white/5 text-white border border-white/10' : 'bg-primary/5 text-primary border border-primary/5')
-                                                }`}
+                                    <div key={tab.id} className="relative group">
+                                        <button
+                                            onClick={() => navigate(tab.path)}
+                                            className="relative flex flex-col items-center justify-center mx-1 z-20"
                                         >
-                                            <tab.icon className={`w-7 h-7 ${isActive ? 'stroke-[2.5px]' : 'stroke-[1.5px]'}`} />
-                                        </motion.div>
-                                        <motion.span
-                                            animate={{
-                                                opacity: isActive ? 1 : 0.6,
-                                                scale: isActive ? 1.05 : 0.9
-                                            }}
-                                            className={`text-[8px] font-black uppercase tracking-widest mt-1.5 transition-colors duration-700 ${navColor}`}
-                                        >
-                                            {tab.label}
-                                        </motion.span>
-                                    </button>
+                                            <motion.div
+                                                animate={{
+                                                    scale: isActive ? 1.15 : 1,
+                                                    y: isActive ? -4 : 0
+                                                }}
+                                                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                                                className={`w-15 h-15 rounded-full flex items-center justify-center transition-all duration-700 shadow-xl ${isActive
+                                                    ? (isOverDark ? 'bg-white text-primary shadow-[0_15px_30px_rgba(255,255,255,0.2)]' : 'bg-primary text-secondary shadow-[0_15px_30px_rgba(113,17,22,0.4)]')
+                                                    : (isOverDark ? 'bg-white/5 text-white border border-white/10' : 'bg-primary/5 text-primary border border-primary/5')
+                                                    }`}
+                                            >
+                                                <tab.icon className={`w-7 h-7 ${isActive ? 'stroke-[2.5px]' : 'stroke-[1.5px]'}`} />
+                                            </motion.div>
+                                            <motion.span
+                                                animate={{
+                                                    opacity: isActive ? 1 : 0.6,
+                                                    scale: isActive ? 1.05 : 0.9
+                                                }}
+                                                className={`text-[8px] font-black uppercase tracking-widest mt-1.5 transition-colors duration-700 ${navColor}`}
+                                            >
+                                                {tab.label}
+                                            </motion.span>
+                                        </button>
+
+                                        {/* Update Indicator in Nav */}
+                                        {updateAvailable && isDismissed && tab.id === 'profile' && (
+                                            <motion.button
+                                                initial={{ scale: 0, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                whileHover={{ scale: 1.1 }}
+                                                onClick={() => {
+                                                    setIsDismissed(false);
+                                                    setShowModal(true);
+                                                }}
+                                                className="absolute -top-2 -right-2 w-7 h-7 bg-[#B8860B] rounded-full flex items-center justify-center z-[30] shadow-lg border-2 border-white animate-bounce"
+                                            >
+                                                <motion.div
+                                                    animate={{ rotate: 360 }}
+                                                    transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+                                                >
+                                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                    </svg>
+                                                </motion.div>
+                                            </motion.button>
+                                        )}
+                                    </div>
                                 );
                             }
 

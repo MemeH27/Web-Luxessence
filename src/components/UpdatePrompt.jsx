@@ -1,7 +1,16 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useEffect } from 'react';
+import { useUpdate } from '../context/UpdateContext';
 
 function UpdatePrompt() {
+    const {
+        setUpdateAvailable,
+        isDismissed,
+        setIsDismissed,
+        showModal,
+        setShowModal
+    } = useUpdate();
+
     const res = useRegisterSW({
         onRegistered(r) {
             console.log('SW Registered');
@@ -22,22 +31,22 @@ function UpdatePrompt() {
         updateServiceWorker,
     } = res || {};
 
+    useEffect(() => {
+        if (needUpdate) {
+            setUpdateAvailable(true);
+        }
+    }, [needUpdate, setUpdateAvailable]);
 
     const close = () => {
-        setOfflineReady(false);
-        setNeedUpdate(false);
+        setIsDismissed(true);
+        setShowModal(false);
     };
 
-    useEffect(() => {
-        // Si estamos en iOS, a veces el SW necesita un empujón extra
-        // Podríamos forzar un check aquí si quisiéramos
-    }, [needUpdate]);
-
-    if (!needUpdate && !offlineReady) return null;
+    if (!showModal && !offlineReady) return null;
 
     return (
         <div className="fixed bottom-24 left-4 right-4 z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-300">
-            <div className="bg-black/90 backdrop-blur-xl border border-[#B8860B]/30 p-5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col sm:flex-row items-center justify-between gap-4 max-w-lg mx-auto">
+            <div className="bg-black/90 backdrop-blur-xl border border-[#B8860B]/30 p-5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col sm:flex-row items-center justify-between gap-4 max-w-lg mx-auto text-white">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-[#B8860B]/10 flex items-center justify-center border border-[#B8860B]/20 flex-shrink-0">
                         <svg className="w-6 h-6 text-[#B8860B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,7 +54,9 @@ function UpdatePrompt() {
                         </svg>
                     </div>
                     <div>
-                        <h4 className="font-serif text-[#B8860B] text-lg leading-tight uppercase tracking-widest">Luxessence Update</h4>
+                        <h4 className="font-serif text-[#B8860B] text-xl leading-tight font-bold">
+                            Luxessence Update
+                        </h4>
                         <p className="text-gray-400 text-sm mt-1">
                             {needUpdate
                                 ? 'Una nueva versión exclusiva está lista para ti.'
@@ -59,7 +70,6 @@ function UpdatePrompt() {
                         <button
                             onClick={() => {
                                 updateServiceWorker?.(true);
-                                // Forzamos el reload después de un pequeño delay para asegurar que el SW tome el control
                                 setTimeout(() => {
                                     window.location.reload();
                                 }, 500);
