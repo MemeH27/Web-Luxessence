@@ -38,23 +38,35 @@ export const UpdateProvider = ({ children }) => {
             // Re-trigger service worker update check
             await registration.update();
 
+            // Check immediately if an update was found and is installing
+            if (registration.installing || registration.waiting) {
+                setUpdateAvailable(true);
+                setLastCheckResult('update-found');
+                setIsDismissed(false);
+                setShowModal(true);
+                setIsChecking(false);
+                return;
+            }
+
             // Wait a bit to see if updateAvailable is triggered via SW events
             setTimeout(() => {
-                // If updateAvailable is still false, then we are on latest or check didn't find anything
                 setUpdateAvailable(prev => {
-                    if (prev) {
+                    if (prev || registration.installing || registration.waiting) {
                         setLastCheckResult('update-found');
+                        setIsDismissed(false);
+                        setShowModal(true);
+                        return true;
                     } else {
                         setLastCheckResult('up-to-date');
                         // Auto-clear message after 5 seconds
                         setTimeout(() => {
                             setLastCheckResult('none');
                         }, 5000);
+                        return prev;
                     }
-                    return prev;
                 });
                 setIsChecking(false);
-            }, 2500);
+            }, 5000);
         } catch (error) {
             console.error('Error checking for update:', error);
             setIsChecking(false);
