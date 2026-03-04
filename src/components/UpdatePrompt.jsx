@@ -57,7 +57,13 @@ function UpdatePrompt() {
                 <div className="flex gap-3 w-full sm:w-auto">
                     {needUpdate && (
                         <button
-                            onClick={() => updateServiceWorker?.(true)}
+                            onClick={() => {
+                                updateServiceWorker?.(true);
+                                // Forzamos el reload después de un pequeño delay para asegurar que el SW tome el control
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 500);
+                            }}
                             className="bg-[#B8860B] hover:bg-[#966d09] text-black px-6 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 flex-1 sm:flex-none"
                         >
                             Actualizar Ahora
