@@ -8,13 +8,15 @@ function UpdatePrompt() {
         isDismissed,
         setIsDismissed,
         showModal,
-        setShowModal
+        setShowModal,
+        setRegistration
     } = useUpdate();
 
     const res = useRegisterSW({
         onRegistered(r) {
             console.log('SW Registered');
             if (r) {
+                setRegistration(r);
                 // Check for updates immediately
                 r.update();
 

@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown, Award, LogOut, Sparkles, Star, Gift, LayoutDashboard } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown, Award, LogOut, Sparkles, Star, Gift, LayoutDashboard, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ADMIN_EMAIL } from '../lib/constants';
+import { useUpdate } from '../context/UpdateContext';
 
 const Profile = () => {
     const { addToast } = useToast();
+    const { checkForUpdate, isChecking, lastCheckResult, setLastCheckResult } = useUpdate();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [user, setUser] = useState(null);
@@ -37,7 +39,10 @@ const Profile = () => {
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            subscription.unsubscribe();
+            setLastCheckResult('none');
+        };
     }, []);
 
     const fetchOrdersOnly = async (email) => {
@@ -443,6 +448,45 @@ const Profile = () => {
                     </div>
                 </div>
             </div >
+
+            <footer className="pt-12 pb-6 flex flex-col items-center gap-4 border-t border-primary/5">
+                <div className="flex flex-col items-center gap-3">
+                    <button
+                        onClick={checkForUpdate}
+                        disabled={isChecking}
+                        className="flex items-center gap-2 bg-white/50 hover:bg-white border border-primary/10 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-primary/50 transition-all disabled:opacity-50 shadow-sm"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
+                        {isChecking ? 'Buscando...' : 'Buscar Actualización de Luxessence'}
+                    </button>
+
+                    <AnimatePresence>
+                        {lastCheckResult === 'up-to-date' && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="text-[10px] text-emerald-600 font-black uppercase tracking-widest flex items-center gap-1.5 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100"
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Estás en la versión más reciente
+                            </motion.div>
+                        )}
+                        {lastCheckResult === 'update-found' && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="text-[10px] text-amber-600 font-black uppercase tracking-widest flex items-center gap-1.5 bg-amber-50 px-4 py-2 rounded-full border border-amber-100"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                                ¡Nueva actualización encontrada!
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+                <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.5</p>
+            </footer>
         </div >
     );
 };
