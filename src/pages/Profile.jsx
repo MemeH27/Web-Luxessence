@@ -131,7 +131,7 @@ const Profile = () => {
 
     if (!user) {
         return (
-            <div className="max-w-4xl mx-auto px-6 py-20 text-center">
+            <div className="max-w-4xl mx-auto px-6 pt-40 pb-20 text-center">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
