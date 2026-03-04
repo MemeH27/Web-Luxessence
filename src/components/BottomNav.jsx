@@ -74,14 +74,14 @@ const BottomNav = () => {
                     height={86}
                     width="auto"
                     className={`px-4 shadow-[0_30px_70px_-20px_rgba(0,0,0, ${isOverDark ? '0.5' : '0.25'})] border-white/50 transition-all duration-700`}
-                    backgroundOpacity={isOverDark ? 0.05 : 0.12}
-                    brightness={isOverDark ? 10 : 90}
+                    backgroundOpacity={isOverDark ? 0.08 : 0.12}
+                    brightness={isOverDark ? 45 : 90}
                     blur={45}
-                    saturation={isOverDark ? 0.8 : 2.8}
+                    saturation={isOverDark ? 1.2 : 2.8}
                     borderWidth={0.01}
                     displace={6}
                     distortionScale={-220}
-                    mixBlendMode={isOverDark ? 'multiply' : 'plus-lighter'}
+                    mixBlendMode={isOverDark ? 'screen' : 'plus-lighter'}
                 >
                     <div className="flex items-center h-full gap-2 relative">
                         {/* Dynamic Liquid Highlight */}
