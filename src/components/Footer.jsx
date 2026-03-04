@@ -89,7 +89,7 @@ const Footer = () => {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .filter-item {
                     display: flex;
                     align-items: center;
