@@ -204,7 +204,7 @@ const Cart = () => {
 
     if (cart.length === 0) {
         return (
-            <div className="max-w-7xl mx-auto px-6 py-40 text-center space-y-8">
+            <div className="max-w-7xl mx-auto px-6 pt-48 pb-40 text-center space-y-8">
                 <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mx-auto shadow-inner">
                     <ShoppingBag className="w-10 h-10 text-primary/20" />
                 </div>
