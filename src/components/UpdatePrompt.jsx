@@ -15,9 +15,20 @@ function UpdatePrompt() {
         onRegistered(r) {
             console.log('SW Registered');
             if (r) {
+                // Check for updates immediately
+                r.update();
+
+                // Then check every 15 minutes
                 setInterval(() => {
                     r.update();
                 }, 15 * 60 * 1000);
+
+                // Check for update when the page is visible again (e.g. after backgrounding)
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        r.update();
+                    }
+                });
             }
         },
         onRegisterError(error) {
