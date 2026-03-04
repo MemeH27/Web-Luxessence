@@ -147,3 +147,19 @@
 body.auth-open .bottom-nav-container {
   display: none !important;
 }
+
+.text-gold-shimmer {
+  @apply bg-gradient-to-r from-[#B8860B] via-[#F9E2AF] to-[#B8860B] bg-clip-text text-transparent;
+  background-size: 200% auto;
+  animation: gold-shimmer 3s linear infinite;
+}
+
+@keyframes gold-shimmer {
+  0% {
+    background-position: 0% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
+}

@@ -34,7 +34,7 @@ const Contact = () => {
                         transition={{ delay: 0.2 }}
                         className="text-6xl md:text-8xl font-serif font-bold italic text-primary leading-tight"
                     >
-                        ¿No encuentras tu <br /> <span className="text-gold">Pieza Ideal?</span>
+                        ¿No encuentras tu <br /> <span className="text-gold-shimmer">Pieza Ideal?</span>
                     </motion.h1>
 
                     <motion.p
