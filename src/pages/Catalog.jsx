@@ -233,7 +233,7 @@ const Catalog = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 md:px-6 pt-32 md:pt-32 space-y-8 md:space-y-16">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 pt-40 md:pt-40 space-y-8 md:space-y-16">
             {/* Page Header */}
             <div className="space-y-4 max-w-2xl px-2 md:px-0">
                 <h1 className="text-4xl md:text-6xl font-serif font-bold italic text-primary">Nuestro Catálogo</h1>

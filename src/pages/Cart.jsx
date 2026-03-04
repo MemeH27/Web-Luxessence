@@ -224,7 +224,7 @@ const Cart = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-6 space-y-16 pb-24 pt-13 md:pt-0">
+        <div className="max-w-7xl mx-auto px-6 space-y-16 pb-24 pt-40 md:pt-40">
             <header className="space-y-4 max-w-2xl">
                 <h1 className="text-4xl md:text-6xl font-serif font-bold italic text-primary">
                     <span className="md:hidden">Tu Carrito</span>
