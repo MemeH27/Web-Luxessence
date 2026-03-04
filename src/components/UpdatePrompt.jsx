@@ -44,6 +44,9 @@ function UpdatePrompt() {
 
     if (!showModal && !offlineReady) return null;
 
+    // Si solo es offlineReady (sin update), mostramos botones de cerrar/entendido
+    const isOnlyOffline = offlineReady && !needUpdate;
+
     return (
         <div className="fixed bottom-24 left-4 right-4 z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-300">
             <div className="bg-black/90 backdrop-blur-xl border border-[#B8860B]/30 p-5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col sm:flex-row items-center justify-between gap-4 max-w-lg mx-auto text-white">
@@ -55,7 +58,7 @@ function UpdatePrompt() {
                     </div>
                     <div>
                         <h4 className="font-serif text-[#B8860B] text-xl leading-tight font-bold">
-                            Luxessence Update
+                            Luxessence update
                         </h4>
                         <p className="text-gray-400 text-sm mt-1">
                             {needUpdate
@@ -83,7 +86,7 @@ function UpdatePrompt() {
                         onClick={close}
                         className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-2.5 rounded-xl text-sm transition-all flex-1 sm:flex-none"
                     >
-                        {needUpdate ? 'Después' : 'Cerrar'}
+                        {needUpdate ? 'Después' : 'Entendido'}
                     </button>
                 </div>
             </div>
