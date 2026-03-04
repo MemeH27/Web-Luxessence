@@ -23,6 +23,13 @@ export const UpdateProvider = ({ children }) => {
             return;
         }
 
+        if (updateAvailable) {
+            setIsDismissed(false);
+            setShowModal(true);
+            setLastCheckResult('update-found');
+            return;
+        }
+
         setIsChecking(true);
         setLastCheckResult('none');
         setIsDismissed(false); // Reset dismissal to allow prompt to show if update found

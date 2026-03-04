@@ -182,6 +182,45 @@ const Profile = () => {
                     <div className="absolute top-0 right-0 w-64 h-64 bg-primary/3 rounded-full blur-[100px] pointer-events-none" />
                     <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/3 rounded-full blur-[100px] pointer-events-none" />
                 </motion.div>
+
+                <footer className="mt-12 pt-12 pb-6 flex flex-col items-center gap-4 border-t border-primary/5">
+                    <div className="flex flex-col items-center gap-3">
+                        <button
+                            onClick={checkForUpdate}
+                            disabled={isChecking}
+                            className="flex items-center gap-2 bg-white/50 hover:bg-white border border-primary/10 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-primary/50 transition-all disabled:opacity-50 shadow-sm"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
+                            {isChecking ? 'Buscando...' : 'Buscar Actualización de Luxessence'}
+                        </button>
+
+                        <AnimatePresence>
+                            {lastCheckResult === 'up-to-date' && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="text-[10px] text-emerald-600 font-black uppercase tracking-widest flex items-center gap-1.5 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100"
+                                >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    Estás en la versión más reciente
+                                </motion.div>
+                            )}
+                            {lastCheckResult === 'update-found' && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="text-[10px] text-amber-600 font-black uppercase tracking-widest flex items-center gap-1.5 bg-amber-50 px-4 py-2 rounded-full border border-amber-100"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                                    ¡Nueva actualización encontrada!
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                    <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.6</p>
+                </footer>
             </div>
         );
     }
@@ -485,7 +524,7 @@ const Profile = () => {
                         )}
                     </AnimatePresence>
                 </div>
-                <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.5</p>
+                <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.6</p>
             </footer>
         </div >
     );
