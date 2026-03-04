@@ -22,6 +22,7 @@ import { ToastProvider } from './context/ToastContext';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from './lib/supabase';
 import { ADMIN_EMAIL } from './lib/constants';
+import UpdatePrompt from './components/UpdatePrompt';
 
 // High-end Auth Guard (Supabase Session based with Admin Role verification)
 const ProtectedRoute = ({ children }) => {
@@ -71,6 +72,7 @@ function App() {
     <Router>
       <ToastProvider>
         <CartProvider>
+          <UpdatePrompt />
           <Routes>
             {/* Storefront Routes */}
             <Route path="/" element={<Layout><Home /></Layout>} />
