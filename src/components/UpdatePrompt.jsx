@@ -4,11 +4,13 @@ import { useUpdate } from '../context/UpdateContext';
 
 function UpdatePrompt() {
     const {
+        updateAvailable,
         setUpdateAvailable,
         isDismissed,
         setIsDismissed,
         showModal,
         setShowModal,
+        registration,
         setRegistration
     } = useUpdate();
 
@@ -59,7 +61,8 @@ function UpdatePrompt() {
 
     // Solo mostramos si hay una actualización real pendiente (y no ha sido descartada)
     // o si el usuario abrió el modal manualmente desde el botón de la barra de navegación.
-    const shouldShow = (needUpdate && !isDismissed) || showModal;
+    const shouldShow = (needUpdate && !isDismissed) || showModal || (updateAvailable && !isDismissed);
+    const isUpdate = needUpdate || updateAvailable;
 
     if (!shouldShow) return null;
 
@@ -77,7 +80,7 @@ function UpdatePrompt() {
                             Luxessence update
                         </h4>
                         <p className="text-gray-400 text-sm mt-1">
-                            {needUpdate
+                            {isUpdate
                                 ? 'Una nueva versión exclusiva está lista para ti.'
                                 : 'La web ya está disponible para usar sin conexión.'}
                         </p>
@@ -85,11 +88,19 @@ function UpdatePrompt() {
                 </div>
 
                 <div className="flex gap-3 w-full sm:w-auto">
-                    {needUpdate ? (
+                    {isUpdate ? (
                         <>
                             <button
                                 onClick={() => {
-                                    updateServiceWorker?.(true);
+                                    if (updateServiceWorker) {
+                                        updateServiceWorker(true);
+                                    }
+                                    if (registration?.waiting) {
+                                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                                    }
+                                    if (registration?.installing) {
+                                        registration.installing.postMessage({ type: 'SKIP_WAITING' });
+                                    }
                                     setTimeout(() => {
                                         window.location.reload();
                                     }, 500);
