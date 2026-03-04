@@ -219,7 +219,7 @@ const Profile = () => {
                             )}
                         </AnimatePresence>
                     </div>
-                    <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.7</p>
+                    <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.8</p>
                 </footer>
             </div>
         );
@@ -524,7 +524,7 @@ const Profile = () => {
                         )}
                     </AnimatePresence>
                 </div>
-                <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.7</p>
+                <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.8</p>
             </footer>
         </div >
     );
