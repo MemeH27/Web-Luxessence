@@ -40,12 +40,15 @@ function UpdatePrompt() {
     const close = () => {
         setIsDismissed(true);
         setShowModal(false);
+        if (setOfflineReady) setOfflineReady(false);
+        if (setNeedUpdate) setNeedUpdate(false);
     };
 
-    if (!showModal && !offlineReady) return null;
+    // Solo mostramos si hay una actualización real pendiente (y no ha sido descartada)
+    // o si el usuario abrió el modal manualmente desde el botón de la barra de navegación.
+    const shouldShow = (needUpdate && !isDismissed) || showModal;
 
-    // Si solo es offlineReady (sin update), mostramos botones de cerrar/entendido
-    const isOnlyOffline = offlineReady && !needUpdate;
+    if (!shouldShow) return null;
 
     return (
         <div className="fixed bottom-24 left-4 right-4 z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-300">
