@@ -95,7 +95,8 @@ const SiteSettings = () => {
             setDbCategories(prev => prev.map(c => c.id === catId ? { ...c, image_url: url } : c));
             addToast('Portada actualizada', 'success');
         } catch (err) {
-            addToast('Error al subir portada', 'error');
+            console.error('Category upload error:', err);
+            addToast('Error al subir portada: ' + (err.message || 'Error desconocido'), 'error');
         } finally {
             setUploading(null);
         }
@@ -187,12 +188,12 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT fals
                         <div className="space-y-4 flex-1 overflow-y-auto pr-4 custom-scrollbar">
                             {dbCategories.map(cat => (
                                 <div key={cat.id} className="relative group">
-                                    <div className="flex items-center gap-6 p-5 bg-primary/[0.02] rounded-[2.5rem] border border-primary/5 group-hover:border-gold/30 transition-all duration-500">
-                                        <div className="relative w-24 h-24 rounded-[1.5rem] overflow-hidden bg-white border border-primary/5 shadow-inner shrink-0">
+                                    <div className="flex items-center gap-3 sm:gap-6 p-4 sm:p-5 bg-primary/[0.02] rounded-[2rem] sm:rounded-[2.5rem] border border-primary/5 group-hover:border-gold/30 transition-all duration-500">
+                                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl sm:rounded-[1.5rem] overflow-hidden bg-white border border-primary/5 shadow-inner shrink-0">
                                             {cat.image_url ? (
                                                 <img src={cat.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={cat.name} />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-primary/20 text-3xl font-serif italic">{cat.name[0]}</div>
+                                                <div className="w-full h-full flex items-center justify-center text-primary/20 text-2xl sm:3xl font-serif italic">{cat.name[0]}</div>
                                             )}
 
                                             <label className="absolute inset-0 bg-primary/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center backdrop-blur-sm transition-all cursor-pointer z-20">
@@ -206,36 +207,36 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT fals
                                                     <Loader2 className="w-6 h-6 animate-spin text-white" />
                                                 ) : (
                                                     <>
-                                                        <ImageIcon className="w-8 h-8 text-white mb-1" />
-                                                        <span className="text-[8px] text-white font-black uppercase tracking-widest">Cambiar Foto</span>
+                                                        <ImageIcon className="w-6 h-6 sm:w-8 sm:h-8 text-white mb-1" />
+                                                        <span className="text-[7px] sm:text-[8px] text-white font-black uppercase tracking-widest text-center px-1">Cambiar Foto</span>
                                                     </>
                                                 )}
                                             </label>
                                         </div>
 
-                                        <div className="flex-1 space-y-1">
-                                            <p className="text-lg font-serif font-bold italic text-primary">{cat.name}</p>
-                                            <div className="flex items-center gap-3">
+                                        <div className="flex-1 min-w-0 space-y-1">
+                                            <p className="text-base sm:text-lg font-serif font-bold italic text-primary truncate pr-2">{cat.name}</p>
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <button
                                                     onClick={() => toggleFeatured(cat.id, cat.is_featured)}
                                                     disabled={updatingCat === cat.id}
-                                                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${cat.is_featured
-                                                            ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200'
-                                                            : 'bg-primary/5 text-primary/30 border border-primary/5'
+                                                    className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${cat.is_featured
+                                                        ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200'
+                                                        : 'bg-primary/5 text-primary/30 border border-primary/5'
                                                         }`}
                                                 >
                                                     {cat.is_featured ? 'Destacada' : 'No destacada'}
                                                 </button>
-                                                {uploading === 'cat_' + cat.id && <span className="text-[8px] text-gold animate-pulse font-black uppercase">Subiendo...</span>}
+                                                {uploading === 'cat_' + cat.id && <span className="text-[7px] text-gold animate-pulse font-black uppercase shrink-0">Subiendo...</span>}
                                             </div>
                                         </div>
 
-                                        <div className="pr-2">
+                                        <div className="shrink-0">
                                             <button
                                                 onClick={() => toggleFeatured(cat.id, cat.is_featured)}
-                                                className={`w-14 h-7 rounded-full transition-all relative ${cat.is_featured ? 'bg-gold' : 'bg-primary/10'}`}
+                                                className={`w-12 sm:w-14 h-6 sm:h-7 rounded-full transition-all relative ${cat.is_featured ? 'bg-gold' : 'bg-primary/10'}`}
                                             >
-                                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-md ${cat.is_featured ? 'right-1' : 'left-1'}`} />
+                                                <div className={`absolute top-0.5 sm:top-1 w-5 h-5 bg-white rounded-full transition-all shadow-md ${cat.is_featured ? 'right-1' : 'left-1'}`} />
                                             </button>
                                         </div>
                                     </div>

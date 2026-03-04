@@ -336,7 +336,7 @@ const AdminLayout = () => {
             {/* Ambient Decorative */}
             <div className="fixed top-0 right-0 w-[400px] h-[400px] bg-primary/2 rounded-full blur-[120px] pointer-events-none -z-10" />
 
-            <style jsx>{`
+            <style>{`
                 .silk-bg {
                     background: linear-gradient(-45deg, #d4af37, #f3e5ab, #aa8529, #fff9e6);
                     background-size: 400% 400%;

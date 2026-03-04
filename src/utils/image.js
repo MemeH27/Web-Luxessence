@@ -10,7 +10,7 @@ export const optimizeImage = async (file, options = {}) => {
     const defaultOptions = {
         maxSizeMB: 0.8,              // Max size in MB (0.8MB is usually plenty for web)
         maxWidthOrHeight: 1200,      // Max width or height
-        useWebWorker: true,
+        useWebWorker: false,
         initialQuality: 0.8,
         ...options
     };
@@ -35,16 +35,16 @@ export const optimizeImage = async (file, options = {}) => {
  */
 export const uploadAndOptimize = async (supabase, bucket, file, optimize = true) => {
     let fileToUpload = file;
-    
+
     if (optimize && file.type.startsWith('image/')) {
         fileToUpload = await optimizeImage(file);
     }
-    
+
     const fileName = `${Date.now()}_${fileToUpload.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
     const { error } = await supabase.storage.from(bucket).upload(fileName, fileToUpload);
-    
+
     if (error) throw error;
-    
+
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(fileName);
     return publicUrl;
 };
