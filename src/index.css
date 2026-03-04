@@ -1,5 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
 
+@font-face {
+  font-family: 'Voyage';
+  src: url('/fonts/voyage-regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Voyage';
+  src: url('/fonts/voyage-bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+}
+
 @import "tailwindcss";
 
 @theme {
@@ -19,7 +33,7 @@
   --color-luxury-border: rgba(113, 17, 22, 0.1);
 
   --font-sans: "Outfit", sans-serif;
-  --font-serif: "Playfair Display", serif;
+  --font-serif: "Voyage", "Playfair Display", serif;
 
   --radius-xl: 1.5rem;
   --radius-2xl: 2rem;
