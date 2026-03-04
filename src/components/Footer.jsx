@@ -2,6 +2,7 @@ import { Instagram, Phone, MapPin, Truck, Mail, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import TruckIcon from './ui/TruckIcon';
+import { APP_VERSION } from '../lib/version';
 
 const Footer = () => {
     return (
@@ -103,8 +104,9 @@ const Footer = () => {
 
                 {/* Bottom Bar */}
                 <div className="pt-8 pb-16 md:pb-0 border-t border-white/5 flex items-center justify-center">
-                    <p className="text-[11px] md:text-[10px] text-white/40 uppercase tracking-widest font-black text-center">
-                        © {new Date().getFullYear()} Luxessence. Todos los derechos reservados.
+                    <p className="text-[10px] text-secondary/40 font-bold tracking-widest flex items-center gap-4">
+                        <span>© {new Date().getFullYear()} LUXESSENCE. TODOS LOS DERECHOS RESERVADOS.</span>
+                        <span className="opacity-50">v{APP_VERSION}</span>
                     </p>
                 </div>
             </div>
