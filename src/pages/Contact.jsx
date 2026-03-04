@@ -19,7 +19,7 @@ const Contact = () => {
     return (
         <div className="bg-[#fafafa] min-h-screen pb-32">
             {/* Header / Hero */}
-            <section className="relative pt-40 pb-20 px-6 overflow-hidden">
+            <section className="relative pt-48 pb-20 px-6 overflow-hidden">
                 <div className="max-w-5xl mx-auto text-center space-y-8 relative z-10">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}

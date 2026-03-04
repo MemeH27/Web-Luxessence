@@ -33,7 +33,7 @@ const About = () => {
     return (
         <div className="pb-32 bg-[#fafafa] overflow-hidden">
             {/* Hero Section */}
-            <section className="relative h-screen flex items-center justify-center overflow-hidden">
+            <section className="relative h-screen flex items-center justify-center overflow-hidden pt-44 md:pt-40">
                 <motion.div
                     initial={{ scale: 1.2 }}
                     animate={{ scale: 1 }}
