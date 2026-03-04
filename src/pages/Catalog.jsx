@@ -341,17 +341,24 @@ const Catalog = () => {
                 <div className="flex-1 space-y-8">
                     {/* Toolbar */}
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 pb-6 border-b border-primary/5">
-                        <div className="flex items-center gap-4">
-                            <p className="text-xs font-medium text-primary/40">{filteredProducts.length} productos</p>
+                        <div className="flex flex-col-reverse md:flex-row items-center gap-4 w-full md:w-auto">
+                            <p className="text-xs font-medium text-primary/40 w-full md:w-auto text-center md:text-left">
+                                {filteredProducts.length} productos
+                            </p>
                             <div className="h-4 w-[1px] bg-primary/10 hidden md:block" />
-                            <div className="relative group">
+                            <div className="relative group w-full md:w-auto">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/20 group-focus-within:text-primary transition-colors" />
                                 <input
                                     type="text"
                                     placeholder="Buscar..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    className="bg-transparent border-none focus:ring-0 text-sm pl-10 w-40 md:w-64 placeholder:text-primary/20"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.currentTarget.blur();
+                                        }
+                                    }}
+                                    className="bg-primary/5 md:bg-transparent border-none focus:ring-1 focus:ring-primary/10 transition-all rounded-full md:rounded-none text-sm pl-10 py-3 md:py-0 w-full md:w-64 placeholder:text-primary/20"
                                 />
                             </div>
                         </div>
