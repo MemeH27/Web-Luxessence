@@ -6,6 +6,7 @@ import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp
 import { Link } from 'react-router-dom';
 import { ADMIN_EMAIL } from '../lib/constants';
 import { useUpdate } from '../context/UpdateContext';
+import { APP_VERSION } from '../lib/version';
 
 const Profile = () => {
     const { addToast } = useToast();
@@ -219,7 +220,7 @@ const Profile = () => {
                             )}
                         </AnimatePresence>
                     </div>
-                    <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.9</p>
+                    <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v{APP_VERSION}</p>
                 </footer>
             </div>
         );
@@ -524,7 +525,7 @@ const Profile = () => {
                         )}
                     </AnimatePresence>
                 </div>
-                <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v1.0.9</p>
+                <p className="text-[9px] text-primary/20 uppercase tracking-[0.4em] font-bold">Luxessence PWA v{APP_VERSION}</p>
             </footer>
         </div >
     );

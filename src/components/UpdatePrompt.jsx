@@ -67,11 +67,11 @@ function UpdatePrompt() {
     if (!shouldShow) return null;
 
     return (
-        <div className="fixed bottom-24 left-4 right-4 z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-300">
-            <div className="bg-black/90 backdrop-blur-xl border border-[#B8860B]/30 p-5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col sm:flex-row items-center justify-between gap-4 max-w-lg mx-auto text-white">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-[#B8860B]/10 flex items-center justify-center border border-[#B8860B]/20 flex-shrink-0">
-                        <svg className="w-6 h-6 text-[#B8860B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="w-full bg-black/90 backdrop-blur-xl border border-[#B8860B]/30 p-6 lg:p-8 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col sm:flex-row items-center justify-between gap-6 max-w-lg mx-auto text-white animate-in slide-in-from-bottom-5 duration-300">
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                    <div className="w-14 h-14 rounded-full bg-[#B8860B]/10 flex items-center justify-center border border-[#B8860B]/20 flex-shrink-0">
+                        <svg className="w-7 h-7 text-[#B8860B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </div>
@@ -111,7 +111,7 @@ function UpdatePrompt() {
                             </button>
                             <button
                                 onClick={close}
-                                className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-2.5 rounded-xl text-sm transition-all flex-1 sm:flex-none"
+                                className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-3 rounded-xl text-sm transition-all flex-1 sm:flex-none"
                             >
                                 Después
                             </button>
@@ -119,7 +119,7 @@ function UpdatePrompt() {
                     ) : (
                         <button
                             onClick={close}
-                            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-2.5 rounded-xl text-sm transition-all flex-1 sm:flex-none w-full sm:w-auto"
+                            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-3 rounded-xl text-sm transition-all flex-1 sm:flex-none w-full sm:w-auto"
                         >
                             Entendido
                         </button>
