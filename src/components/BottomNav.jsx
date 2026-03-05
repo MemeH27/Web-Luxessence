@@ -132,7 +132,7 @@ const BottomNav = () => {
                                                     setIsDismissed(false);
                                                     setShowModal(true);
                                                 }}
-                                                className="absolute -top-2 -right-2 w-7 h-7 bg-[#B8860B] rounded-full flex items-center justify-center z-[30] shadow-lg border-2 border-white animate-bounce"
+                                                className="absolute -top-2 -right-2 w-7 h-7 bg-primary rounded-full flex items-center justify-center z-[30] shadow-lg border-2 border-white animate-bounce"
                                             >
                                                 <motion.div
                                                     animate={{ rotate: 360 }}

@@ -152,17 +152,18 @@ const NavGlassPill = ({
                                     setShowModal(true);
                                 }}
                                 className="relative p-1.5 transition-colors group"
+                                title="Actualización disponible"
                             >
                                 <motion.div
                                     animate={{ rotate: 360 }}
                                     transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
                                 >
-                                    <svg className="w-4.5 h-4.5 text-[#B8860B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4.5 h-4.5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
                                 </motion.div>
-                                <span className="absolute top-1 right-1 w-2 h-2 bg-[#B8860B] rounded-full animate-ping" />
-                                <span className="absolute top-1 right-1 w-2 h-2 bg-[#B8860B] rounded-full" />
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full animate-ping" />
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full" />
                             </button>
                         )}
                         <button className="text-white/65 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10">
@@ -204,12 +205,12 @@ const NavGlassPill = ({
                                 animate={{ rotate: 360 }}
                                 transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
                             >
-                                <svg className="w-5 h-5 text-[#B8860B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
                             </motion.div>
-                            <span className="absolute top-1 right-1 w-2 h-2 bg-[#B8860B] rounded-full animate-ping" />
-                            <span className="absolute top-1 right-1 w-2 h-2 bg-[#B8860B] rounded-full" />
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full animate-ping" />
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full" />
                         </button>
                     )}
                 </div>

@@ -20,19 +20,10 @@ function UpdatePrompt() {
             console.log('SW Registered');
             if (r) {
                 setRegistration(r);
-                // Check for updates immediately
                 r.update();
-
-                // Then check every 15 minutes
-                setInterval(() => {
-                    r.update();
-                }, 15 * 60 * 1000);
-
-                // Check for update when the page is visible again (e.g. after backgrounding)
+                setInterval(() => { r.update(); }, 15 * 60 * 1000);
                 document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') {
-                        r.update();
-                    }
+                    if (document.visibilityState === 'visible') r.update();
                 });
             }
         },
@@ -48,9 +39,7 @@ function UpdatePrompt() {
     } = res || {};
 
     useEffect(() => {
-        if (needUpdate) {
-            setUpdateAvailable(true);
-        }
+        if (needUpdate) setUpdateAvailable(true);
     }, [needUpdate, setUpdateAvailable]);
 
     const close = () => {
@@ -60,49 +49,112 @@ function UpdatePrompt() {
         if (setNeedUpdate) setNeedUpdate(false);
     };
 
-    // Solo mostramos si hay una actualización real pendiente (y no ha sido descartada)
-    // o si el usuario abrió el modal manualmente desde el botón de la barra de navegación.
+    const doUpdate = () => {
+        if (updateServiceWorker) updateServiceWorker(true);
+        if (registration?.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        if (registration?.installing) registration.installing.postMessage({ type: 'SKIP_WAITING' });
+        setTimeout(() => window.location.reload(), 500);
+    };
+
     const shouldShow = (needUpdate && !isDismissed) || showModal || (updateAvailable && !isDismissed);
     const isUpdate = needUpdate || updateAvailable;
 
     if (!shouldShow) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-md animate-in fade-in duration-500" onClick={close} />
-            <div className="relative w-full max-w-sm overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] backdrop-blur-[20px] animate-in zoom-in-95 duration-500">
-                {/* Reflejos de cristal líquidos */}
-                <div className="absolute -top-24 -left-20 w-48 h-48 bg-[#B8860B]/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-24 -right-20 w-48 h-48 bg-[#B8860B]/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            {/* iOS-style blurred backdrop */}
+            <div
+                className="absolute inset-0 animate-in fade-in duration-500"
+                style={{
+                    backdropFilter: 'blur(24px) saturate(1.8)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                    background: 'rgba(20, 4, 10, 0.55)',
+                }}
+                onClick={close}
+            />
 
-                <div className="relative z-10 p-8 flex flex-col items-center text-center">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#B8860B]/20 to-[#B8860B]/5 flex items-center justify-center border border-[#B8860B]/30 mb-6 shadow-[0_0_15px_rgba(184,134,11,0.2)]">
-                        <svg className="w-8 h-8 text-[#B8860B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            {/* Modal card */}
+            <div
+                className="relative w-full max-w-[340px] animate-in zoom-in-95 fade-in duration-400 overflow-hidden"
+                style={{
+                    borderRadius: '2.25rem',
+                    background: 'linear-gradient(145deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.05) 60%, rgba(113,17,22,0.10) 100%)',
+                    backdropFilter: 'blur(40px) saturate(2)',
+                    WebkitBackdropFilter: 'blur(40px) saturate(2)',
+                    border: '1px solid rgba(255,255,255,0.22)',
+                    boxShadow: '0 8px 64px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.1)',
+                }}
+            >
+                {/* Top shimmer highlight — iOS glass rim */}
+                <div
+                    className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+                    style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)' }}
+                />
+
+                {/* Ambient blobs */}
+                <div className="absolute -top-16 -left-16 w-40 h-40 rounded-full pointer-events-none"
+                    style={{ background: 'radial-gradient(circle, rgba(113,17,22,0.35) 0%, transparent 70%)', filter: 'blur(24px)' }} />
+                <div className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full pointer-events-none"
+                    style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)', filter: 'blur(20px)' }} />
+
+                <div className="relative z-10 px-7 pt-8 pb-7 flex flex-col items-center text-center">
+
+                    {/* Icon */}
+                    <div
+                        className="w-16 h-16 rounded-[1.2rem] flex items-center justify-center mb-5"
+                        style={{
+                            background: 'linear-gradient(145deg, rgba(113,17,22,0.70), rgba(80,10,30,0.85))',
+                            boxShadow: '0 4px 24px rgba(113,17,22,0.45), inset 0 1px 0 rgba(255,255,255,0.18)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                        }}
+                    >
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </div>
 
-                    <h4 className="font-serif text-[#B8860B] text-2xl leading-tight font-bold mb-2 drop-shadow-md">
-                        {isUpdate ? 'Nueva Actualización' : 'Luxessence HQ'}
+                    {/* Title */}
+                    <h4 className="text-white text-xl font-bold tracking-tight mb-1">
+                        {isUpdate ? 'Nueva Actualización' : 'Lista sin conexión'}
                     </h4>
 
-                    <div className="inline-block px-3 py-1 bg-white/10 border border-white/10 rounded-full mb-4">
-                        <span className="text-[10px] uppercase tracking-widest font-black text-white/80">Versión {APP_VERSION}</span>
+                    {/* Version pill */}
+                    <div
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-4"
+                        style={{
+                            background: 'rgba(255,255,255,0.10)',
+                            border: '1px solid rgba(255,255,255,0.14)',
+                        }}
+                    >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">
+                            v{APP_VERSION}
+                        </span>
                     </div>
 
-                    <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+                    {/* Description */}
+                    <p className="text-white/60 text-[13px] mb-5 leading-relaxed font-medium">
                         {isUpdate
-                            ? 'Experimenta mejoras exclusivas y nuevas funciones añadidas a tu PWA.'
-                            : 'La web ya está optimizada y lista para usar sin conexión.'}
+                            ? 'Actualizaciones disponibles para mejorar tu experiencia Luxessence.'
+                            : 'La aplicación está lista para usarla sin conexión a internet.'}
                     </p>
 
-                    {isUpdate && UPDATE_CHANGELOG && (
-                        <div className="w-full text-left bg-black/20 rounded-2xl p-4 mb-8 border border-white/5 shadow-inner max-h-[160px] overflow-y-auto custom-scrollbar">
-                            <ul className="space-y-3">
+                    {/* Changelog */}
+                    {isUpdate && UPDATE_CHANGELOG && UPDATE_CHANGELOG.length > 0 && (
+                        <div
+                            className="w-full text-left rounded-2xl p-4 mb-6 max-h-[150px] overflow-y-auto"
+                            style={{
+                                background: 'rgba(0,0,0,0.20)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                            }}
+                        >
+                            <p className="text-[9px] uppercase tracking-[0.2em] font-black text-white/30 mb-2.5">Novedades</p>
+                            <ul className="space-y-2">
                                 {UPDATE_CHANGELOG.map((log, i) => (
-                                    <li key={i} className="text-white/70 text-xs flex items-start leading-snug">
-                                        <span className="shrink-0 mr-2 text-[#B8860B]">•</span>
+                                    <li key={i} className="text-white/60 text-[11px] flex items-start gap-2 leading-snug">
+                                        <span className="mt-0.5 w-1 h-1 rounded-full bg-white/40 shrink-0" />
                                         {log}
                                     </li>
                                 ))}
@@ -110,32 +162,31 @@ function UpdatePrompt() {
                         </div>
                     )}
 
-                    <div className="flex flex-col gap-3 w-full mt-auto">
+                    {/* Divider */}
+                    <div className="w-full h-px mb-5" style={{ background: 'rgba(255,255,255,0.08)' }} />
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-2.5 w-full">
                         {isUpdate ? (
                             <>
                                 <button
-                                    onClick={() => {
-                                        if (updateServiceWorker) {
-                                            updateServiceWorker(true);
-                                        }
-                                        if (registration?.waiting) {
-                                            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                                        }
-                                        if (registration?.installing) {
-                                            registration.installing.postMessage({ type: 'SKIP_WAITING' });
-                                        }
-                                        setTimeout(() => {
-                                            window.location.reload();
-                                        }, 500);
+                                    onClick={doUpdate}
+                                    className="relative overflow-hidden w-full py-3.5 rounded-[1.1rem] text-sm font-bold text-white transition-all active:scale-[0.97]"
+                                    style={{
+                                        background: 'linear-gradient(145deg, rgba(113,17,22,0.95), rgba(80,10,30,1))',
+                                        boxShadow: '0 4px 20px rgba(113,17,22,0.5), inset 0 1px 0 rgba(255,255,255,0.20)',
+                                        border: '1px solid rgba(255,255,255,0.12)',
                                     }}
-                                    className="relative group overflow-hidden w-full bg-[#B8860B] hover:bg-[#966d09] text-black py-3.5 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-[0_5px_15px_rgba(184,134,11,0.3)]"
                                 >
-                                    <span className="relative z-10">Actualizar ahora</span>
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                                    Actualizar ahora
                                 </button>
                                 <button
                                     onClick={close}
-                                    className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 py-3.5 rounded-xl text-sm transition-all"
+                                    className="w-full py-3.5 rounded-[1.1rem] text-sm font-medium text-white/60 transition-all active:scale-[0.97] hover:text-white/80"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.06)',
+                                        border: '1px solid rgba(255,255,255,0.09)',
+                                    }}
                                 >
                                     Recordarme después
                                 </button>
@@ -143,7 +194,11 @@ function UpdatePrompt() {
                         ) : (
                             <button
                                 onClick={close}
-                                className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 py-3.5 rounded-xl text-sm transition-all font-medium"
+                                className="w-full py-3.5 rounded-[1.1rem] text-sm font-medium text-white/70 transition-all active:scale-[0.97] hover:text-white"
+                                style={{
+                                    background: 'rgba(255,255,255,0.08)',
+                                    border: '1px solid rgba(255,255,255,0.12)',
+                                }}
                             >
                                 Entendido
                             </button>
