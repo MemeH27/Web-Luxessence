@@ -1,9 +1,13 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useUpdate } from '../context/UpdateContext';
 import { APP_VERSION, UPDATE_CHANGELOG } from '../lib/version';
 
 function UpdatePrompt() {
+    const isMounted = useRef(true);
+    useEffect(() => {
+        return () => { isMounted.current = false; };
+    }, []);
     const {
         updateAvailable,
         setUpdateAvailable,
@@ -18,13 +22,22 @@ function UpdatePrompt() {
     const res = useRegisterSW({
         onRegistered(r) {
             console.log('SW Registered');
-            if (r) {
-                setRegistration(r);
+            if (r && isMounted.current) {
+                if (typeof setRegistration === 'function') setRegistration(r);
                 r.update();
-                setInterval(() => { r.update(); }, 15 * 60 * 1000);
-                document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') r.update();
-                });
+                const interval = setInterval(() => {
+                    if (isMounted.current) r.update();
+                }, 15 * 60 * 1000);
+
+                const handleVisibility = () => {
+                    if (document.visibilityState === 'visible' && isMounted.current) r.update();
+                };
+                document.addEventListener('visibilitychange', handleVisibility);
+
+                return () => {
+                    clearInterval(interval);
+                    document.removeEventListener('visibilitychange', handleVisibility);
+                };
             }
         },
         onRegisterError(error) {
@@ -39,7 +52,9 @@ function UpdatePrompt() {
     } = res || {};
 
     useEffect(() => {
-        if (needUpdate) setUpdateAvailable(true);
+        if (needUpdate && isMounted.current) {
+            if (typeof setUpdateAvailable === 'function') setUpdateAvailable(true);
+        }
     }, [needUpdate, setUpdateAvailable]);
 
     const close = () => {

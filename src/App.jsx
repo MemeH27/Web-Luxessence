@@ -16,6 +16,8 @@ import Promotions from './pages/admin/Promotions';
 import Featured from './pages/admin/Featured';
 import SiteSettings from './pages/admin/SiteSettings';
 import Requests from './pages/admin/Requests';
+import ProductDetail from './pages/ProductDetail';
+import Orders from './pages/Orders';
 import AdminLayout from './components/admin/AdminLayout';
 import { CartProvider } from './context/CartContext';
 import { ToastProvider } from './context/ToastContext';
@@ -80,6 +82,8 @@ function App() {
               <Route path="/" element={<Layout><Home /></Layout>} />
               <Route path="/catalog" element={<Layout><Catalog /></Layout>} />
               <Route path="/cart" element={<Layout><Cart /></Layout>} />
+              <Route path="/product/:id" element={<Layout><ProductDetail /></Layout>} />
+              <Route path="/orders" element={<Layout><Orders /></Layout>} />
               <Route path="/reset-password" element={<Layout><Suspense fallback={null}><ResetPassword /></Suspense></Layout>} />
               <Route path="/contact" element={<Layout><Contact /></Layout>} />
               <Route path="/profile" element={<Layout><Profile /></Layout>} />

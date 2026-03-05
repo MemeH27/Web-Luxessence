@@ -7,6 +7,8 @@ import { Link } from 'react-router-dom';
 import { ADMIN_EMAIL } from '../lib/constants';
 import { useUpdate } from '../context/UpdateContext';
 import { APP_VERSION } from '../lib/version';
+import OrderTracker from '../components/profile/OrderTracker';
+import AnimatedIcon from '../components/profile/AnimatedIcon';
 
 const Profile = () => {
     const { addToast } = useToast();
@@ -25,6 +27,7 @@ const Profile = () => {
         department: ''
     });
     const [loyaltyStamps, setLoyaltyStamps] = useState(0);
+    const [showFullHistory, setShowFullHistory] = useState(false);
 
     useEffect(() => {
         fetchProfile();
@@ -51,8 +54,7 @@ const Profile = () => {
             .from('orders')
             .select('*')
             .eq('client_email', email)
-            .order('created_at', { ascending: false })
-            .limit(5);
+            .order('created_at', { ascending: false });
         setOrders(ordersData || []);
     };
 
@@ -116,6 +118,21 @@ const Profile = () => {
         await supabase.auth.signOut();
         addToast('Sesión cerrada correctamente');
         window.location.reload();
+    };
+
+    const requestNotifications = async () => {
+        if (!("Notification" in window)) {
+            addToast("Este explorador no soporta notificaciones", "error");
+            return;
+        }
+
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+            addToast("¡Notificaciones activadas con éxito!", "success");
+            localStorage.setItem('luxessence_notifications', 'true');
+        } else {
+            addToast("Permiso de notificaciones denegado", "error");
+        }
     };
 
     const openLogin = () => {
@@ -254,6 +271,15 @@ const Profile = () => {
                         <LogOut className="w-4 h-4 text-primary/40 group-hover:text-primary transition-colors relative z-10" />
                         <span className="relative z-10 leading-none mt-0.5">Cerrar Sesión</span>
                     </button>
+                    {/*
+                    <button
+                        onClick={requestNotifications}
+                        className="flex-1 relative overflow-hidden group flex items-center justify-center gap-2 bg-secondary text-primary py-3.5 px-2 rounded-[1.25rem] text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all shadow-xl hover:shadow-secondary/20 hover:-translate-y-0.5 active:translate-y-0"
+                    >
+                        <ShieldCheck className="w-4 h-4 active:rotate-12 transition-transform relative z-10" />
+                        <span className="relative z-10 leading-none mt-0.5">Alertas Lux</span>
+                    </button>
+                    */}
                 </div>
             </header>
 
@@ -417,39 +443,89 @@ const Profile = () => {
                 </div>
 
                 {/* Right: Order History Summary */}
-                <div className="space-y-8">
-                    <div className="glass-panel p-8 rounded-[3rem] space-y-6">
-                        <div className="flex items-center gap-3">
-                            <Clock className="w-5 h-5 text-primary" />
-                            <h3 className="text-xl font-serif font-bold italic text-primary">Mis Pedidos</h3>
+                <div className="lg:col-span-3 space-y-8">
+                    <div className="glass-panel p-10 rounded-[4rem] space-y-10 relative overflow-hidden">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center">
+                                    <Clock className="w-6 h-6 text-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="text-3xl font-serif font-bold italic text-primary">Mis Tesoros Adquiridos</h3>
+                                    <p className="text-[10px] uppercase tracking-[0.3em] font-black text-primary/30 mt-1">Historial de exclusividad</p>
+                                </div>
+                            </div>
+
+                            {orders.length > 0 && (
+                                <Link
+                                    to="/orders"
+                                    className="px-8 py-3 bg-primary/5 border border-primary/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-primary/60 hover:bg-primary hover:text-secondary-light transition-all shadow-sm active:scale-95"
+                                >
+                                    Ver Historial Completo
+                                </Link>
+                            )}
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10">
                             {orders.length > 0 ? (
-                                orders.map(order => (
-                                    <div key={order.id} className="flex flex-col">
-                                        <button
-                                            onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
-                                            className="p-5 bg-white/50 border border-primary/5 rounded-2xl flex justify-between items-center group hover:bg-white transition-all text-left"
+                                (showFullHistory ? orders : orders.slice(0, 3)).map(order => (
+                                    <motion.div
+                                        key={order.id}
+                                        layout
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex flex-col h-full"
+                                    >
+                                        <div
+                                            className={`p-8 bg-white/40 border-2 rounded-[3rem] hover:bg-white transition-all text-left space-y-6 flex flex-col justify-between h-full group ${expandedOrder === order.id ? 'border-primary shadow-2xl' : 'border-primary/5 shadow-sm'}`}
                                         >
-                                            <div className="space-y-1">
-                                                <p className="text-xs font-black text-primary flex items-center gap-2">
-                                                    #{order.id.slice(0, 8)}
-                                                    {expandedOrder === order.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3 text-primary/30" />}
-                                                </p>
-                                                <p className="text-[10px] text-primary/40 uppercase tracking-widest">{new Date(order.created_at).toLocaleDateString()}</p>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="space-y-1">
+                                                        <p className="text-[10px] font-black text-primary/40 uppercase tracking-widest italic leading-none">Orden Lux</p>
+                                                        <p className="text-sm font-black text-primary flex items-center gap-2">
+                                                            #{order.id.slice(0, 8)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-black text-2xl text-primary font-sans leading-none">L. {(Number(order.total) || 0).toLocaleString()}</p>
+                                                        <p className="text-[10px] text-primary/30 uppercase tracking-widest mt-1 italic">{new Date(order.created_at).toLocaleDateString()}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="h-px bg-primary/5 w-full" />
+
+                                                <div className="space-y-3">
+                                                    <p className="text-[9px] uppercase tracking-widest font-black text-primary/20 italic">Estado Actual</p>
+                                                    <div className="flex items-center gap-3">
+                                                        <AnimatedIcon
+                                                            icon={
+                                                                order.status === 'pending' ? Clock :
+                                                                    order.status === 'processing' ? Package :
+                                                                        order.status === 'shipped' ? Truck : CheckCircle2
+                                                            }
+                                                            color="#711116"
+                                                            size={20}
+                                                            animation="pulse"
+                                                        />
+                                                        <span className="text-xs font-black uppercase text-primary italic">
+                                                            {order.status === 'pending' ? 'Recibido' :
+                                                                order.status === 'processing' ? 'Preparando su Pedido' :
+                                                                    order.status === 'shipped' ? 'En camino a su hogar' :
+                                                                        (order.status === 'processed' || order.status === 'delivered') ? 'Entregado con Éxito' : 'Cancelado'}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="font-bold text-primary font-sans">L. {Number(order.total).toLocaleString()}</p>
-                                                <span className={`text-[8px] uppercase font-black px-2 py-0.5 rounded-full ${order.status === 'processed' ? 'bg-green-100 text-green-700' : 'bg-primary/10 text-primary'
-                                                    }`}>
-                                                    {order.status === 'pending' ? 'Recibido' :
-                                                        order.status === 'processing' ? 'Preparando' :
-                                                            order.status === 'shipped' ? 'En camino' :
-                                                                order.status === 'processed' ? 'Venta Exitosa' : 'Entregado'}
-                                                </span>
-                                            </div>
-                                        </button>
+
+                                            <button
+                                                onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                                                className="w-full mt-6 py-4 bg-primary/5 hover:bg-primary text-primary/60 hover:text-secondary-light rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 group/btn shadow-sm"
+                                            >
+                                                {expandedOrder === order.id ? 'OCULTAR DETALLES' : 'RASTREAR Y DETALLES'}
+                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-500 ${expandedOrder === order.id ? 'rotate-180' : 'group-hover/btn:translate-y-0.5'}`} />
+                                            </button>
+                                        </div>
 
                                         <AnimatePresence>
                                             {expandedOrder === order.id && (
@@ -457,34 +533,60 @@ const Profile = () => {
                                                     initial={{ height: 0, opacity: 0 }}
                                                     animate={{ height: 'auto', opacity: 1 }}
                                                     exit={{ height: 0, opacity: 0 }}
-                                                    className="overflow-hidden bg-primary/[0.02] mx-2 rounded-b-2xl border-x border-b border-primary/5"
+                                                    className="overflow-hidden bg-white/50 backdrop-blur-xl border-x-2 border-b-2 border-primary rounded-b-[2.5rem] mt-[-1.5rem] pt-8"
                                                 >
-                                                    <div className="p-4 space-y-3 font-sans">
-                                                        {order.items?.map((item, idx) => (
-                                                            <div key={idx} className="flex justify-between items-center text-[10px]">
-                                                                <div className="flex gap-2 items-center">
-                                                                    <span className="font-black text-primary/30">x{item.quantity}</span>
-                                                                    <span className="font-medium text-primary/60 italic truncate max-w-[120px]">{item.name}</span>
+                                                    <div className="p-8 space-y-8 font-sans">
+                                                        {/* Status Tracking Visual */}
+                                                        <div className="bg-white/30 rounded-3xl p-6 border border-primary/5">
+                                                            <OrderTracker currentStatus={order.status} />
+                                                        </div>
+
+                                                        {/* Items List */}
+                                                        <div className="space-y-4 pt-4 border-t border-primary/5">
+                                                            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-primary/30 italic">Artículos Exclusivos</p>
+                                                            {order.items?.map((item, idx) => (
+                                                                <div key={idx} className="flex justify-between items-center group/item">
+                                                                    <div className="flex gap-4 items-center">
+                                                                        <span className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center font-black text-primary text-xs shrink-0 group-hover/item:scale-110 transition-transform">x{item.quantity}</span>
+                                                                        <span className="font-serif font-bold text-primary italic leading-tight text-base">{item.name}</span>
+                                                                    </div>
+                                                                    <span className="font-black text-primary/80 font-sans">L. {(item.price * item.quantity).toLocaleString()}</span>
                                                                 </div>
-                                                                <span className="font-bold text-primary">L. {(item.price * item.quantity).toLocaleString()}</span>
+                                                            ))}
+                                                        </div>
+
+                                                        <div className="pt-6 border-t border-primary/5 mt-4 flex justify-between items-center bg-primary/5 -mx-8 -mb-8 p-8">
+                                                            <div>
+                                                                <p className="text-[9px] text-primary/30 uppercase font-black italic tracking-widest leading-none">Modo de Entrega</p>
+                                                                <p className="text-xs font-black text-primary uppercase mt-1 italic tracking-widest">
+                                                                    {order.delivery_mode === 'domicilio' ? 'Servicio a Domicilio Premium' : 'Pick-up en Boutique Lux'}
+                                                                </p>
                                                             </div>
-                                                        ))}
-                                                        <div className="pt-2 border-t border-primary/5 mt-2">
-                                                            <p className="text-[9px] text-primary/30 uppercase font-black italic">Modo: {order.delivery_mode === 'domicilio' ? 'A Domicilio' : 'Pick-up'}</p>
+                                                            <AnimatedIcon icon={Truck} color="#711116" size={24} animation="bounce" />
                                                         </div>
                                                     </div>
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
-                                    </div>
+                                    </motion.div>
                                 ))
                             ) : (
-                                <div className="text-center py-10 space-y-4">
-                                    <Package className="w-10 h-10 text-primary/10 mx-auto" />
-                                    <p className="text-primary/30 text-xs italic">Aún no hay pedidos registrados con esta cuenta.</p>
+                                <div className="col-span-full py-20 bg-primary/5 rounded-[3rem] border border-dashed border-primary/10 flex flex-col items-center gap-6 group">
+                                    <div className="w-20 h-20 bg-primary/5 rounded-[2rem] flex items-center justify-center group-hover:bg-primary group-hover:text-secondary-light transition-all duration-700">
+                                        <Package className="w-10 h-10 opacity-30 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-center space-y-2">
+                                        <p className="text-primary/40 text-sm italic font-medium">Aún no hay tesoros registrados en su historial.</p>
+                                        <p className="text-[10px] uppercase tracking-[0.2em] font-black text-primary/20">Descubra nuestro catálogo exclusivo</p>
+                                    </div>
+                                    <Link to="/catalog" className="text-[10px] font-black uppercase text-primary border-b border-primary/20 hover:border-primary transition-all mt-4 tracking-[0.3em]">Explorar Ahora</Link>
                                 </div>
                             )}
                         </div>
+
+                        {/* Background Decoration */}
+                        <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-primary/[0.02] rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 w-[40rem] h-[40rem] bg-primary/[0.01] rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
                     </div>
                 </div>
             </div >

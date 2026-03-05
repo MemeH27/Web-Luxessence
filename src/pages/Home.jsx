@@ -1,40 +1,52 @@
-import { motion } from 'framer-motion';
-import { ShoppingBag, Sparkles, ShieldCheck, Heart, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../context/ToastContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    ShieldCheck,
+    Sparkles,
+    ShoppingBag,
+    Heart,
+    ChevronLeft,
+    ChevronRight,
+    ArrowRight
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Silk from '../components/Silk';
+import CountdownTimer from '../components/CountdownTimer';
 
 const ProductGridItem = ({ product }) => (
-    <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        viewport={{ once: true }}
-        className="group space-y-4"
-    >
-        <div className="aspect-[4/5] rounded-2xl overflow-hidden bg-primary/5 relative">
-            <img
-                src={product.image_url || '/img/logo.svg'}
-                alt={product.name}
-                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-            />
-            {product.is_new_arrival && (
-                <span className="absolute top-4 left-4 px-3 py-1 bg-primary text-secondary-light text-[8px] font-black uppercase tracking-widest rounded-full z-10">
-                    Nuevo
-                </span>
-            )}
-            <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-        <div className="space-y-1 text-center">
-            <p className="text-[10px] uppercase tracking-widest text-primary/40 font-black truncate px-2">
-                {product.categories?.name}
-            </p>
-            <h3 className="font-serif italic text-lg text-primary leading-tight line-clamp-1 px-2 group-hover:underline transition-all decoration-secondary">
-                {product.name}
-            </h3>
-            <p className="text-primary font-bold">L. {product.price}</p>
-        </div>
-    </motion.div>
+    <Link to={`/product/${product.id}`}>
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="group space-y-4"
+        >
+            <div className="aspect-[4/5] rounded-2xl overflow-hidden bg-primary/5 relative">
+                <img
+                    src={product.image_url || '/img/logo.svg'}
+                    alt={product.name}
+                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                />
+                {product.is_new_arrival && (
+                    <span className="absolute top-4 left-4 px-3 py-1 bg-primary text-secondary-light text-[8px] font-black uppercase tracking-widest rounded-full z-10">
+                        Nuevo
+                    </span>
+                )}
+                <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <div className="space-y-1 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-primary/40 font-black truncate px-2">
+                    {product.categories?.name}
+                </p>
+                <h3 className="font-serif italic text-lg text-primary leading-tight line-clamp-1 px-2 group-hover:underline transition-all decoration-secondary">
+                    {product.name}
+                </h3>
+                <p className="text-primary font-bold">L. {Number(product.price).toLocaleString()}</p>
+            </div>
+        </motion.div>
+    </Link>
 );
 const Home = () => {
     const brandValues = [
@@ -335,6 +347,11 @@ const Home = () => {
                                     )}
                                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent z-10 opacity-70" />
                                     <div className="absolute inset-x-8 bottom-8 z-20 space-y-4">
+                                        {promo.end_date && (
+                                            <div className="flex justify-start mb-4">
+                                                <CountdownTimer targetDate={promo.end_date} />
+                                            </div>
+                                        )}
                                         <span className="px-4 py-1.5 bg-secondary text-primary text-[10px] font-black uppercase tracking-widest rounded-full">{promo.discount_badge}</span>
                                         <h3 className="text-3xl font-serif font-bold italic text-white leading-tight">{promo.title}</h3>
                                         <p className="text-white/60 text-xs line-clamp-2">{promo.description}</p>

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Send, ShieldCheck, ChevronUp, ChevronDown, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 const Cart = () => {
     const { cart, removeFromCart, updateQuantity, clearCart, subtotal } = useCart();
     const { addToast } = useToast();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ type: null, message: null }); // { type: 'success' | 'error', message: string }
     const [formData, setFormData] = useState({
@@ -18,12 +20,28 @@ const Cart = () => {
     const [promoCode, setPromoCode] = useState('');
     const [appliedDiscount, setAppliedDiscount] = useState(0); // 0 or 0.05
     const [validatingPromo, setValidatingPromo] = useState(false);
+    const [giftWrap, setGiftWrap] = useState(false);
+    const giftWrapFee = giftWrap ? 75 : 0;
 
     const deliveryFee = deliveryMode === 'domicilio' ? 50 : 0;
     const discountAmount = subtotal * appliedDiscount;
-    const finalTotal = subtotal + deliveryFee - discountAmount;
+    const finalTotal = subtotal + deliveryFee + giftWrapFee - discountAmount;
 
-    useState(() => {
+    const handleIncreaseQty = (item) => {
+        let maxStock = item?.stock || 0;
+        if (item.isCombo && item.variants && item.comboConfig) {
+            const variant = item.variants.find(v => v.id === item.comboConfig.id);
+            if (variant) maxStock = variant.stock;
+        }
+
+        if (item.quantity >= maxStock) {
+            addToast(`Solo hay ${maxStock} unidad${maxStock === 1 ? '' : 'es'} disponibles`, 'warning');
+            return;
+        }
+        updateQuantity(item.cartItemId, item.quantity + 1);
+    };
+
+    useEffect(() => {
         const fetchUserData = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.user_metadata) {
@@ -186,6 +204,7 @@ const Cart = () => {
                 }).join('%0A') +
                 `%0A--------------------------%0A` +
                 (deliveryFee > 0 ? `*Envío:* L. ${deliveryFee}%0A` : '') +
+                (giftWrap ? `*Empaque de Regalo:* L. ${giftWrapFee}%0A` : '') +
                 (discountAmount > 0 ? `*Descuento Cupón (5%):* -L. ${discountAmount.toFixed(2)}%0A` : '') +
                 `*TOTAL: L. ${finalTotal.toFixed(2)}*%0A` +
                 `--------------------------%0A` +
@@ -204,21 +223,121 @@ const Cart = () => {
 
     if (cart.length === 0) {
         return (
-            <div className="max-w-7xl mx-auto px-6 pt-48 pb-40 text-center space-y-8">
-                <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                    <ShoppingBag className="w-10 h-10 text-primary/20" />
-                </div>
-                <div className="space-y-4">
-                    <h2 className="text-4xl font-serif font-bold italic text-primary">Su Selección está Vacía</h2>
-                    <p className="text-luxury-black/40 max-w-md mx-auto italic font-medium">Explore nuestra colección curada y descubra piezas que definen su legado.</p>
-                </div>
-                <motion.a
-                    href="/catalog"
-                    whileHover={{ scale: 1.05 }}
-                    className="btn-primary inline-flex items-center gap-3"
+            <div className="min-h-screen bg-secondary-light flex items-center justify-center px-6">
+                <motion.div
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-xl w-full text-center space-y-12 bg-white/40 backdrop-blur-3xl p-16 rounded-[4rem] border border-white shadow-2xl relative overflow-hidden group"
                 >
-                    Volver al Catálogo <ArrowRight className="w-5 h-5" />
-                </motion.a>
+                    <div className="absolute inset-0 pointer-events-none">
+                        <motion.div
+                            animate={{
+                                x: [0, 50, 0],
+                                y: [0, 30, 0],
+                                scale: [1, 1.2, 1]
+                            }}
+                            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                            className="absolute top-0 left-0 w-48 h-48 bg-primary/5 rounded-full blur-[80px]"
+                        />
+                        <motion.div
+                            animate={{
+                                x: [0, -40, 0],
+                                y: [0, -50, 0],
+                                scale: [1, 1.3, 1]
+                            }}
+                            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                            className="absolute bottom-0 right-0 w-64 h-64 bg-secondary/10 rounded-full blur-[100px]"
+                        />
+                    </div>
+
+                    <div className="relative z-10">
+                        <motion.div
+                            initial={{ scale: 0.8, rotate: -10 }}
+                            animate={{
+                                scale: 1,
+                                rotate: 0,
+                            }}
+                            transition={{
+                                scale: { duration: 0.8, type: 'spring' },
+                            }}
+                            className="w-40 h-40 bg-primary rounded-[3rem] flex items-center justify-center mx-auto shadow-2xl shadow-primary/20 relative"
+                        >
+                            <motion.div
+                                animate={{
+                                    y: [0, -15, 0],
+                                    rotate: [0, -5, 5, -5, 0]
+                                }}
+                                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                            >
+                                <ShoppingBag className="w-16 h-16 text-secondary-light" />
+                            </motion.div>
+                            <motion.div
+                                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 1, 0.3] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                className="absolute -top-3 -right-3 w-10 h-10 bg-secondary rounded-full flex items-center justify-center text-primary text-xs font-black shadow-xl border-2 border-white"
+                            >
+                                0
+                            </motion.div>
+
+                            {/* Floating particles */}
+                            {[...Array(6)].map((_, i) => (
+                                <motion.div
+                                    key={i}
+                                    className="absolute w-1 h-1 bg-secondary/40 rounded-full"
+                                    animate={{
+                                        x: [0, (i % 2 === 0 ? 60 : -60) * Math.random()],
+                                        y: [0, (i % 3 === 0 ? 60 : -60) * Math.random()],
+                                        opacity: [0, 1, 0],
+                                        scale: [0, 1.5, 0]
+                                    }}
+                                    transition={{
+                                        duration: 3 + Math.random() * 2,
+                                        repeat: Infinity,
+                                        delay: i * 0.5
+                                    }}
+                                />
+                            ))}
+                        </motion.div>
+                    </div>
+
+                    <div className="space-y-6 relative z-10">
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                        >
+                            <h2 className="text-4xl md:text-6xl font-serif font-bold italic text-primary leading-tight">
+                                No tienes nada agregado en tu Carrito.
+                            </h2>
+                        </motion.div>
+                        <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.5 }}
+                            className="text-primary/50 max-w-sm mx-auto text-base md:text-lg italic font-medium leading-relaxed"
+                        >
+                            Explore nuestra curaduría de tesoros y comience a escribir su propia leyenda hoy mismo.
+                        </motion.p>
+                    </div>
+
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.7 }}
+                        className="relative z-20"
+                    >
+                        <button
+                            onClick={() => navigate('/catalog')}
+                            className="btn-primary w-full !py-7 rounded-[2.5rem] flex items-center justify-center gap-4 group shadow-3xl hover:shadow-primary/30 transition-all font-black tracking-[0.2em] text-xs uppercase relative overflow-hidden"
+                        >
+                            <span className="relative z-10 flex items-center gap-4">
+                                DESCUBRIR LA COLECCIÓN
+                                <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
+                            </span>
+                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+                        </button>
+                    </motion.div>
+                </motion.div>
             </div>
         );
     }
@@ -266,7 +385,7 @@ const Cart = () => {
                                         <div className="flex items-center gap-2 md:gap-3 bg-primary/5 p-1 rounded-xl border border-primary/5 shadow-inner">
                                             <button onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)} className="p-1.5 md:p-2 hover:bg-white rounded-lg transition-all text-primary/40 hover:text-primary"><Minus className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                             <span className="w-4 text-center font-bold text-primary font-sans text-sm md:text-base">{item.quantity}</span>
-                                            <button onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)} className="p-1.5 md:p-2 hover:bg-white rounded-lg transition-all text-primary/40 hover:text-primary"><Plus className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                            <button onClick={() => handleIncreaseQty(item)} className="p-1.5 md:p-2 hover:bg-white rounded-lg transition-all text-primary/40 hover:text-primary"><Plus className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
                                         </div>
                                         <p className="text-lg md:text-2xl font-sans font-bold text-primary tracking-tighter">
                                             L. {item.is_bogo ? (item.price * Math.ceil(item.quantity / 2)) : (item.price * item.quantity)}
@@ -316,6 +435,12 @@ const Cart = () => {
                                             {deliveryMode === 'pickup' ? 'No Aplica' : (deliveryFee === 0 ? 'Gratis' : `L. ${deliveryFee}`)}
                                         </span>
                                     </div>
+                                    {giftWrap && (
+                                        <div className="flex justify-between text-xs text-primary/40 uppercase tracking-widest font-black italic">
+                                            <span>Empaque de Regalo</span>
+                                            <span>L. {giftWrapFee}</span>
+                                        </div>
+                                    )}
                                     {appliedDiscount > 0 && (
                                         <div className="flex justify-between text-xs text-green-600 uppercase tracking-widest font-black italic">
                                             <span>Descuento ({(appliedDiscount * 100).toFixed(0)}% Cupón)</span>
@@ -416,6 +541,54 @@ const Cart = () => {
                                     <textarea required rows="2" placeholder="Dirección Exacta para Envío" className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium resize-none shadow-inner" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
                                 </div>
 
+                                <button
+                                    type="button"
+                                    onClick={() => setGiftWrap(!giftWrap)}
+                                    className={`w-full group relative p-6 rounded-3xl border transition-all duration-700 overflow-hidden flex items-center justify-between ${giftWrap ? 'bg-primary border-primary shadow-2xl' : 'bg-white border-primary/10'}`}
+                                >
+                                    <div className="flex items-center gap-4 relative z-10">
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-700 ${giftWrap ? 'bg-secondary text-primary' : 'bg-primary/5 text-primary/40'}`}>
+                                            <motion.div
+                                                animate={giftWrap ? {
+                                                    rotate: [0, -10, 10, -5, 5, 0],
+                                                    scale: [1, 1.1, 1]
+                                                } : {}}
+                                                transition={{ duration: 0.5 }}
+                                            >
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M20 12v10H4V12" />
+                                                    <path d="M2 7h20v5H2z" />
+                                                    <path d="M12 22V7" />
+                                                    <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                                                    <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+                                                </svg>
+                                            </motion.div>
+                                        </div>
+                                        <div className="text-left">
+                                            <p className={`text-[10px] font-black uppercase tracking-widest ${giftWrap ? 'text-secondary-light' : 'text-primary/40'}`}>Presentación Premium</p>
+                                            <p className={`text-base font-serif italic font-bold ${giftWrap ? 'text-white' : 'text-primary'}`}>¿Es un regalo?</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end relative z-10">
+                                        <span className={`text-sm font-black ${giftWrap ? 'text-secondary' : 'text-primary/60'}`}>L. {giftWrapFee}</span>
+                                        {giftWrap && (
+                                            <motion.span
+                                                initial={{ opacity: 0, scale: 0.8 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                className="text-[8px] font-black text-secondary-light tracking-tighter uppercase mt-1"
+                                            >
+                                                Añadido
+                                            </motion.span>
+                                        )}
+                                    </div>
+                                    {giftWrap && (
+                                        <motion.div
+                                            layoutId="gift-glow"
+                                            className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10"
+                                        />
+                                    )}
+                                </button>
+
                                 <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest font-black text-primary/40 bg-primary/5 p-4 rounded-2xl italic">
                                     <ShieldCheck className="w-4 h-4 text-green-600" /> Transacción Segura vía WhatsApp
                                 </div>
@@ -423,9 +596,12 @@ const Cart = () => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full btn-primary !py-6 flex items-center justify-center gap-4 shadow-3xl group"
+                                    className="w-full btn-primary !py-6 flex items-center justify-center gap-4 shadow-3xl group relative overflow-hidden"
                                 >
-                                    {loading ? 'Procesando...' : 'COMPLETAR PEDIDO'} <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform text-secondary-light" />
+                                    <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+                                    <span className="relative z-10 flex items-center gap-4">
+                                        {loading ? 'Procesando...' : 'COMPLETAR PEDIDO'} <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform text-secondary-light" />
+                                    </span>
                                 </button>
                             </form>
                         </div>

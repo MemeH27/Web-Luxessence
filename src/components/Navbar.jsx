@@ -21,8 +21,22 @@ const NavGlassPill = ({
     updateAvailable,
     isDismissed,
     setIsDismissed,
-    setShowModal
+    setShowModal,
+    setIsSearchOpen
 }) => {
+    const { cart, lastAdded } = useCart();
+    const [isCartWiggling, setIsCartWiggling] = useState(false);
+    const [animatingItem, setAnimatingItem] = useState(null);
+    const cartRef = useRef(null);
+
+    useEffect(() => {
+        if (lastAdded) {
+            setAnimatingItem(lastAdded);
+            setIsCartWiggling(true);
+            setTimeout(() => setIsCartWiggling(false), 500);
+            setTimeout(() => setAnimatingItem(null), 1000);
+        }
+    }, [lastAdded]);
     const containerRef = useRef(null);
     const feImageRef = useRef(null);
     const uid = useId().replace(/:/g, '-');
@@ -166,7 +180,10 @@ const NavGlassPill = ({
                                 <span className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full" />
                             </button>
                         )}
-                        <button className="text-white/65 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10">
+                        <button
+                            onClick={() => setIsSearchOpen(true)}
+                            className="text-white/65 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10 hidden md:block"
+                        >
                             <Search className="w-4 h-4" />
                         </button>
                         {user ? (
@@ -190,12 +207,79 @@ const NavGlassPill = ({
                             </button>
                         )}
                     </div>
-                    <Link to="/cart" className="relative p-1.5 text-white/80 hover:text-white transition-colors">
-                        <ShoppingCart className="w-5 h-5" />
-                        {cartCount > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-white text-[#500a1e] text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-md">
-                                {cartCount}
-                            </span>
+
+                    {/* Mobile/Global Icons */}
+                    <button
+                        onClick={() => setIsSearchOpen(true)}
+                        className="text-white/65 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10 md:hidden"
+                    >
+                        <Search className="w-5 h-5" />
+                    </button>
+                    {/* Flying item animation */}
+                    <AnimatePresence>
+                        {animatingItem && (
+                            <motion.div
+                                initial={{
+                                    opacity: 0,
+                                    scale: 0.2,
+                                    x: "50vw",
+                                    y: "90vh",
+                                    left: -32,
+                                    top: -32,
+                                    rotate: -20
+                                }}
+                                animate={{
+                                    opacity: [0, 1, 1, 0.5, 0],
+                                    scale: [0.2, 1.2, 1, 0.4, 0.1],
+                                    x: window.innerWidth > 768 ? "calc(100vw - 120px)" : "calc(100vw - 60px)",
+                                    y: window.innerWidth > 768 ? "40px" : "40px",
+                                    rotate: [20, 0, 10, 40, 90]
+                                }}
+                                transition={{
+                                    duration: 1.2,
+                                    ease: [0.16, 1, 0.3, 1], // Custom cubic bezier for "swoosh" effect
+                                    times: [0, 0.1, 0.5, 0.8, 1]
+                                }}
+                                className="fixed z-[1000] pointer-events-none"
+                            >
+                                <div className="w-20 h-20 bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] p-3 border-2 border-primary/20 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5" />
+                                    <img
+                                        src={animatingItem.image_url || '/img/logo.svg'}
+                                        alt=""
+                                        className="w-full h-full object-contain relative z-10"
+                                    />
+                                    <motion.div
+                                        animate={{ opacity: [0, 1, 0], scale: [0.8, 1.5, 0.8] }}
+                                        transition={{ duration: 0.6, repeat: Infinity }}
+                                        className="absolute inset-0 bg-secondary/10"
+                                    />
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <Link
+                        to="/cart"
+                        ref={cartRef}
+                        className="relative group p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                    >
+                        <motion.div
+                            animate={isCartWiggling ? {
+                                rotate: [0, -10, 10, -10, 10, 0],
+                                scale: [1, 1.2, 1]
+                            } : {}}
+                        >
+                            <ShoppingBag className="w-4 h-4 text-white/65 group-hover:text-white transition-colors" />
+                        </motion.div>
+                        {cart.length > 0 && (
+                            <motion.span
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-secondary text-primary font-black text-[7px] flex items-center justify-center rounded-full shadow-lg"
+                            >
+                                {cart.length}
+                            </motion.span>
                         )}
                     </Link>
                     {updateAvailable && isDismissed && (
@@ -253,27 +337,33 @@ const Navbar = () => {
     const { addToast } = useToast();
     const { updateAvailable, isDismissed, setIsDismissed, setShowModal } = useUpdate();
 
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+
     useEffect(() => {
         const handleScroll = () => {
-            // heroGone = true when the hero section (85vh) has fully scrolled past
             const heroHeight = window.innerHeight * 0.85;
             setScrolled(window.scrollY > heroHeight);
         };
         window.addEventListener('scroll', handleScroll);
 
-        // Check Auth
+        // Check Auth initial state
         supabase.auth.getSession().then(({ data: { session } }) => {
             setUser(session?.user ?? null);
         });
 
+        // Auth listeners
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(session?.user ?? null);
-            if (session) {
+            if (session && _event === 'SIGNED_IN') {
                 setIsAuthOpen(false);
+                const firstName = session.user.user_metadata?.first_name || 'Estimado Cliente';
+                addToast(`¡Bienvenido de nuevo, ${firstName}!`, 'success');
             }
         });
 
-        // Listen for open auth modal event
         const handleOpenAuth = () => {
             setIsAuthOpen(true);
             setAuthMode('login');
@@ -282,10 +372,31 @@ const Navbar = () => {
 
         return () => {
             window.removeEventListener('scroll', handleScroll);
-            subscription.unsubscribe();
+            if (subscription) subscription.unsubscribe();
             window.removeEventListener('open-auth-modal', handleOpenAuth);
         };
-    }, []);
+    }, [addToast]);
+
+    const handleSearch = async (query) => {
+        if (!query.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const { data } = await supabase
+                .from('products')
+                .select('*, categories(name)')
+                .ilike('name', `%${query}%`)
+                .limit(4);
+            setSearchResults(data || []);
+        } catch (error) {
+            console.error('Search error:', error);
+        } finally {
+            setIsSearching(false);
+        }
+    };
 
     useEffect(() => {
         if (isAuthOpen) {
@@ -425,8 +536,100 @@ const Navbar = () => {
                     isDismissed={isDismissed}
                     setIsDismissed={setIsDismissed}
                     setShowModal={setShowModal}
+                    setIsSearchOpen={setIsSearchOpen}
                 />
             </motion.nav>
+
+            {/* Premium Search Overlay */}
+            <AnimatePresence>
+                {isSearchOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[300] bg-primary/40 backdrop-blur-2xl px-4 flex flex-col items-center pt-24"
+                    >
+                        <motion.button
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            whileHover={{ rotate: 90 }}
+                            onClick={() => {
+                                setIsSearchOpen(false);
+                                setSearchQuery('');
+                                setSearchResults([]);
+                            }}
+                            className="absolute top-10 right-10 p-3 bg-white text-primary rounded-full shadow-2xl z-[310]"
+                        >
+                            <X className="w-6 h-6" />
+                        </motion.button>
+
+                        <div className="w-full max-w-3xl space-y-12">
+                            <div className="relative group">
+                                <Search className={`absolute left-6 top-1/2 -translate-y-1/2 w-8 h-8 transition-colors duration-500 ${searchQuery ? 'text-primary' : 'text-primary/20'}`} />
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    placeholder="¿Qué tesoro busca hoy?"
+                                    className="w-full bg-white/90 backdrop-blur-xl border-none rounded-[3rem] py-8 pl-20 pr-10 text-2xl md:text-4xl font-serif italic text-primary placeholder:text-primary/10 shadow-3xl focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        handleSearch(e.target.value);
+                                    }}
+                                />
+                                {isSearching && (
+                                    <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                                        <div className="w-6 h-6 border-4 border-primary/10 border-t-primary rounded-full animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-6">
+                                <p className="text-[10px] uppercase tracking-[0.5em] font-black text-white/40 text-center">Resultados sugeridos</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                    {searchResults.length > 0 ? (
+                                        searchResults.map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => {
+                                                    navigate(`/product/${p.id}`);
+                                                    setIsSearchOpen(false);
+                                                    setSearchQuery('');
+                                                }}
+                                                className="group bg-white/10 hover:bg-white backdrop-blur-xl border border-white/20 p-6 rounded-[2.5rem] flex items-center gap-6 transition-all text-left overflow-hidden"
+                                            >
+                                                <div className="w-20 h-20 bg-primary/5 rounded-2xl overflow-hidden shrink-0">
+                                                    <img src={p.image_url} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-[8px] uppercase tracking-widest font-black text-primary/30 group-hover:text-primary/40 italic">{p.categories?.name}</p>
+                                                    <h4 className="text-white group-hover:text-primary font-serif font-bold italic text-lg leading-tight transition-colors">{p.name}</h4>
+                                                    <p className="text-white/40 group-hover:text-primary/60 font-black text-xs leading-none pt-1">L. {Number(p.price).toLocaleString()}</p>
+                                                </div>
+                                            </button>
+                                        ))
+                                    ) : searchQuery && !isSearching ? (
+                                        <div className="col-span-full py-20 text-center space-y-4">
+                                            <p className="text-white/20 text-2xl font-serif italic">No se encontraron tesoros con ese nombre.</p>
+                                            <button
+                                                onClick={() => { navigate('/catalog'); setIsSearchOpen(false); }}
+                                                className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] border-b border-white/20 hover:text-white transition-colors"
+                                            >
+                                                Explorar catálogo completo
+                                            </button>
+                                        </div>
+                                    ) : !searchQuery && (
+                                        <div className="col-span-full py-20 text-center space-y-4">
+                                            <p className="text-white/20 text-sm font-black uppercase tracking-[0.3em] italic">Comience a escribir para descubrir...</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Custom Auth Modal */}
             <AnimatePresence>

@@ -4,17 +4,40 @@ const CartContext = createContext();
 
 export const useCart = () => useContext(CartContext);
 
+const CART_VERSION = 'v2';
+
 export const CartProvider = ({ children }) => {
     const [cart, setCart] = useState(() => {
-        const savedCart = localStorage.getItem('luxessence_cart');
-        return savedCart ? JSON.parse(savedCart) : [];
+        try {
+            const savedCart = localStorage.getItem('luxessence_cart');
+            const savedVersion = localStorage.getItem('luxessence_cart_version');
+            // Clear old cart data if version mismatch
+            if (savedVersion !== CART_VERSION) {
+                localStorage.removeItem('luxessence_cart');
+                localStorage.setItem('luxessence_cart_version', CART_VERSION);
+                return [];
+            }
+            if (!savedCart) return [];
+            const parsed = JSON.parse(savedCart);
+            // Validate: every item must have a cartItemId
+            if (!Array.isArray(parsed) || parsed.some(item => !item.cartItemId)) {
+                localStorage.removeItem('luxessence_cart');
+                return [];
+            }
+            return parsed;
+        } catch {
+            return [];
+        }
     });
+    const [lastAdded, setLastAdded] = useState(null);
 
     useEffect(() => {
         localStorage.setItem('luxessence_cart', JSON.stringify(cart));
+        localStorage.setItem('luxessence_cart_version', CART_VERSION);
     }, [cart]);
 
     const addToCart = (product, config = null, quantity = 1) => {
+        setLastAdded({ ...product, config, quantity, timestamp: Date.now() });
         setCart((prev) => {
             const cartItemId = config ? `${product.id}-${config.id}` : product.id;
             const existing = prev.find((item) => item.cartItemId === cartItemId);
@@ -72,7 +95,7 @@ export const CartProvider = ({ children }) => {
     }, 0);
 
     return (
-        <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, subtotal }}>
+        <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, subtotal, lastAdded }}>
             {children}
         </CartContext.Provider>
     );

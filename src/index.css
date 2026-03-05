@@ -118,19 +118,14 @@
   @apply bg-primary/20 text-primary;
 }
 
-/* Custom Scrollbar for desktop */
-@media (min-width: 1024px) {
-  ::-webkit-scrollbar {
-    width: 8px;
-  }
+/* Hide scrollbar globally */
+::-webkit-scrollbar {
+  display: none;
+}
 
-  ::-webkit-scrollbar-track {
-    @apply bg-secondary-dark;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-primary/20 rounded-full hover:bg-primary/50 transition-colors;
-  }
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */

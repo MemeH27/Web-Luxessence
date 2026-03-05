@@ -53,13 +53,13 @@ const Layout = ({ children }) => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                    className="w-full pt-0 pb-32 md:pb-10"
+                    className="w-full"
                 >
                     {children}
                 </motion.main>
             </AnimatePresence>
 
-            <Footer />
+            {!location.pathname.startsWith('/product/') && <Footer />}
             <BottomNav />
 
             {/* Decorative Brand Colors */}

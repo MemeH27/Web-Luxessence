@@ -20,15 +20,13 @@ export const UpdateProvider = ({ children }) => {
     const checkForUpdate = async () => {
         if (!registration) {
             // No SW registration – likely Safari/iPad or non-PWA browser.
-            // Do a hard reload so the browser at least fetches fresh assets.
             setIsChecking(true);
             setLastCheckResult('none');
             setTimeout(() => {
                 setIsChecking(false);
                 setLastCheckResult('up-to-date');
                 setTimeout(() => setLastCheckResult('none'), 5000);
-                window.location.reload();
-            }, 800);
+            }, 1000);
             return;
         }
 
