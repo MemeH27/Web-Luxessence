@@ -191,6 +191,27 @@ const NavGlassPill = ({
                             </span>
                         )}
                     </Link>
+                    {updateAvailable && isDismissed && (
+                        <button
+                            onClick={() => {
+                                setIsDismissed(false);
+                                setShowModal(true);
+                            }}
+                            className="relative p-1.5 transition-colors md:hidden"
+                            title="Actualización pendiente"
+                        >
+                            <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+                            >
+                                <svg className="w-5 h-5 text-[#B8860B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </motion.div>
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-[#B8860B] rounded-full animate-ping" />
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-[#B8860B] rounded-full" />
+                        </button>
+                    )}
                 </div>
 
             </div>
