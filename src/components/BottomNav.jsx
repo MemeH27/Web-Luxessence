@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Grid, Users, Send, User } from 'lucide-react';
+import { Home, Grid, Users, Send, User, LayoutDashboard } from 'lucide-react';
 import GlassSurface from './GlassSurface';
 import { useUpdate } from '../context/UpdateContext';
+import { supabase } from '../lib/supabase';
+import { ADMIN_EMAIL } from '../lib/constants';
 
 const BottomNav = () => {
     const navigate = useNavigate();
@@ -11,11 +13,20 @@ const BottomNav = () => {
     const { updateAvailable, isDismissed, setIsDismissed, setShowModal } = useUpdate();
     const [isAuthOpen, setIsAuthOpen] = useState(document.body.classList.contains('auth-open'));
     const [isOverDark, setIsOverDark] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         const handleAuthChange = (e) => setIsAuthOpen(e.detail.open);
         window.addEventListener('auth-modal-change', handleAuthChange);
         setIsAuthOpen(document.body.classList.contains('auth-open'));
+
+        // Check admin status
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setIsAdmin(session?.user?.email === ADMIN_EMAIL);
+        });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setIsAdmin(session?.user?.email === ADMIN_EMAIL);
+        });
 
         const checkFooterOverlap = () => {
             if (window.innerWidth >= 768) return;
@@ -40,6 +51,7 @@ const BottomNav = () => {
             window.removeEventListener('scroll', checkFooterOverlap);
             window.removeEventListener('resize', checkFooterOverlap);
             clearTimeout(timeout);
+            subscription.unsubscribe();
         };
     }, [location.pathname]);
 
@@ -178,6 +190,35 @@ const BottomNav = () => {
                                 </button>
                             );
                         })}
+
+                        {/* Admin shortcut — solo visible si es admin */}
+                        {isAdmin && (
+                            <motion.button
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                                onClick={() => navigate('/admin/dashboard')}
+                                className="relative w-15 h-full flex flex-col items-center justify-center group flex-1"
+                            >
+                                {location.pathname.startsWith('/admin') && (
+                                    <motion.div
+                                        layoutId="nav-bg"
+                                        className={`absolute inset-x-1 inset-y-2.5 rounded-[2rem] -z-10 ${navActiveBg}`}
+                                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                    />
+                                )}
+                                <div
+                                    className={`relative p-2 transition-all duration-700 ${isOverDark ? 'text-white/80' : 'text-primary/70'} group-hover:${navColor}`}
+                                >
+                                    <LayoutDashboard className="w-5.5 h-5.5 stroke-[1.5px]" />
+                                    {/* Small crown or star dot to mark it as special */}
+                                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full border border-white/60" />
+                                </div>
+                                <span className={`text-[8px] font-extrabold uppercase tracking-tighter transition-colors duration-700 ${isOverDark ? 'text-white/50' : 'text-primary/40'}`}>
+                                    Admin
+                                </span>
+                            </motion.button>
+                        )}
                     </div>
                 </GlassSurface>
             </motion.div>

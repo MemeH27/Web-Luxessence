@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useId } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ShoppingBag, User, LogOut, Mail, Lock, UserCircle, ArrowRight, ChevronDown, Search, ShoppingCart, Eye, EyeOff } from 'lucide-react';
+import { Menu, X, ShoppingBag, User, LogOut, Mail, Lock, UserCircle, ArrowRight, ChevronDown, Search, ShoppingCart, Eye, EyeOff, LayoutDashboard } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
@@ -171,9 +171,15 @@ const NavGlassPill = ({
                         </button>
                         {user ? (
                             <>
-                                <Link to={user.email === ADMIN_EMAIL ? '/admin/dashboard' : '/profile'} className="text-white/65 hover:text-white p-1.5 rounded-full hover:bg-white/10">
+                                <Link to="/profile" className="text-white/65 hover:text-white p-1.5 rounded-full hover:bg-white/10">
                                     <User className="w-4 h-4" />
                                 </Link>
+                                {user.email === ADMIN_EMAIL && (
+                                    <Link to="/admin/dashboard" className="relative text-white/65 hover:text-white p-1.5 rounded-full hover:bg-white/10" title="Panel Admin">
+                                        <LayoutDashboard className="w-4 h-4" />
+                                        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-white rounded-full" />
+                                    </Link>
+                                )}
                                 <button onClick={handleLogout} className="text-white/45 hover:text-white p-1.5 rounded-full hover:bg-white/10">
                                     <LogOut className="w-4 h-4" />
                                 </button>
