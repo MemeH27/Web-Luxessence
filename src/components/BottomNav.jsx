@@ -20,7 +20,7 @@ const BottomNav = () => {
         const checkFooterOverlap = () => {
             if (window.innerWidth >= 768) return;
             const navElement = document.getElementById('bottom-nav-container');
-            const footerElement = document.querySelector('footer');
+            const footerElement = document.getElementById('site-footer');
             if (!navElement || !footerElement) return;
 
             const navRect = navElement.getBoundingClientRect();

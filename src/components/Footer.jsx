@@ -6,7 +6,7 @@ import { APP_VERSION } from '../lib/version';
 
 const Footer = () => {
     return (
-        <footer className="bg-primary text-white pt-20 pb-24 md:pb-12 border-t border-white/10 relative overflow-hidden">
+        <footer id="site-footer" className="bg-primary text-white pt-20 pb-24 md:pb-12 border-t border-white/10 relative overflow-hidden">
             {/* Ambient background glow */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-secondary/10 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-[100px] pointer-events-none" />
