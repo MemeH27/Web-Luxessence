@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown, Award, LogOut, Sparkles, Star, Gift, LayoutDashboard, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { User, UserCircle, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown, Award, LogOut, Sparkles, Star, Gift, LayoutDashboard, RefreshCw, CheckCircle2, PartyPopper } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { Link } from 'react-router-dom';
 import { ADMIN_EMAIL } from '../lib/constants';
 import { useUpdate } from '../context/UpdateContext';
@@ -63,24 +64,54 @@ const Profile = () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
             setUser(session.user);
+            const rawPhone = (session.user.user_metadata?.phone || '').replace('+504', '').replace(/\D/g, '').slice(0, 8);
+
             setFormData({
                 first_name: session.user.user_metadata?.first_name || '',
                 last_name: session.user.user_metadata?.last_name || '',
-                phone: session.user.user_metadata?.phone || '',
+                phone: rawPhone,
                 address: session.user.user_metadata?.address || '',
                 city: session.user.user_metadata?.city || '',
                 department: session.user.user_metadata?.department || ''
             });
 
             // Fetch loyalty stamps from customers table
-            const { data: customerData } = await supabase
+            // Robust check: try by email first, then by phone if available
+            let { data: customerData } = await supabase
                 .from('customers')
-                .select('loyalty_stamps')
+                .select('loyalty_stamps, email, phone')
                 .eq('email', session.user.email)
-                .single();
+                .maybeSingle();
+
+            if (!customerData && rawPhone) {
+                // Try finding by phone if email didn't match (phone in metadata should match phone in customers)
+                const { data: byPhone } = await supabase
+                    .from('customers')
+                    .select('loyalty_stamps, email, phone')
+                    .eq('phone', `+504 ${rawPhone}`)
+                    .maybeSingle();
+                customerData = byPhone;
+            }
 
             if (customerData) {
-                setLoyaltyStamps(customerData.loyalty_stamps || 0);
+                const stamps = Number(customerData.loyalty_stamps) || 0;
+                setLoyaltyStamps(stamps);
+
+                // If reward is ready and it's a fresh load/refresh, show some magic
+                if (stamps >= 5 && !loading) {
+                    confetti({
+                        particleCount: 150,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#E5C158', '#000000', '#FFFFFF']
+                    });
+                }
+            } else if (session.user.email !== ADMIN_EMAIL) {
+                // Si el usuario no está en la tabla customers y no es admin, fue eliminado
+                await supabase.auth.signOut();
+                addToast('Tu cuenta ha sido eliminada por el administrador. Crea una nueva para continuar.', 'error');
+                window.location.href = '/';
+                return;
             }
 
             fetchOrdersOnly(session.user.email);
@@ -92,20 +123,42 @@ const Profile = () => {
 
     const handleUpdate = async (e) => {
         e.preventDefault();
-        setSaving(true);
+        const rawPhone = formData.phone.replace(/\D/g, '').slice(0, 8);
+        if (rawPhone.length !== 8) {
+            addToast('El número de teléfono debe tener exactamente 8 dígitos (sin contar +504)', 'error');
+            setSaving(false);
+            return;
+        }
+
+        const formattedPhone = `+504 ${rawPhone}`;
+
         try {
-            const { error } = await supabase.auth.updateUser({
+            const { error: authError } = await supabase.auth.updateUser({
                 data: {
                     first_name: formData.first_name,
                     last_name: formData.last_name,
-                    phone: formData.phone,
+                    phone: formattedPhone,
                     address: formData.address,
                     city: formData.city,
                     department: formData.department
                 }
             });
 
-            if (error) throw error;
+            if (authError) throw authError;
+
+            // Also search and update customers table to keep synced
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.email) {
+                await supabase.from('customers')
+                    .update({
+                        first_name: formData.first_name,
+                        last_name: formData.last_name,
+                        phone: formattedPhone,
+                        address: formData.address,
+                    })
+                    .eq('email', session.user.email);
+            }
+
             addToast('Perfil actualizado correctamente');
         } catch (err) {
             addToast(err.message, 'error');
@@ -296,11 +349,11 @@ const Profile = () => {
                             <div className="space-y-2">
                                 <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Nombre</label>
                                 <div className="relative">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+                                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
                                     <input
                                         type="text"
                                         placeholder="Tu nombre"
-                                        className="w-full bg-white border border-primary/5 rounded-2xl py-4 pl-12 pr-6 outline-none focus:ring-1 focus:ring-primary shadow-inner"
+                                        className="w-full bg-white border border-primary/5 rounded-2xl py-4 pl-12 pr-6 outline-none focus:ring-1 focus:ring-primary shadow-inner placeholder:text-primary/10"
                                         value={formData.first_name}
                                         onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                                     />
@@ -309,11 +362,11 @@ const Profile = () => {
                             <div className="space-y-2">
                                 <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Apellido</label>
                                 <div className="relative">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+                                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
                                     <input
                                         type="text"
                                         placeholder="Tu apellido"
-                                        className="w-full bg-white border border-primary/5 rounded-2xl py-4 pl-12 pr-6 outline-none focus:ring-1 focus:ring-primary shadow-inner"
+                                        className="w-full bg-white border border-primary/5 rounded-2xl py-4 pl-12 pr-6 outline-none focus:ring-1 focus:ring-primary shadow-inner placeholder:text-primary/10"
                                         value={formData.last_name}
                                         onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                                     />
@@ -336,14 +389,19 @@ const Profile = () => {
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Teléfono</label>
-                                <div className="relative">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+                                <div className="flex bg-white border border-primary/5 rounded-2xl shadow-inner focus-within:ring-1 focus-within:ring-primary transition-all overflow-hidden items-stretch">
+                                    <div className="bg-primary/5 px-4 flex items-center justify-center border-r border-primary/10 shrink-0">
+                                        <span className="text-primary font-bold text-xs">+504</span>
+                                    </div>
                                     <input
                                         type="tel"
-                                        placeholder="9999-9999"
-                                        className="w-full bg-white border border-primary/5 rounded-2xl py-4 pl-12 pr-6 outline-none focus:ring-1 focus:ring-primary shadow-inner"
+                                        placeholder="0000 0000"
                                         value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                            setFormData({ ...formData, phone: val });
+                                        }}
+                                        className="w-full bg-transparent py-4 px-4 outline-none text-sm font-medium"
                                     />
                                 </div>
                             </div>
@@ -352,26 +410,33 @@ const Profile = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Ciudad</label>
-                                <input
-                                    type="text"
-                                    placeholder="Su ciudad"
-                                    className="w-full bg-white border border-primary/5 rounded-2xl py-4 px-6 outline-none focus:ring-1 focus:ring-primary shadow-inner"
-                                    value={formData.city}
-                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                />
+                                <div className="relative">
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+                                    <input
+                                        type="text"
+                                        placeholder="Su ciudad"
+                                        className="w-full bg-white border border-primary/5 rounded-2xl py-4 pl-12 pr-6 outline-none focus:ring-1 focus:ring-primary shadow-inner placeholder:text-primary/10"
+                                        value={formData.city}
+                                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                    />
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Departamento</label>
-                                <select
-                                    className="w-full bg-white border border-primary/5 rounded-2xl py-4 px-6 outline-none focus:ring-1 focus:ring-primary shadow-inner text-sm"
-                                    value={formData.department}
-                                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                >
-                                    <option value="" disabled>Seleccione un departamento</option>
-                                    {["Atlántida", "Choluteca", "Colón", "Comayagua", "Copán", "Cortés", "El Paraíso", "Francisco Morazán", "Gracias a Dios", "Intibucá", "Islas de la Bahía", "La Paz", "Lempira", "Ocotepeque", "Olancho", "Santa Bárbara", "Valle", "Yoro"].map(d => (
-                                        <option key={d} value={d}>{d}</option>
-                                    ))}
-                                </select>
+                                <div className="relative">
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
+                                    <select
+                                        className="w-full bg-white border border-primary/5 rounded-2xl py-4 pl-12 pr-10 outline-none focus:ring-1 focus:ring-primary shadow-inner text-sm appearance-none"
+                                        value={formData.department}
+                                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                                    >
+                                        <option value="" disabled>Seleccione un departamento</option>
+                                        {["Atlántida", "Choluteca", "Colón", "Comayagua", "Copán", "Cortés", "El Paraíso", "Francisco Morazán", "Gracias a Dios", "Intibucá", "Islas de la Bahía", "La Paz", "Lempira", "Ocotepeque", "Olancho", "Santa Bárbara", "Valle", "Yoro"].map(d => (
+                                            <option key={d} value={d}>{d}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30 pointer-events-none" />
+                                </div>
                             </div>
                         </div>
 
@@ -408,7 +473,17 @@ const Profile = () => {
                                 <div className="flex flex-col xl:flex-row items-center gap-3 xl:gap-4">
                                     <div className="flex flex-col md:flex-row items-center gap-3 xl:gap-4">
                                         <Award className="w-12 h-12 md:w-10 md:h-10 text-secondary shrink-0" />
-                                        <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-secondary-light leading-tight">Tarjeta Cliente Frecuente</h2>
+                                        <div className="flex items-center gap-3">
+                                            <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-secondary-light leading-tight">Tarjeta Cliente Frecuente</h2>
+                                            <button
+                                                onClick={() => fetchProfile()}
+                                                disabled={loading}
+                                                className={`p-2 hover:bg-white/10 rounded-full transition-all ${loading ? 'animate-spin opacity-50' : 'hover:scale-110 active:scale-90'}`}
+                                                title="Actualizar sellos"
+                                            >
+                                                <RefreshCw className="w-4 h-4 text-secondary/40" />
+                                            </button>
+                                        </div>
                                     </div>
                                     <span className="text-6xl md:text-5xl font-black font-sans tracking-tighter text-[#E5C158] drop-shadow-[0_0_20px_rgba(229,193,88,0.4)] leading-none mt-2 xl:mt-0 xl:ml-2">
                                         20% OFF
@@ -419,7 +494,11 @@ const Profile = () => {
                                 </span>
                             </div>
                             {loyaltyStamps >= 5 && (
-                                <span className="bg-secondary text-primary px-6 py-3 md:px-4 md:py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-lg animate-pulse shrink-0 mt-4 md:mt-0 w-full md:w-auto text-center">¡Recompensa Lista!</span>
+                                <div className="flex flex-col items-center gap-2">
+                                    <span className="bg-secondary text-primary px-6 py-3 md:px-4 md:py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-lg animate-pulse shrink-0 mt-4 md:mt-0 w-full md:w-auto text-center flex items-center gap-2 justify-center">
+                                        <PartyPopper className="w-4 h-4" /> ¡Recompensa Lista!
+                                    </span>
+                                </div>
                             )}
                         </div>
 

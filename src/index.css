@@ -104,6 +104,15 @@
     @apply bg-gradient-to-br from-gold via-gold-light to-gold-dark bg-clip-text text-transparent;
   }
 
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   .pt-safe {
     padding-top: env(safe-area-inset-top);
   }
@@ -136,6 +145,17 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Hide numeric input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 /* Auth Modal responsive fixes */

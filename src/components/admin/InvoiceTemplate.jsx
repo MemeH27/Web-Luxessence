@@ -86,7 +86,7 @@ const InvoiceContent = ({ sale, customer, items, payments, totalPaid, balanceDue
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {items.filter(i => !i.is_promo_metadata).map((item, idx) => (
+                            {items.filter(i => !i.is_promo_metadata && !i.is_gift_metadata).map((item, idx) => (
                                 <tr key={idx} className="text-sm group hover:bg-white transition-colors">
                                     <td className="px-8 py-5 font-black text-gray-400">
                                         <span className="bg-gray-100 px-2 py-1 rounded-md text-[10px] text-primary/60">{item.quantity}</span>
@@ -141,16 +141,32 @@ const InvoiceContent = ({ sale, customer, items, payments, totalPaid, balanceDue
                     {/* Breakdown */}
                     <div className="space-y-4 px-2 pb-6">
                         <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-tighter text-gray-400">
-                            <span className="whitespace-nowrap">Subtotal Neto</span>
-                            <span className="text-sm font-sans font-bold text-gray-600 whitespace-nowrap">L. {(sale.total + (sale.discount || 0)).toLocaleString()}</span>
+                            <span className="whitespace-nowrap">Subtotal de Productos</span>
+                            <span className="text-sm font-sans font-bold text-gray-600 whitespace-nowrap">
+                                L. {items.filter(i => !i.is_promo_metadata && !i.is_gift_metadata).reduce((acc, i) => acc + (i.price * i.quantity), 0).toLocaleString()}
+                            </span>
                         </div>
+
+                        {sale.order?.delivery_mode === 'domicilio' && (
+                            <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-tighter text-gray-400">
+                                <span className="whitespace-nowrap">Tarifa de Envío</span>
+                                <span className="text-sm font-sans font-bold text-gray-600 whitespace-nowrap">L. 50</span>
+                            </div>
+                        )}
+
+                        {items.find(i => i.is_gift_metadata) && (
+                            <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-tighter text-gray-400">
+                                <span className="whitespace-nowrap">Empaque de Regalo Premium</span>
+                                <span className="text-sm font-sans font-bold text-gray-600 whitespace-nowrap">L. 75</span>
+                            </div>
+                        )}
 
                         {sale.discount > 0 && (
                             <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-tighter text-red-500/60 transition-all">
                                 <span className="whitespace-nowrap">
                                     {items.find(i => i.is_promo_metadata)?.promo_code_used
                                         ? `Descuento p. cupón (${items.find(i => i.is_promo_metadata).promo_code_used})`
-                                        : 'Descuento Especial'
+                                        : 'Descuento / Incentivo Aplicado'
                                     }
                                 </span>
                                 <span className="text-sm font-sans font-bold whitespace-nowrap">- L. {sale.discount.toLocaleString()}</span>
@@ -238,6 +254,10 @@ const InvoiceTemplate = React.forwardRef(({ saleData }, ref) => {
     const customer = saleData?.customer || saleData?.customers;
     const items = saleData?.items || saleData?.orders?.items || [];
     const payments = saleData?.payments || [];
+    const order = saleData?.order || saleData?.orders;
+
+    // Standardize sale object to have order attached for InvoiceContent
+    const standardizedSale = { ...sale, order };
 
     // Calculate totals for credit sales
     const totalPaid = payments.reduce((acc, p) => acc + Number(p.amount), 0);
@@ -250,7 +270,7 @@ const InvoiceTemplate = React.forwardRef(({ saleData }, ref) => {
             {/* The responsive Preview for the UI Modal */}
             <div className="w-full">
                 <InvoiceContent
-                    sale={sale}
+                    sale={standardizedSale}
                     customer={customer}
                     items={items}
                     payments={payments}
@@ -272,7 +292,7 @@ const InvoiceTemplate = React.forwardRef(({ saleData }, ref) => {
             <div className="absolute top-[-9999px] left-[-9999px] -z-50 pointer-events-none w-[816px]">
                 <div ref={ref} id="invoice-capture-area-export">
                     <InvoiceContent
-                        sale={sale}
+                        sale={standardizedSale}
                         customer={customer}
                         items={items}
                         payments={payments}

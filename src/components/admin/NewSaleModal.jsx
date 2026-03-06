@@ -124,7 +124,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
 
     // Financials
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discountAmount = useLoyaltyDiscount ? subtotal * 0.10 : (discountType === 'percentage' ? subtotal * (discount / 100) : discount);
+    const discountAmount = useLoyaltyDiscount ? subtotal * 0.20 : (discountType === 'percentage' ? subtotal * (discount / 100) : discount);
     const total = Math.max(0, subtotal - discountAmount);
 
     const handleProductClick = (product) => {
@@ -291,7 +291,11 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 phone: `+504 ${rawPhone}`
             };
 
-            const { data, error } = await supabase.from('customers').insert(formattedCustomer).select().single();
+            // Use upsert instead of insert to merge with existing record by phone
+            const { data, error } = await supabase.from('customers')
+                .upsert(formattedCustomer, { onConflict: 'phone' })
+                .select()
+                .single();
             if (error) throw error;
 
             setCustomers([...customers, data]);
@@ -378,13 +382,21 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 });
             }
 
-            // Update Loyalty Stamps
+            // Update Loyalty Stamps - Fetch fresh data
             if (customerId) {
-                let newStamps = selectedCustomer.loyalty_stamps || 0;
+                const { data: currentCust } = await supabase
+                    .from('customers')
+                    .select('loyalty_stamps')
+                    .eq('id', customerId)
+                    .single();
+
+                let currentStamps = currentCust?.loyalty_stamps || 0;
+                let newStamps = currentStamps;
+
                 if (useLoyaltyDiscount) {
-                    newStamps = 0; // Reset after using
+                    newStamps = 0; // Reset after use
                 } else {
-                    newStamps = Math.min(newStamps + 1, 5); // Add 1 stamp, max 5
+                    newStamps = Math.min(currentStamps + 1, 5); // Add 1 stamp, max 5 para la 6ta compra con descuento
                 }
                 await supabase.from('customers').update({ loyalty_stamps: newStamps }).eq('id', customerId);
             }
@@ -622,7 +634,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                                                 onClick={() => setUseLoyaltyDiscount(!useLoyaltyDiscount)}
                                                 className={`text-[10px] uppercase font-black px-2 py-1 rounded transition-colors ${useLoyaltyDiscount ? 'bg-secondary text-primary' : 'bg-white text-secondary border border-secondary hover:bg-secondary/10'}`}
                                             >
-                                                {useLoyaltyDiscount ? 'Descuento Aplicado' : 'Canjear 10%'}
+                                                {useLoyaltyDiscount ? 'Descuento Aplicado' : 'Canjear 20%'}
                                             </button>
                                         )}
                                     </div>

@@ -1,13 +1,66 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Send, ShieldCheck, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Send, ShieldCheck, ChevronUp, ChevronDown, X, UserCircle, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 
+const CartTimer = ({ earliestExpiry, cartLength }) => {
+    const [timeLeft, setTimeLeft] = useState(null);
+
+    useEffect(() => {
+        if (!earliestExpiry) {
+            setTimeLeft(null);
+            return;
+        }
+
+        const updateTimer = () => {
+            const now = new Date().getTime();
+            const diff = earliestExpiry - now;
+            if (diff <= 0) {
+                setTimeLeft(0);
+            } else {
+                setTimeLeft(Math.floor(diff / 1000));
+            }
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [earliestExpiry]);
+
+    if (timeLeft === null || cartLength === 0) return null;
+
+    const mins = Math.floor(timeLeft / 60);
+    const secs = timeLeft % 60;
+    const isUrgent = timeLeft < 60;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold tracking-tight transition-colors duration-500 mb-6 w-fit mx-auto ${isUrgent
+                ? 'bg-red-50 border-red-200 text-red-600 animate-pulse'
+                : 'bg-amber-50 border-amber-200 text-amber-700'
+                }`}
+        >
+            <div className={`w-2 h-2 rounded-full ${isUrgent ? 'bg-red-600' : 'bg-amber-500'} animate-ping`} />
+            <span>RESERVA ACTIVA:</span>
+            <span className="font-mono text-sm">
+                {mins}:{secs.toString().padStart(2, '0')}
+            </span>
+            <span className="opacity-60 font-medium">Restante</span>
+        </motion.div>
+    );
+};
+
 const Cart = () => {
-    const { cart, removeFromCart, updateQuantity, clearCart, subtotal } = useCart();
+    const {
+        cart, removeFromCart, updateQuantity, clearCart, subtotal, sessionId,
+        expirationWarning, setExpirationWarning, extendReservation, isExtending,
+        earliestExpiry
+    } = useCart();
     const { addToast } = useToast();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -27,18 +80,21 @@ const Cart = () => {
     const discountAmount = subtotal * appliedDiscount;
     const finalTotal = subtotal + deliveryFee + giftWrapFee - discountAmount;
 
-    const handleIncreaseQty = (item) => {
-        let maxStock = item?.stock || 0;
-        if (item.isCombo && item.variants && item.comboConfig) {
-            const variant = item.variants.find(v => v.id === item.comboConfig.id);
-            if (variant) maxStock = variant.stock;
+    const handleIncreaseQty = async (item) => {
+        const result = await updateQuantity(item.cartItemId, item.quantity + 1);
+        if (result === false) {
+            addToast(`No hay más stock disponible para ${item.name}`, 'warning');
         }
+    };
 
-        if (item.quantity >= maxStock) {
-            addToast(`Solo hay ${maxStock} unidad${maxStock === 1 ? '' : 'es'} disponibles`, 'warning');
-            return;
+    const handleManualQtyChange = async (item, value) => {
+        const num = parseInt(value);
+        if (isNaN(num) || num < 1) return; // Keep as is or handle as 1
+
+        const result = await updateQuantity(item.cartItemId, num);
+        if (result === false) {
+            addToast(`Solo hay stock suficiente para esta cantidad`, 'warning');
         }
-        updateQuantity(item.cartItemId, item.quantity + 1);
     };
 
     useEffect(() => {
@@ -49,7 +105,7 @@ const Cart = () => {
                 setFormData({
                     first_name: meta.first_name || '',
                     last_name: meta.last_name || '',
-                    phone: meta.phone || '',
+                    phone: meta.phone ? meta.phone.replace('+504', '').replace(/\D/g, '') : '',
                     address: meta.address || '',
                     city: meta.city || '',
                     department: meta.department || ''
@@ -60,7 +116,7 @@ const Cart = () => {
     }, []);
 
     const handlePhoneChange = (e) => {
-        const val = e.target.value.replace(/\D/g, ''); // Solo números
+        const val = e.target.value.replace(/\D/g, '').slice(0, 8); // Solo números, max 8
         setFormData({ ...formData, phone: val });
     };
 
@@ -152,6 +208,7 @@ const Cart = () => {
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
+            const formattedPhone = `+504 ${formData.phone}`;
 
             // 1. Create/Get Customer
             const { data: customer, error: custError } = await supabase
@@ -159,7 +216,7 @@ const Cart = () => {
                 .upsert({
                     first_name: formData.first_name,
                     last_name: formData.last_name,
-                    phone: formData.phone,
+                    phone: formattedPhone,
                     address: formData.address,
                     email: session?.user?.email || null
                 }, { onConflict: 'phone' })
@@ -167,24 +224,29 @@ const Cart = () => {
 
             if (custError) throw custError;
 
-            // 2. Create Order (with coupon metadata to prevent re-use)
-            const orderItems = appliedDiscount > 0
-                ? [...cart, { is_promo_metadata: true, promo_code_used: promoCode.trim().toUpperCase(), discount_amount: discountAmount }]
-                : cart;
+            // 2. Create Order using Atomic RPC v2 (Stock Reservation aware)
+            let orderItems = [...cart];
+            if (appliedDiscount > 0) {
+                orderItems.push({ is_promo_metadata: true, promo_code_used: promoCode.trim().toUpperCase(), discount_amount: discountAmount });
+            }
+            if (giftWrap) {
+                orderItems.push({ is_gift_metadata: true, fee: giftWrapFee });
+            }
 
-            const { data: order, error: ordError } = await supabase
-                .from('orders')
-                .insert({
-                    customer_id: customer.id,
-                    items: orderItems,
-                    total: finalTotal,
-                    status: 'pending',
-                    delivery_mode: deliveryMode,
-                    client_email: session?.user?.email || null
-                })
-                .select().single();
+            const { data: result, error: ordError } = await supabase
+                .rpc('process_order_v2', {
+                    p_customer_id: customer.id,
+                    p_items: orderItems,
+                    p_total: finalTotal,
+                    p_delivery_mode: deliveryMode,
+                    p_client_email: session?.user?.email || null,
+                    p_session_id: sessionId
+                });
 
             if (ordError) throw ordError;
+            if (result && !result.success) {
+                throw new Error(result.error || 'Error al procesar inventario');
+            }
 
             addToast('Pedido registrado con éxito');
 
@@ -192,7 +254,7 @@ const Cart = () => {
             const message = `*NUEVO PEDIDO LUXESSENCE*%0A` +
                 `--------------------------%0A` +
                 `*Cliente:* ${formData.first_name} ${formData.last_name}%0A` +
-                `*Teléfono:* ${formData.phone}%0A` +
+                `*Teléfono:* ${formattedPhone}%0A` +
                 `*Entrega:* ${deliveryMode.toUpperCase()}%0A` +
                 `*Ubicación:* ${formData.city}, ${formData.department}%0A` +
                 `*Dirección:* ${formData.address}%0A` +
@@ -347,7 +409,7 @@ const Cart = () => {
             <header className="space-y-4 max-w-2xl">
                 <h1 className="text-4xl md:text-6xl font-serif font-bold italic text-primary">
                     <span className="md:hidden">Tu Carrito</span>
-                    <span className="hidden md:inline">Bolsa de Compras</span>
+                    <span className="hidden md:inline">Carrito de Compras</span>
                 </h1>
                 <p className="text-luxury-black/40 tracking-[0.3em] uppercase text-xs font-black">Revisión de su pedido premium</p>
                 <div className="w-20 h-1 bg-primary/20 rounded-full" />
@@ -356,6 +418,7 @@ const Cart = () => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-12 items-start">
                 {/* Cart Items */}
                 <div className="lg:col-span-2 space-y-4">
+                    <CartTimer earliestExpiry={earliestExpiry} cartLength={cart.length} />
                     <AnimatePresence>
                         {cart.map((item) => (
                             <motion.div
@@ -374,7 +437,10 @@ const Cart = () => {
                                     <div className="flex justify-between items-start gap-2">
                                         <div className="min-w-0 flex-1">
                                             <h3 className="text-base md:text-xl font-serif font-bold italic text-primary leading-tight truncate">{item.name}</h3>
-                                            <p className="text-[8px] md:text-[10px] uppercase tracking-widest text-primary/30 font-black">L. {item.price} c/u</p>
+                                            <p className="text-[8px] md:text-[10px] uppercase tracking-widest text-primary/30 font-black">
+                                                L. {item.price} c/u
+                                                {item.stock !== undefined && ` • ${item.stock} disponibles`}
+                                            </p>
                                         </div>
                                         <button onClick={() => { removeFromCart(item.cartItemId); addToast('Producto eliminado'); }} className="p-2 text-red-500/30 hover:text-red-500 transition-colors hover:bg-red-500/5 rounded-xl">
                                             <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
@@ -382,10 +448,23 @@ const Cart = () => {
                                     </div>
 
                                     <div className="flex items-center justify-between mt-2 md:mt-3">
-                                        <div className="flex items-center gap-2 md:gap-3 bg-primary/5 p-1 rounded-xl border border-primary/5 shadow-inner">
-                                            <button onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)} className="p-1.5 md:p-2 hover:bg-white rounded-lg transition-all text-primary/40 hover:text-primary"><Minus className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                                            <span className="w-4 text-center font-bold text-primary font-sans text-sm md:text-base">{item.quantity}</span>
-                                            <button onClick={() => handleIncreaseQty(item)} className="p-1.5 md:p-2 hover:bg-white rounded-lg transition-all text-primary/40 hover:text-primary"><Plus className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2 md:gap-3 bg-primary/5 p-1 rounded-xl border border-primary/5 shadow-inner">
+                                                <button onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)} className="p-1.5 md:p-2 hover:bg-white rounded-lg transition-all text-primary/40 hover:text-primary"><Minus className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                                <input
+                                                    type="number"
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleManualQtyChange(item, e.target.value)}
+                                                    className="w-8 text-center font-bold text-primary font-sans text-sm md:text-base bg-transparent border-none p-0 focus:ring-0"
+                                                />
+                                                <button onClick={() => handleIncreaseQty(item)} className="p-1.5 md:p-2 hover:bg-white rounded-lg transition-all text-primary/40 hover:text-primary"><Plus className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                                            </div>
+                                            {item.reservationExpired && (
+                                                <p className="text-[7px] md:text-[8px] text-orange-500 font-bold uppercase tracking-tighter flex items-center gap-1">
+                                                    <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
+                                                    Reserva expirada (Stock libre)
+                                                </p>
+                                            )}
                                         </div>
                                         <p className="text-lg md:text-2xl font-sans font-bold text-primary tracking-tighter">
                                             L. {item.is_bogo ? (item.price * Math.ceil(item.quantity / 2)) : (item.price * item.quantity)}
@@ -515,30 +594,77 @@ const Cart = () => {
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-6">
                                     <p className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Datos de {deliveryMode === 'pickup' ? 'Contacto' : 'Entrega'}</p>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <input required placeholder="Nombre" className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium shadow-inner" value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
-                                        <input required placeholder="Apellido" className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium shadow-inner" value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
-                                    </div>
-                                    <input required placeholder="Teléfono" type="tel" className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium shadow-inner" value={formData.phone} onChange={handlePhoneChange} />
 
                                     <div className="grid grid-cols-2 gap-4">
-                                        <input required placeholder="Ciudad" className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium shadow-inner" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
-                                        <select
-                                            required
-                                            className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all text-primary font-medium shadow-inner"
-                                            value={formData.department}
-                                            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                        >
-                                            <option value="" disabled>Departamento</option>
-                                            {["Atlántida", "Choluteca", "Colón", "Comayagua", "Copán", "Cortés", "El Paraíso", "Francisco Morazán", "Gracias a Dios", "Intibucá", "Islas de la Bahía", "La Paz", "Lempira", "Ocotepeque", "Olancho", "Santa Bárbara", "Valle", "Yoro"].map(d => (
-                                                <option key={d} value={d}>{d}</option>
-                                            ))}
-                                        </select>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Nombre</label>
+                                            <div className="relative group">
+                                                <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                                                <input required placeholder="Nombre" className="w-full bg-white border border-primary/10 rounded-2xl py-3.5 pl-12 pr-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/10 text-primary font-medium shadow-sm" value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Apellido</label>
+                                            <div className="relative group">
+                                                <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                                                <input required placeholder="Apellido" className="w-full bg-white border border-primary/10 rounded-2xl py-3.5 pl-12 pr-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium shadow-sm" value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <textarea required rows="2" placeholder="Dirección Exacta para Envío" className="w-full bg-primary/5 border border-primary/5 rounded-2xl py-4 px-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium resize-none shadow-inner" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Teléfono</label>
+                                        <div className="w-full bg-white border border-primary/10 rounded-2xl flex items-center focus-within:ring-1 focus-within:ring-primary overflow-hidden transition-all shadow-sm">
+                                            <div className="bg-primary/5 px-6 h-full flex items-center justify-center border-r border-primary/10 py-3.5">
+                                                <span className="text-primary font-bold text-sm">+504</span>
+                                            </div>
+                                            <input
+                                                required
+                                                placeholder="0000 0000"
+                                                type="tel"
+                                                className="flex-1 bg-transparent py-3.5 px-6 outline-none placeholder:text-primary/10 text-primary font-medium"
+                                                value={formData.phone}
+                                                onChange={handlePhoneChange}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Ciudad</label>
+                                            <div className="relative group">
+                                                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                                                <input required placeholder="Ciudad" className="w-full bg-white border border-primary/10 rounded-2xl py-3.5 pl-12 pr-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium shadow-sm" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Departamento</label>
+                                            <div className="relative group">
+                                                <select
+                                                    required
+                                                    className="w-full bg-white border border-primary/10 rounded-2xl py-3.5 px-6 pr-10 focus:ring-1 focus:ring-primary outline-none transition-all text-primary font-medium shadow-sm appearance-none cursor-pointer"
+                                                    value={formData.department}
+                                                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                                                >
+                                                    <option value="" disabled>Seleccione un departamento</option>
+                                                    {["Atlántida", "Choluteca", "Colón", "Comayagua", "Copán", "Cortés", "El Paraíso", "Francisco Morazán", "Gracias a Dios", "Intibucá", "Islas de la Bahía", "La Paz", "Lempira", "Ocotepeque", "Olancho", "Santa Bárbara", "Valle", "Yoro"].map(d => (
+                                                        <option key={d} value={d}>{d}</option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30 pointer-events-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Dirección Exacta</label>
+                                        <div className="relative group">
+                                            <MapPin className="absolute left-4 top-6 w-4.5 h-4.5 text-primary/30 group-focus-within:text-primary transition-colors" />
+                                            <textarea required rows="2" placeholder="Barrio, Colonia, Calle, # de Casa..." className="w-full bg-white border border-primary/10 rounded-2xl py-4 pl-12 pr-6 focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-primary/20 text-primary font-medium resize-none shadow-sm text-sm" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <button
@@ -609,6 +735,67 @@ const Cart = () => {
                     </motion.div>
                 </div>
             </div>
+
+            {/* Reservation Expiration Warning Modal */}
+            <AnimatePresence>
+                {expirationWarning && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-amber-200 dark:border-amber-900/30 overflow-hidden relative"
+                        >
+                            {/* Animated Background Pulse */}
+                            <motion.div
+                                animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                className="absolute -top-10 -right-10 w-32 h-32 bg-amber-400 rounded-full blur-3xl opacity-20 pointer-events-none"
+                            />
+
+                            <div className="flex flex-col items-center text-center">
+                                <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4">
+                                    <ShoppingBag className="w-8 h-8 text-amber-600 dark:text-amber-400 animate-bounce" />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                                    ¡Tu reserva casi expira!
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+                                    El stock de <span className="font-semibold text-amber-600">"{expirationWarning.name}"</span> se liberará en <span className="font-bold text-lg">{expirationWarning.timeLeft}</span> segundos si no finalizas tu compra.
+                                </p>
+
+                                <div className="flex flex-col gap-3 w-full">
+                                    <button
+                                        onClick={extendReservation}
+                                        disabled={isExtending}
+                                        className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                        {isExtending ? (
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Plus className="w-5 h-5" />
+                                                AGREGAR +5 MINUTOS
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setExpirationWarning(null)}
+                                        className="w-full py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-sm font-medium transition-colors"
+                                    >
+                                        Seguir navegando
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

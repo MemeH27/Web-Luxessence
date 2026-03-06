@@ -146,7 +146,7 @@ const OrderManagement = () => {
     const executeProcessSale = async () => {
         setProcessing(true);
         try {
-            const calculatedDiscount = useLoyaltyDiscount ? selectedOrder.total * 0.10 : Number(discount);
+            const calculatedDiscount = useLoyaltyDiscount ? selectedOrder.total * 0.20 : Number(discount);
             const finalTotal = Math.max(0, selectedOrder.total - calculatedDiscount);
 
             const metadataItem = selectedOrder.items.find(i => i.is_promo_metadata);
@@ -190,13 +190,21 @@ const OrderManagement = () => {
 
             await supabase.from('orders').update({ status: 'processed' }).eq('id', selectedOrder.id);
 
-            // Loyalty Stamps Logic
+            // Loyalty Stamps Logic - Fetch fresh count
             if (selectedOrder.customer_id) {
-                let newStamps = selectedOrder.customers?.loyalty_stamps || 0;
+                const { data: currentCust } = await supabase
+                    .from('customers')
+                    .select('loyalty_stamps')
+                    .eq('id', selectedOrder.customer_id)
+                    .single();
+
+                let currentStamps = currentCust?.loyalty_stamps || 0;
+                let newStamps = currentStamps;
+
                 if (useLoyaltyDiscount) {
                     newStamps = 0; // Reset after using
                 } else {
-                    newStamps = Math.min(newStamps + 1, 5); // Add 1 stamp, max 5
+                    newStamps = Math.min(currentStamps + 1, 5); // Add 1 stamp, max 5 para la 6ta compra con descuento
                 }
                 await supabase.from('customers').update({ loyalty_stamps: newStamps }).eq('id', selectedOrder.customer_id);
             }
@@ -215,7 +223,7 @@ const OrderManagement = () => {
                 customer: selectedOrder.customers,
                 order: selectedOrder,
                 sale: { ...sale, total: finalTotal },
-                items: selectedOrder.items.filter(i => !i.is_promo_metadata)
+                items: selectedOrder.items
             };
 
             setLastSaleData(billingData);
@@ -507,12 +515,12 @@ const OrderManagement = () => {
                                     </div>
                                     <div className="flex justify-between text-xs text-red-600/60 uppercase tracking-widest font-black italic">
                                         <span>Aplicación de Descuento</span>
-                                        <span>- L. {useLoyaltyDiscount ? selectedOrder?.total * 0.10 : (discount || 0)}</span>
+                                        <span>- L. {useLoyaltyDiscount ? selectedOrder?.total * 0.20 : (discount || 0)}</span>
                                     </div>
                                     <div className="pt-6 border-t border-primary/10 flex justify-between items-end">
                                         <span className="text-[10px] uppercase tracking-[0.2em] font-black text-primary/40">Total a Percibir</span>
                                         <span className="text-4xl font-serif font-bold text-primary tracking-tighter">
-                                            L. {Math.max(0, selectedOrder?.total - (useLoyaltyDiscount ? selectedOrder?.total * 0.10 : (discount || 0)))}
+                                            L. {Math.max(0, selectedOrder?.total - (useLoyaltyDiscount ? selectedOrder?.total * 0.20 : (discount || 0)))}
                                         </span>
                                     </div>
                                 </div>

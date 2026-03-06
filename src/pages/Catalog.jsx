@@ -116,7 +116,7 @@ const Catalog = () => {
         navigate(`/product/${product.id}`);
     };
 
-    const handleAddToCart = (product, e) => {
+    const handleAddToCart = async (product, e) => {
         e.stopPropagation(); // Prevent navigation
         const isJibbitz = product.categories?.name?.toLowerCase().includes('jibbitz');
         if (isJibbitz) {
@@ -127,22 +127,12 @@ const Catalog = () => {
         }
 
         const qty = productQuantities[product.id] || 1;
-        const inCart = cart.find(item => item.cartItemId === product.id)?.quantity || 0;
-        const totalAfter = inCart + qty;
-
-        if (totalAfter > product.stock) {
-            const remaining = product.stock - inCart;
-            if (remaining <= 0) {
-                addToast(`Ya tienes todo el stock disponible en tu carrito`, 'warning');
-            } else {
-                addToast(`Solo puedes agregar ${remaining} unidad${remaining === 1 ? '' : 'es'} más`, 'warning');
-                setProductQuantities(prev => ({ ...prev, [product.id]: remaining }));
-            }
-            return;
+        const result = await addToCart(product, null, qty);
+        if (result.success) {
+            addToast(`Producto agregado al carrito`, 'success');
+        } else {
+            addToast(result.message, 'error');
         }
-
-        addToCart(product, null, qty);
-        addToast(`Producto agregado al carrito`, 'success');
     };
 
     const updateProductQty = (productId, delta, stock, e) => {
@@ -154,21 +144,39 @@ const Catalog = () => {
         });
     };
 
-    const confirmJibbitzCombos = () => {
+    const handleQuantityInputChange = (productId, value, stock, e) => {
+        e.stopPropagation();
+        const val = parseInt(value);
+        if (isNaN(val) || val < 1) {
+            setProductQuantities(prev => ({ ...prev, [productId]: 1 }));
+            return;
+        }
+        if (val > stock) {
+            addToast(`Solo hay ${stock} en stock`, 'warning');
+            setProductQuantities(prev => ({ ...prev, [productId]: stock }));
+            return;
+        }
+        setProductQuantities(prev => ({ ...prev, [productId]: val }));
+    };
+
+    const confirmJibbitzCombos = async () => {
         let addedCount = 0;
-        Object.entries(comboQuantities).forEach(([comboId, qty]) => {
+        const entries = Object.entries(comboQuantities);
+
+        for (const [comboId, qty] of entries) {
             if (qty > 0) {
                 const combo = jibbitzCombos.find(c => c.id === comboId);
-                for (let i = 0; i < qty; i++) {
-                    addToCart(selectedJibbitz, combo);
-                }
-                addedCount += qty;
+                const result = await addToCart(selectedJibbitz, combo, qty);
+                if (result.success) addedCount += qty;
+                else addToast(result.message, 'error');
             }
-        });
+        }
 
         if (addedCount > 0) {
             addToast(`${addedCount} combos de Jibbitz añadidos`);
             setIsComboModalOpen(false);
+        } else if (Object.values(comboQuantities).some(q => q > 0)) {
+            // Some were tried but failed
         } else {
             addToast('Seleccione al menos un combo', 'error');
         }
@@ -358,8 +366,8 @@ const Catalog = () => {
                             <motion.div
                                 layout
                                 className={viewMode === 'grid'
-                                    ? "grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-x-6 gap-y-12"
-                                    : "flex flex-col gap-12"
+                                    ? "grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-x-6 gap-y-12 pb-32"
+                                    : "flex flex-col gap-12 pb-32"
                                 }
                             >
                                 {filteredProducts.map((product) => (
@@ -425,11 +433,12 @@ const Catalog = () => {
                                         </div>
 
                                         <div className={`flex flex-col cursor-pointer ${viewMode === 'list' ? 'flex-1 justify-center' : 'text-center'}`} onClick={() => openProductDetails(product)}>
-                                            <div className="space-y-1">
+                                            {/* Fix: Uniform Title Height Container */}
+                                            <div className="space-y-1 h-[60px] flex flex-col justify-center">
                                                 <p className="text-[10px] uppercase tracking-widest text-primary/30 font-black italic">
                                                     {product.categories?.name}
                                                 </p>
-                                                <h3 className="text-base md:text-xl font-serif font-black italic text-primary leading-tight line-clamp-2 md:line-clamp-none group-hover:underline decoration-secondary transition-all">
+                                                <h3 className="text-sm md:text-base font-serif font-black italic text-primary leading-tight line-clamp-2 group-hover:underline decoration-secondary transition-all">
                                                     {product.name}
                                                 </h3>
                                             </div>
@@ -440,39 +449,54 @@ const Catalog = () => {
                                                 </p>
                                             )}
 
-                                            <div className={`mt-auto flex flex-col gap-4 ${viewMode === 'list' ? 'pt-4' : 'justify-center pt-4'}`}>
-                                                <div className="flex flex-col">
+                                            <div className={`mt-auto flex flex-col gap-4 ${viewMode === 'list' ? 'pt-4' : 'justify-center pt-6'}`}>
+                                                <div className="flex flex-col h-[70px] justify-end">
                                                     {product.original_price && (
                                                         <span className="text-[10px] text-primary/20 line-through font-bold">L. {Number(product.original_price).toLocaleString()}</span>
                                                     )}
-                                                    <p className="text-lg md:text-2xl font-black text-primary">
+                                                    <p className="text-xl md:text-2xl font-black text-primary leading-none">
                                                         L. {Number(product.price).toLocaleString()}
                                                     </p>
+                                                    <span className="text-[9px] uppercase font-black tracking-widest text-primary/30 mt-1">
+                                                        {product.stock > 0 ? `${product.stock} DISPONIBLES` : 'SIN STOCK'}
+                                                    </span>
                                                 </div>
 
-                                                <div className="flex items-center justify-center gap-3">
-                                                    <div className="flex items-center bg-primary/5 rounded-xl p-1 border border-primary/5" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-center gap-2 h-[44px]">
+                                                    <div className="flex items-center bg-primary/5 rounded-xl p-0.5 border border-primary/5" onClick={(e) => e.stopPropagation()}>
                                                         <button
                                                             onClick={(e) => updateProductQty(product.id, -1, product.stock, e)}
-                                                            className="w-8 h-8 flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
+                                                            className="w-8 h-8 flex items-center justify-center text-primary/30 hover:text-primary transition-colors"
                                                         >
-                                                            <Minus className="w-4 h-4" />
+                                                            <Minus className="w-3.5 h-3.5" />
                                                         </button>
-                                                        <span className="w-8 text-center text-xs font-bold text-primary">
+                                                        <span className="w-8 text-center text-xs font-black text-primary font-sans">
                                                             {productQuantities[product.id] || 1}
                                                         </span>
                                                         <button
                                                             onClick={(e) => updateProductQty(product.id, 1, product.stock, e)}
-                                                            className="w-8 h-8 flex items-center justify-center text-primary/40 hover:text-primary transition-colors"
+                                                            className="w-8 h-8 flex items-center justify-center text-primary/30 hover:text-primary transition-colors"
                                                         >
-                                                            <Plus className="w-4 h-4" />
+                                                            <Plus className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
                                                     <button
-                                                        onClick={(e) => handleAddToCart(product, e)}
-                                                        className="flex-1 bg-primary text-secondary-light py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/10"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const isJibbitz = product.categories?.name?.toLowerCase().includes('jibbitz');
+                                                            if (product.variants?.length > 0 && !isJibbitz) {
+                                                                openProductDetails(product);
+                                                            } else {
+                                                                handleAddToCart(product, e);
+                                                            }
+                                                        }}
+                                                        className={`flex-1 h-full ${product.variants?.length > 0 && !product.categories?.name?.toLowerCase().includes('jibbitz') ? 'bg-primary/5 text-primary border border-primary/10' : 'bg-primary text-secondary-light'} rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-primary/5`}
                                                     >
-                                                        <ShoppingCart className="w-4 h-4 mx-auto" />
+                                                        {product.variants?.length > 0 && !product.categories?.name?.toLowerCase().includes('jibbitz') ? (
+                                                            'VER OPC'
+                                                        ) : (
+                                                            <ShoppingCart className="w-4 h-4 mx-auto" />
+                                                        )}
                                                     </button>
                                                 </div>
                                             </div>

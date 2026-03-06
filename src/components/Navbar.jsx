@@ -445,6 +445,20 @@ const Navbar = () => {
         try {
             let result;
             if (authMode === 'login') {
+                // Login Inteligente: Buscar en registros antes de intentar acceso
+                if (email !== ADMIN_EMAIL) {
+                    const { data: customerRecord } = await supabase
+                        .from('customers')
+                        .select('id')
+                        .eq('email', email)
+                        .maybeSingle();
+
+                    if (!customerRecord) {
+                        setError('No se ha encontrado una cuenta asociada a este correo electrónico. Le invitamos cordialmente a registrarse para disfrutar de los beneficios exclusivos de Luxessence.');
+                        setLoading(false);
+                        return;
+                    }
+                }
                 result = await supabase.auth.signInWithPassword({ email, password });
             } else {
                 // Explicit check for existing email
@@ -677,10 +691,12 @@ const Navbar = () => {
                                             initial={{ opacity: 0, y: -10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
-                                            className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center gap-3 text-red-700 text-xs font-bold italic"
+                                            className={`${error.includes('Le invitamos cordialmente') ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-red-500/10 border-red-500/20 text-red-700'} p-4 rounded-2xl flex flex-col gap-3 text-xs font-bold italic shadow-sm`}
                                         >
-                                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                            {error}
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-2 h-2 rounded-full ${error.includes('Le invitamos cordialmente') ? 'bg-primary' : 'bg-red-500'} animate-pulse`} />
+                                                <span className="flex-1 leading-relaxed">{error}</span>
+                                            </div>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
@@ -867,16 +883,38 @@ const Navbar = () => {
                                         <span className="text-xs text-luxury-black/40">
                                             {authMode === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
                                         </span>
-                                        <button
-                                            onClick={() => {
-                                                setAuthMode(authMode === 'login' ? 'signup' : 'login');
-                                                setError(null);
-                                                setResetEmailSent(false);
-                                            }}
-                                            className="text-xs font-black text-primary hover:underline underline-offset-4"
-                                        >
-                                            {authMode === 'login' ? 'Regístrate aquí' : 'Inicia sesión'}
-                                        </button>
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => {
+                                                    setAuthMode(authMode === 'login' ? 'signup' : 'login');
+                                                    setError(null);
+                                                    setResetEmailSent(false);
+                                                }}
+                                                className="text-xs font-black text-primary hover:underline underline-offset-4"
+                                            >
+                                                {authMode === 'login' ? 'Regístrate aquí' : 'Inicia sesión'}
+                                            </button>
+
+                                            {/* Guía Visual Animada para Invitación */}
+                                            {error?.includes('Le invitamos cordialmente') && authMode === 'login' && (
+                                                <motion.div
+                                                    className="absolute -right-3 -top-3 w-6 h-6 flex items-center justify-center pointer-events-none z-10"
+                                                    initial={{ opacity: 0, scale: 0.5 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                >
+                                                    <motion.div
+                                                        className="absolute inset-0 bg-primary/40 rounded-full"
+                                                        animate={{ scale: [1, 2.5], opacity: [0.6, 0] }}
+                                                        transition={{ repeat: Infinity, duration: 2, ease: "easeOut" }}
+                                                    />
+                                                    <motion.div
+                                                        animate={{ scale: [1, 1.2, 1] }}
+                                                        transition={{ repeat: Infinity, duration: 1 }}
+                                                        className="w-2.5 h-2.5 bg-primary rounded-full shadow-lg border-2 border-white ring-2 ring-primary/20"
+                                                    />
+                                                </motion.div>
+                                            )}
+                                        </div>
                                     </div>
                                     {authMode === 'login' && (
                                         <button

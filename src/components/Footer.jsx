@@ -101,44 +101,6 @@ const Footer = () => {
 
                 </div>
 
-                {/* Newsletter Section */}
-                <div className="mb-16 p-8 md:p-12 rounded-[3.5rem] bg-white/5 border border-white/10 relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-transparent to-white/5 opacity-50" />
-                    <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
-                        <div className="space-y-4 text-center lg:text-left">
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-secondary/10 border border-secondary/20">
-                                <Sparkles className="w-3 h-3 text-secondary" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary">Acceso Exclusivo</span>
-                            </div>
-                            <h3 className="text-3xl md:text-5xl font-serif font-bold italic text-white leading-tight">Newsletter</h3>
-                            <p className="text-white/40 text-sm md:text-base italic max-w-md mx-auto lg:mx-0">
-                                Suscríbase para recibir invitaciones a lanzamientos privados y curadurías exclusivas de Luxessence.
-                            </p>
-                        </div>
-
-                        <form
-                            onSubmit={(e) => { e.preventDefault(); alert("¡Bienvenido al legado Luxessence!"); }}
-                            className="w-full lg:w-auto flex flex-col md:flex-row gap-4"
-                        >
-                            <div className="relative group/input">
-                                <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within/input:text-secondary transition-colors" />
-                                <input
-                                    type="email"
-                                    required
-                                    placeholder="Su correo electrónico"
-                                    className="w-full lg:w-80 bg-white/5 border border-white/10 rounded-3xl py-5 pl-16 pr-8 outline-none focus:ring-1 focus:ring-secondary focus:bg-white/10 transition-all text-white placeholder:text-white/20 text-sm"
-                                />
-                            </div>
-                            <button
-                                type="submit"
-                                className="bg-secondary text-primary px-10 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.3em] hover:bg-white hover:text-primary transition-all shadow-2xl flex items-center justify-center gap-3 group"
-                            >
-                                SUSCRIBIRME
-                                <Send className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                            </button>
-                        </form>
-                    </div>
-                </div>
 
                 {/* Bottom Bar */}
                 <div className="pt-8 pb-16 md:pb-0 border-t border-white/5 flex items-center justify-center">
