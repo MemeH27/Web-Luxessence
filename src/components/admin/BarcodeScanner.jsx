@@ -9,24 +9,36 @@ const BarcodeScanner = ({ onScan, onClose }) => {
     const [isTorchOn, setIsTorchOn] = useState(false);
     const [cameraId, setCameraId] = useState(null);
     const [availableCameras, setAvailableCameras] = useState([]);
+    const [zoom, setZoom] = useState(1);
+    const [maxZoom, setMaxZoom] = useState(1);
+    const [minZoom, setMinZoom] = useState(1);
+    const [isZoomSupported, setIsZoomSupported] = useState(false);
 
     useEffect(() => {
         // Initialize cameras
-        Html5Qrcode.getCameras().then(cameras => {
-            if (cameras && cameras.length > 0) {
-                setAvailableCameras(cameras);
-                // Prefer back camera
-                const backCamera = cameras.find(c => c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('trasera'));
-                setCameraId(backCamera ? backCamera.id : cameras[0].id);
-            }
-        }).catch(err => console.error("Error getting cameras", err));
+        try {
+            Html5Qrcode.getCameras().then(cameras => {
+                if (cameras && cameras.length > 0) {
+                    setAvailableCameras(cameras);
+                    // Prefer back camera
+                    const backCamera = cameras.find(c => c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('trasera'));
+                    setCameraId(backCamera ? backCamera.id : cameras[0].id);
+                }
+            }).catch(err => console.warn("Error getting cameras", err));
+        } catch (e) {
+            console.warn("Global camera initialization error", e);
+        }
 
         const html5QrCode = new Html5Qrcode("reader");
         setScanner(html5QrCode);
 
         return () => {
             if (html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => html5QrCode.clear());
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                }).catch(err => console.warn("Error stopping scanner on unmount", err));
+            } else {
+                try { html5QrCode.clear(); } catch(e) {}
             }
         };
     }, []);
@@ -38,28 +50,52 @@ const BarcodeScanner = ({ onScan, onClose }) => {
     }, [scanner, cameraId]);
 
     const startScanning = async () => {
-        if (scanner.isScanning) {
-            await scanner.stop();
-        }
-
-        const config = {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
-            aspectRatio: 1.0
-        };
-
-        scanner.start(
-            cameraId,
-            config,
-            (decodedText) => {
-                // Success!
-                onScan(decodedText);
-                stopAndClose();
-            },
-            (errorMessage) => {
-                // Ignore errors
+        if (!scanner || !cameraId) return;
+        
+        try {
+            if (scanner.isScanning) {
+                await scanner.stop();
             }
-        ).catch(err => console.error("Scanner start error", err));
+
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 150 },
+                aspectRatio: 1.0,
+                showTorchButtonIfSupported: false // We handle it manually
+            };
+
+            await scanner.start(
+                cameraId,
+                config,
+                (decodedText) => {
+                    onScan(decodedText);
+                    stopAndClose();
+                },
+                (errorMessage) => {
+                    // Ignore transient errors
+                }
+            );
+
+            // Check for zoom capabilities after start
+            try {
+                const track = scanner.getRunningTrack();
+                if (track) {
+                    const capabilities = track.getCapabilities();
+                    if (capabilities.zoom) {
+                        setIsZoomSupported(true);
+                        setMinZoom(capabilities.zoom.min || 1);
+                        setMaxZoom(capabilities.zoom.max || 1);
+                        setZoom(track.getSettings().zoom || 1);
+                    } else {
+                        setIsZoomSupported(false);
+                    }
+                }
+            } catch (e) {
+                console.warn("Zoom not supported on this track", e);
+            }
+        } catch (err) {
+            console.warn("Scanner start error (usually camera busy or permission denied):", err);
+        }
     };
 
     const stopAndClose = async () => {
@@ -77,7 +113,9 @@ const BarcodeScanner = ({ onScan, onClose }) => {
                 advanced: [{ torch: currentIsTorchOn }]
             }).then(() => {
                 setIsTorchOn(currentIsTorchOn);
-            }).catch(e => console.warn("Torch not supported", e));
+            }).catch(e => {
+                // Silently ignore if torch is not supported
+            });
         }
     };
 
@@ -85,6 +123,20 @@ const BarcodeScanner = ({ onScan, onClose }) => {
         const currentIndex = availableCameras.findIndex(c => c.id === cameraId);
         const nextIndex = (currentIndex + 1) % availableCameras.length;
         setCameraId(availableCameras[nextIndex].id);
+        setIsZoomSupported(false); // Reset for new camera
+    };
+
+    const handleZoomChange = (e) => {
+        const value = parseFloat(e.target.value);
+        if (scanner && scanner.isScanning) {
+            scanner.applyVideoConstraints({
+                advanced: [{ zoom: value }]
+            }).then(() => {
+                setZoom(value);
+            }).catch(e => {
+                console.warn("Error applying zoom", e);
+            });
+        }
     };
 
     return (
@@ -137,22 +189,41 @@ const BarcodeScanner = ({ onScan, onClose }) => {
             </div>
 
             {/* Controls */}
-            <div className="p-10 flex justify-center gap-6 bg-gradient-to-t from-black/80 to-transparent">
-                <button 
-                    onClick={toggleTorch}
-                    className={`p-6 rounded-[2rem] transition-all border ${isTorchOn ? 'bg-gold border-gold text-primary' : 'bg-white/5 border-white/10 text-white'}`}
-                >
-                    <Zap className={`w-8 h-8 ${isTorchOn ? 'fill-primary' : ''}`} />
-                </button>
-                
-                {availableCameras.length > 1 && (
-                    <button 
-                        onClick={switchCamera}
-                        className="p-6 bg-white/5 border border-white/10 rounded-[2rem] text-white hover:bg-white/10 transition-all"
-                    >
-                        <RefreshCw className="w-8 h-8" />
-                    </button>
+            <div className="p-10 flex flex-col items-center gap-8 bg-gradient-to-t from-black/80 to-transparent">
+                {/* Zoom Control */}
+                {isZoomSupported && (
+                    <div className="w-full max-w-xs flex items-center gap-4 bg-white/5 border border-white/10 px-6 py-4 rounded-3xl backdrop-blur-md">
+                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Zoom</span>
+                        <input 
+                            type="range"
+                            min={minZoom}
+                            max={maxZoom}
+                            step="0.1"
+                            value={zoom}
+                            onChange={handleZoomChange}
+                            className="flex-1 accent-gold h-1.5 rounded-full appearance-none bg-white/10"
+                        />
+                        <span className="text-[10px] font-black text-gold uppercase tracking-widest w-8">{zoom.toFixed(1)}x</span>
+                    </div>
                 )}
+
+                <div className="flex justify-center gap-6">
+                    <button 
+                        onClick={toggleTorch}
+                        className={`p-6 rounded-[2rem] transition-all border ${isTorchOn ? 'bg-gold border-gold text-primary' : 'bg-white/5 border-white/10 text-white'}`}
+                    >
+                        <Zap className={`w-8 h-8 ${isTorchOn ? 'fill-primary' : ''}`} />
+                    </button>
+                    
+                    {availableCameras.length > 1 && (
+                        <button 
+                            onClick={switchCamera}
+                            className="p-6 bg-white/5 border border-white/10 rounded-[2rem] text-white hover:bg-white/10 transition-all"
+                        >
+                            <RefreshCw className="w-8 h-8" />
+                        </button>
+                    )}
+                </div>
             </div>
         </motion.div>
     );

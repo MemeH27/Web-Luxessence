@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { exportToExcel } from '../../utils/export';
-import { Plus, Edit3, Trash2, X, Upload, Search, Download, Package2, ChevronUp, ChevronDown, ListPlus, Lock, CheckCircle2, Circle, ChevronLeft, ChevronRight, Clock, Loader2 } from 'lucide-react';
+import { Plus, Edit3, Trash2, X, Upload, Search, Download, Package2, ChevronUp, ChevronDown, ListPlus, Lock, CheckCircle2, Circle, ChevronLeft, ChevronRight, Clock, Loader2, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SecurityModal from '../../components/admin/SecurityModal';
 import Pagination from '../../components/admin/Pagination';

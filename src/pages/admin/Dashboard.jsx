@@ -4,6 +4,7 @@ import { BarChart3, Users, Package, ShoppingBag, TrendingUp, ArrowRight, Clock, 
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { APP_VERSION } from '../../lib/version';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -147,7 +148,7 @@ const Dashboard = () => {
                             className="inline-flex items-center gap-3 px-4 py-2 bg-gold/10 border border-gold/20 rounded-full"
                         >
                             <Sparkles className="w-4 h-4 text-gold" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-gold-light">LuxOS V2.0 - Central Intelligence</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-gold-light">LuxOS V{APP_VERSION} - Central Intelligence</span>
                         </motion.div>
                         <h1 className="text-6xl md:text-9xl font-serif font-black italic text-white leading-none tracking-tighter">
                             LuxOS <br /> <span className="text-gold-gradient">Command</span>
@@ -181,6 +182,7 @@ const Dashboard = () => {
                 <div className="lg:col-span-8 space-y-12">
                     <div className="glass-card-premium p-12 rounded-[4.5rem] relative overflow-hidden bg-white border-primary/5 shadow-2xl group">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-16 gap-6">
+
                             <div className="space-y-2">
                                 <h3 className="text-4xl font-serif font-bold italic text-primary">Inteligencia Comercial</h3>
                                 <div className="flex items-center gap-3">
@@ -202,62 +204,64 @@ const Dashboard = () => {
                         </div>
 
                         <div className="h-[450px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.4} />
-                                            <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="colorPrimary" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#711116" stopOpacity={0.15} />
-                                            <stop offset="95%" stopColor="#711116" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#711116" strokeOpacity={0.03} />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#711116', opacity: 0.2, fontSize: 10, fontWeight: 900 }}
-                                        dy={15}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#711116', opacity: 0.2, fontSize: 10, fontWeight: 900 }}
-                                        tickFormatter={(val) => `L.${(val / 1000).toFixed(0)}k`}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                            backdropFilter: 'blur(30px)',
-                                            borderRadius: '2.5rem',
-                                            border: '1px solid rgba(113, 17, 22, 0.08)',
-                                            boxShadow: '0 40px 80px -15px rgba(113, 17, 22, 0.2)',
-                                            padding: '24px'
-                                        }}
-                                        itemStyle={{ color: '#711116', fontWeight: 900, textTransform: 'uppercase', fontSize: '11px' }}
-                                        labelStyle={{ fontFamily: 'serif', fontStyle: 'italic', fontWeight: 900, color: '#D4AF37', fontSize: '1.2rem', marginBottom: '10px' }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="revenue"
-                                        stroke="#711116"
-                                        strokeWidth={6}
-                                        fillOpacity={1}
-                                        fill="url(#colorPrimary)"
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="profit"
-                                        stroke="#D4AF37"
-                                        strokeWidth={4}
-                                        fillOpacity={1}
-                                        fill="url(#colorSales)"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                            {!loading && (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData}>
+                                        <defs>
+                                            <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.4} />
+                                                <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
+                                            </linearGradient>
+                                            <linearGradient id="colorPrimary" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#711116" stopOpacity={0.15} />
+                                                <stop offset="95%" stopColor="#711116" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#711116" strokeOpacity={0.03} />
+                                        <XAxis
+                                            dataKey="name"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#711116', opacity: 0.2, fontSize: 10, fontWeight: 900 }}
+                                            dy={15}
+                                        />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#711116', opacity: 0.2, fontSize: 10, fontWeight: 900 }}
+                                            tickFormatter={(val) => `L.${(val / 1000).toFixed(0)}k`}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                backdropFilter: 'blur(30px)',
+                                                borderRadius: '2.5rem',
+                                                border: '1px solid rgba(113, 17, 22, 0.08)',
+                                                boxShadow: '0 40px 80px -15px rgba(113, 17, 22, 0.2)',
+                                                padding: '24px'
+                                            }}
+                                            itemStyle={{ color: '#711116', fontWeight: 900, textTransform: 'uppercase', fontSize: '11px' }}
+                                            labelStyle={{ fontFamily: 'serif', fontStyle: 'italic', fontWeight: 900, color: '#D4AF37', fontSize: '1.2rem', marginBottom: '10px' }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="revenue"
+                                            stroke="#711116"
+                                            strokeWidth={6}
+                                            fillOpacity={1}
+                                            fill="url(#colorPrimary)"
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="profit"
+                                            stroke="#D4AF37"
+                                            strokeWidth={4}
+                                            fillOpacity={1}
+                                            fill="url(#colorSales)"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            )}
                         </div>
                     </div>
 
@@ -418,7 +422,7 @@ const Dashboard = () => {
                                 transition={{ repeat: Infinity, duration: 2 }}
                                 className="text-lg font-black uppercase tracking-[1em] text-primary drop-shadow-2xl ml-6"
                             >
-                                LuxOS v2.0
+                                LuxOS v{APP_VERSION}
                             </motion.p>
                             <p className="text-xs text-primary/40 italic font-black uppercase tracking-[0.4em]">Sincronizando Libro de Patrimonio...</p>
                         </div>
