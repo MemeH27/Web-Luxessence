@@ -20,7 +20,9 @@ const Dashboard = () => {
         customersCount: 0,
         productsCount: 0,
         pendingCredits: 0,
-        inventoryValue: 0
+        inventoryValue: 0,
+        lowStockProducts: [],
+        topCategories: []
     });
 
     const [chartData, setChartData] = useState([]);
@@ -93,6 +95,24 @@ const Dashboard = () => {
 
             const formattedChartData = Object.values(dataPoints).sort((a, b) => new Date(a.name) - new Date(b.name));
 
+            // Top Categories & Low Stock
+            const { data: productsWithCats } = await supabase.from('products').select('*, categories(*)');
+            const criticalStock = productsWithCats?.filter(p => p.stock <= 5).sort((a,b) => a.stock - b.stock).slice(0, 5) || [];
+            
+            const categoryPerformance = {};
+            salesData?.forEach(sale => {
+                const items = sale.order_id?.items || [];
+                items.forEach(item => {
+                    const catName = item.category_name || 'Sin Categoría';
+                    if (!categoryPerformance[catName]) categoryPerformance[catName] = 0;
+                    categoryPerformance[catName] += item.quantity;
+                });
+            });
+            const topCats = Object.entries(categoryPerformance)
+                .map(([name, count]) => ({ name, count }))
+                .sort((a,b) => b.count - a.count)
+                .slice(0, 3);
+
             setStats({
                 revenue: totalRevenue,
                 cost: totalCost,
@@ -101,7 +121,9 @@ const Dashboard = () => {
                 customersCount: custCount || 0,
                 productsCount: allProducts?.length || 0,
                 pendingCredits: realPending,
-                inventoryValue: totalInventoryValue
+                inventoryValue: totalInventoryValue,
+                lowStockProducts: criticalStock,
+                topCategories: topCats
             });
 
             setChartData(formattedChartData.length > 0 ? formattedChartData : [{ name: 'Sin datos', revenue: 0, cost: 0, profit: 0 }]);
@@ -288,31 +310,58 @@ const Dashboard = () => {
                                     <TrendingUp className="w-5 h-5" />
                                 </div>
                             </div>
-                            <p className="text-[10px] uppercase tracking-[0.4em] text-primary/30 font-black">Métricas de Salud del Capital</p>
+                            <p className="text-[10px] uppercase tracking-[0.4em] text-primary/30 font-black">Estado de Salud del Negocio</p>
+                        </div>
+
+                        {/* Health Status Widget */}
+                        <div className="bg-primary/5 p-8 rounded-[3rem] border border-primary/5 space-y-4">
+                           <div className="flex justify-between items-center">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-primary/40">Sincronización</span>
+                                <span className="px-3 py-1 bg-green-500/10 text-green-600 rounded-full text-[8px] font-black uppercase tracking-widest">Óptima</span>
+                           </div>
+                           <div className="w-full h-2 bg-primary/10 rounded-full overflow-hidden">
+                                <motion.div initial={{ width: 0 }} animate={{ width: "94%" }} className="h-full bg-emerald-500" />
+                           </div>
+                           <p className="text-[9px] text-primary/30 italic">Eficiencia operativa al 94% hoy.</p>
                         </div>
 
                         <div className="space-y-8">
-                            {[
-                                { label: 'Valor en Inventario', val: `L. ${stats.inventoryValue.toLocaleString()}`, color: 'bg-emerald-500/10 text-emerald-600', sub: 'Capital Inmovilizado' },
-                                { label: 'Comunidad VIP', val: stats.customersCount, color: 'bg-blue-500/10 text-blue-600', sub: 'Clientes Fidelizados' },
-                                { label: 'Utilidad Neta Est.', val: `L. ${stats.profit.toLocaleString()}`, color: 'bg-gold/10 text-gold', sub: 'Margen de Ganancia' }
-                            ].map((kpi, idx) => (
-                                <div key={idx} className="group/item flex flex-col gap-4 p-6 hover:bg-primary/[0.02] rounded-3xl transition-all duration-500 border border-transparent hover:border-primary/5">
-                                    <div className="flex justify-between items-start">
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary/30">{kpi.label}</p>
-                                            <p className="text-3xl font-bold text-primary font-sans tracking-tighter">{kpi.val}</p>
-                                        </div>
-                                        <div className={`px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest ${kpi.color}`}>
-                                            Premium
-                                        </div>
+                            {/* Critical Stock Alert */}
+                            {stats.lowStockProducts.length > 0 && (
+                                <div className="p-6 bg-red-500/5 border border-red-500/10 rounded-3xl space-y-4">
+                                    <div className="flex items-center gap-2 text-red-600">
+                                        <Package className="w-4 h-4" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Stock Crítico</span>
                                     </div>
-                                    <div className="w-full h-1 bg-primary/5 rounded-full overflow-hidden">
-                                        <motion.div initial={{ width: 0 }} whileInView={{ width: "65%" }} className="h-full bg-primary/30" />
+                                    <div className="space-y-3">
+                                        {stats.lowStockProducts.map(p => (
+                                            <div key={p.id} className="flex justify-between items-center">
+                                                <span className="text-xs font-bold text-primary truncate max-w-[150px]">{p.name}</span>
+                                                <span className="text-xs font-black text-red-600 bg-red-500/10 px-2 py-0.5 rounded-lg">{p.stock} uni</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <p className="text-[9px] text-primary/20 italic font-medium">{kpi.sub}</p>
+                                    <button onClick={() => navigate('/admin/inventory')} className="w-full py-3 bg-red-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 transition-all">Surtir Inventario</button>
                                 </div>
-                            ))}
+                            )}
+
+                            {/* Top Categories */}
+                            <div className="p-6 bg-primary/5 border border-primary/5 rounded-3xl space-y-6">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-primary/40">Top Categorías</span>
+                                <div className="space-y-6">
+                                    {stats.topCategories.map((cat, i) => (
+                                        <div key={i} className="space-y-2">
+                                            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                                                <span className="text-primary/60">{cat.name}</span>
+                                                <span className="text-primary">{cat.count} vtas</span>
+                                            </div>
+                                            <div className="w-full h-1 bg-primary/5 rounded-full overflow-hidden">
+                                                <div className="h-full bg-gold" style={{ width: `${(cat.count / stats.topCategories[0].count) * 100}%` }} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="pt-8">

@@ -18,6 +18,7 @@ const SalesHistory = () => {
     const [filterPeriod, setFilterPeriod] = useState('all'); // day, week, month, all
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [filterMethod, setFilterMethod] = useState('all'); // Contado, Crédito, all
+    const [creditStatus, setCreditStatus] = useState('all'); // pending, paid, all
 
     // Server-side Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -60,7 +61,7 @@ const SalesHistory = () => {
     // Fetch sales with server-side pagination and filtering
     useEffect(() => {
         fetchSales();
-    }, [currentPage, filterPeriod, filterMethod, selectedDate, debouncedSearch]);
+    }, [currentPage, filterPeriod, filterMethod, creditStatus, selectedDate, debouncedSearch]);
 
     const buildDateRange = () => {
         let startDate = new Date(selectedDate);
@@ -109,6 +110,11 @@ const SalesHistory = () => {
             // Apply payment method filter
             if (filterMethod !== 'all') {
                 query = query.eq('payment_method', filterMethod);
+                
+                // If filtering by Credit, we can also filter by payment status
+                if (filterMethod === 'Crédito' && creditStatus !== 'all') {
+                    query = query.eq('is_paid', creditStatus === 'paid');
+                }
             }
 
             // Get paginated data
@@ -261,13 +267,18 @@ const SalesHistory = () => {
         }
 
         try {
+            const paymentDate = new Date(paymentForm.date);
+            const now = new Date();
+            paymentDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+            const isoTimestamp = paymentDate.toISOString();
+
             const { error } = await supabase
                 .from('payments')
                 .insert([{
                     sale_id: selectedSale.id,
                     amount: Number(paymentForm.amount),
                     notes: paymentForm.notes,
-                    created_at: new Date(paymentForm.date).toISOString()
+                    created_at: isoTimestamp
                 }]);
 
             if (error) throw error;
@@ -398,17 +409,46 @@ const SalesHistory = () => {
 
                         <div className="flex flex-wrap items-center gap-2 md:gap-4 border-t border-primary/5 pt-4 md:pt-6">
                             <span className="text-[9px] md:text-[10px] uppercase font-black text-primary/20 tracking-widest mr-1 md:mr-2">Método:</span>
-                            {['all', 'Contado', 'Crédito'].map(m => (
-                                <button
-                                    key={m}
-                                    onClick={() => setFilterMethod(m)}
-                                    className={`px-4 md:px-6 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-wider md:tracking-widest border transition-all ${filterMethod === m
-                                        ? 'bg-primary/5 border-primary text-primary'
-                                        : 'border-primary/5 text-primary/40 hover:border-primary/20'}`}
-                                >
-                                    {m === 'all' ? 'Todos' : m}
-                                </button>
-                            ))}
+                            <div className="flex flex-wrap gap-2">
+                                {['all', 'Contado', 'Crédito'].map(m => (
+                                    <button
+                                        key={m}
+                                        onClick={() => {
+                                            setFilterMethod(m);
+                                            setCurrentPage(1);
+                                        }}
+                                        className={`px-4 md:px-6 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-wider md:tracking-widest border transition-all ${filterMethod === m
+                                            ? 'bg-primary/5 border-primary text-primary'
+                                            : 'border-primary/5 text-primary/40 hover:border-primary/20'}`}
+                                    >
+                                        {m === 'all' ? 'Todos' : m}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {filterMethod === 'Crédito' && (
+                                <div className="flex items-center gap-2 pl-4 border-l border-primary/10 ml-2">
+                                    <span className="text-[8px] uppercase font-black text-primary/20 tracking-widest mr-2">Estado:</span>
+                                    {[
+                                        { id: 'all', label: 'Todos' },
+                                        { id: 'pending', label: 'Pendientes' },
+                                        { id: 'paid', label: 'Cancelados' }
+                                    ].map(s => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => {
+                                                setCreditStatus(s.id);
+                                                setCurrentPage(1);
+                                            }}
+                                            className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${creditStatus === s.id
+                                                ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
+                                                : 'text-primary/40 hover:text-primary bg-primary/5'}`}
+                                        >
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 

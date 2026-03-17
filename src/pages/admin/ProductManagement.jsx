@@ -7,6 +7,7 @@ import SecurityModal from '../../components/admin/SecurityModal';
 import Pagination from '../../components/admin/Pagination';
 import { useToast } from '../../context/ToastContext';
 import { uploadAndOptimize } from '../../utils/image';
+import BarcodeScanner from '../../components/admin/BarcodeScanner';
 
 const StepperInput = ({ label, value, onChange, min = 0, step = 1, prefix = '' }) => (
     <div className="space-y-2">
@@ -57,6 +58,7 @@ const ProductManagement = () => {
     const [newCategoryImage, setNewCategoryImage] = useState('');
     const [editingCategory, setEditingCategory] = useState(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -67,6 +69,7 @@ const ProductManagement = () => {
     const [securityAction, setSecurityAction] = useState(null); // { type, id, data }
 
     const [form, setForm] = useState({
+        sku: '',
         name: '', description: '', price: 0, cost: 0, stock: 0, category_id: '', image_url: '', hover_image_url: '',
         is_new_arrival: false, is_gift_option: false, is_coming_soon: false,
         variants: []
@@ -96,17 +99,46 @@ const ProductManagement = () => {
     const handleOpenModal = (prod = null) => {
         if (prod) {
             setEditingProduct(prod);
-            setForm({ ...prod });
+            setForm({
+                sku: prod.sku || '',
+                name: prod.name || '',
+                description: prod.description || '',
+                price: prod.price || 0,
+                cost: prod.cost || 0,
+                stock: prod.stock || 0,
+                category_id: prod.category_id || '',
+                image_url: prod.image_url || '',
+                hover_image_url: prod.hover_image_url || '',
+                is_new_arrival: prod.is_new_arrival || false,
+                is_gift_option: prod.is_gift_option || false,
+                is_coming_soon: prod.is_coming_soon || false,
+                variants: prod.variants || []
+            });
         } else {
             setEditingProduct(null);
             setForm({
-                name: '', description: '', price: 0, cost: 0, stock: 0,
-                category_id: categories[0]?.id || '', image_url: '',
+                sku: '',
+                name: '', description: '', price: 0, cost: 0, stock: 0, category_id: '', image_url: '', hover_image_url: '',
                 is_new_arrival: false, is_gift_option: false, is_coming_soon: false,
                 variants: []
             });
         }
         setIsModalOpen(true);
+    };
+
+    const handleBarcodeScan = (code) => {
+        setIsScannerOpen(false);
+        // Check if product with this SKU exists
+        const existingProduct = products.find(p => p.sku === code);
+        if (existingProduct) {
+            handleOpenModal(existingProduct);
+            addToast(`Producto encontrado: ${existingProduct.name}`, 'success');
+        } else {
+            // New product, open modal and fill SKU
+            handleOpenModal();
+            setForm(prev => ({ ...prev, sku: code }));
+            addToast(`Nuevo código detectado: ${code}`, 'info');
+        }
     };
 
     const handleCreateCategory = async () => {
@@ -333,15 +365,33 @@ const ProductManagement = () => {
                 {/* Product List Panel */}
                 <div className="lg:col-span-2 space-y-8">
                     {/* Search Bar */}
-                    <div className="relative group">
-                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-primary/20 w-5 h-5 group-focus-within:text-primary transition-colors" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre o categoría..."
-                            className="w-full bg-white border border-primary/5 rounded-[2rem] py-6 pl-16 pr-8 focus:ring-1 focus:ring-primary outline-none shadow-sm font-medium transition-all"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="flex flex-wrap items-center gap-4 bg-white p-5 rounded-[2.5rem] border border-primary/5 shadow-sm">
+                        <button
+                            onClick={() => handleOpenModal()}
+                            className="flex-1 lg:flex-none flex items-center justify-center gap-3 bg-primary text-secondary-light px-8 py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-primary/20 active:scale-95 group"
+                        >
+                            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                            <span>Añadir Tesoro</span>
+                        </button>
+
+                        <button
+                            onClick={() => setIsScannerOpen(true)}
+                            className="flex-1 lg:flex-none flex items-center justify-center gap-3 bg-gold text-primary px-8 py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-gold-light transition-all shadow-xl shadow-gold/20 active:scale-95 group"
+                        >
+                            <Package2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            <span>Escanear</span>
+                        </button>
+
+                        <div className="flex-1 min-w-[280px] relative group">
+                            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/20 group-focus-within:text-primary transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Buscar en el catálogo secreto..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full bg-primary/5 border-none pl-14 pr-6 py-4 rounded-2xl text-sm font-bold text-primary focus:ring-2 ring-primary/10 transition-all placeholder:text-primary/10"
+                            />
+                        </div>
                     </div>
 
                     <div className="bg-white/40 rounded-[3rem] p-4 md:p-8 shadow-sm border border-primary/5 min-h-[600px] max-h-[800px] overflow-y-auto no-scrollbar space-y-4">
@@ -487,7 +537,7 @@ const ProductManagement = () => {
                 {isModalOpen && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-4xl rounded-[4rem] p-10 md:p-14 relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10">
+                        <motion.div initial={{ scale: 0.9, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-4xl rounded-[4rem] p-10 md:p-14 relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10">
                             <div className="flex justify-between items-center mb-10">
                                 <div className="space-y-1">
                                     <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-primary">{editingProduct ? 'Perfil de Producto' : 'Nueva Referencia'}</h2>
@@ -525,35 +575,69 @@ const ProductManagement = () => {
                                     </div>
                                 </div>
 
-                                <div className="md:col-span-1 space-y-8">
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Nombre Comercial</label>
-                                        <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full bg-white border border-primary/10 rounded-2xl py-5 px-8 outline-none transition-all shadow-sm font-serif italic text-xl text-primary focus:border-primary" />
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Segmento / Categoría</label>
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex-1 relative">
-                                                <select
-                                                    value={form.category_id}
-                                                    onChange={e => setForm({ ...form, category_id: e.target.value })}
-                                                    className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 font-bold text-primary outline-none focus:border-primary appearance-none cursor-pointer shadow-sm"
+                                <div className="md:col-span-1 space-y-6">
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-primary/40 flex items-center gap-2 mb-4">
+                                        <Package2 className="w-4 h-4" /> Especificaciones de Lujo
+                                    </h3>
+                                    
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Código SKU / Barra</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={form.sku}
+                                                    onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                                                    placeholder="CÓDIGO ÚNICO"
+                                                    className="flex-1 bg-white border border-primary/10 p-4 rounded-2xl text-sm font-bold text-primary focus:ring-2 ring-primary/10 outline-none shadow-sm"
+                                                />
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setIsScannerOpen(true)}
+                                                    className="p-4 bg-gold text-primary rounded-2xl hover:bg-gold-light transition-colors shadow-lg shadow-gold/10"
                                                 >
-                                                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                                                </select>
-                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-20">
-                                                    <ChevronDown className="w-4 h-4" />
-                                                </div>
+                                                    <Camera className="w-5 h-5" />
+                                                </button>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsCategoryModalOpen(true)}
-                                                className="w-14 h-14 bg-primary text-secondary rounded-2xl flex items-center justify-center shrink-0 shadow-lg hover:scale-105 transition-all"
-                                                title="Nueva Categoría"
-                                            >
-                                                <Plus className="w-7 h-7" />
-                                            </button>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Nombre Comercial</label>
+                                            <input
+                                                type="text"
+                                                value={form.name}
+                                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                                className="w-full bg-white border border-primary/10 p-4 rounded-2xl text-sm font-bold text-primary focus:ring-2 ring-primary/10 outline-none shadow-sm"
+                                                placeholder="Ej: Aroma de Verano"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] uppercase tracking-widest text-primary/40 font-black ml-1">Segmento / Categoría</label>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-1 relative">
+                                                    <select
+                                                        value={form.category_id}
+                                                        onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                                                        className="w-full bg-white border border-primary/10 p-4 rounded-2xl text-sm font-bold text-primary focus:ring-2 ring-primary/10 outline-none appearance-none cursor-pointer shadow-sm"
+                                                        required
+                                                    >
+                                                        <option value="">Colección</option>
+                                                        {categories.map(cat => (
+                                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/20 pointer-events-none" />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsCategoryModalOpen(true)}
+                                                    className="w-14 h-14 bg-primary text-secondary rounded-2xl flex items-center justify-center shrink-0 shadow-lg hover:scale-105 transition-all outline-none"
+                                                >
+                                                    <Plus className="w-7 h-7" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -716,6 +800,15 @@ const ProductManagement = () => {
                             </div>
                         </motion.div>
                     </div>
+                )}
+            </AnimatePresence>
+            {/* Barcode Scanner Overlay */}
+            <AnimatePresence>
+                {isScannerOpen && (
+                    <BarcodeScanner 
+                        onScan={handleBarcodeScan}
+                        onClose={() => setIsScannerOpen(false)}
+                    />
                 )}
             </AnimatePresence>
         </div>

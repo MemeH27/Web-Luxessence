@@ -25,6 +25,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from './lib/supabase';
 import { ADMIN_EMAIL } from './lib/constants';
 import UpdatePrompt from './components/UpdatePrompt';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { UpdateProvider } from './context/UpdateContext';
 
 // High-end Auth Guard (Supabase Session based with Admin Role verification)
@@ -77,6 +78,7 @@ function App() {
         <ToastProvider>
           <CartProvider>
             <UpdatePrompt />
+            <PWAInstallPrompt />
             <Routes>
               {/* Storefront Routes */}
               <Route path="/" element={<Layout><Home /></Layout>} />
