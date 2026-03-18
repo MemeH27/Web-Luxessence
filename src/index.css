@@ -159,8 +159,17 @@ input[type="number"] {
 }
 
 /* Auth Modal responsive fixes */
-body.auth-open .bottom-nav-container {
+body.auth-open #bottom-nav-container {
   display: none !important;
+}
+
+/* Ensure fixed elements on mobile behave consistently */
+#bottom-nav-container {
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  will-change: bottom, transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .text-gold-shimmer {

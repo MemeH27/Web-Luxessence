@@ -17,28 +17,22 @@ const BottomNav = () => {
         window.addEventListener('auth-modal-change', handleAuthChange);
         setIsAuthOpen(document.body.classList.contains('auth-open'));
 
-        const checkFooterOverlap = () => {
-            if (window.innerWidth >= 768) return;
-            const navElement = document.getElementById('bottom-nav-container');
-            const footerElement = document.getElementById('site-footer');
-            if (!navElement || !footerElement) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                setIsOverDark(entry.isIntersecting);
+            },
+            {
+                threshold: 0,
+                rootMargin: `0px 0px -${86}px 0px` // 86 is the height of nav
+            }
+        );
 
-            const navRect = navElement.getBoundingClientRect();
-            const footerRect = footerElement.getBoundingClientRect();
-
-            const isOverlapping = navRect.bottom > footerRect.top && navRect.top < footerRect.bottom;
-            setIsOverDark(isOverlapping);
-        };
-
-        window.addEventListener('scroll', checkFooterOverlap);
-        window.addEventListener('resize', checkFooterOverlap);
-        const timeout = setTimeout(checkFooterOverlap, 300);
+        const footerElement = document.getElementById('site-footer');
+        if (footerElement) observer.observe(footerElement);
 
         return () => {
             window.removeEventListener('auth-modal-change', handleAuthChange);
-            window.removeEventListener('scroll', checkFooterOverlap);
-            window.removeEventListener('resize', checkFooterOverlap);
-            clearTimeout(timeout);
+            if (footerElement) observer.unobserve(footerElement);
         };
     }, [location.pathname]);
 
@@ -62,7 +56,15 @@ const BottomNav = () => {
     const navActiveBg = isOverDark ? 'bg-white/10' : 'bg-primary/5';
 
     return (
-        <div id="bottom-nav-container" className="md:hidden fixed bottom-10 left-0 right-0 z-[200] flex justify-center px-4 pointer-events-none transition-transform duration-500">
+        <div 
+            id="bottom-nav-container" 
+            className="md:hidden fixed left-0 right-0 z-[200] flex justify-center px-4 pointer-events-none"
+            style={{ 
+                bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+                WebkitTransform: 'translate3d(0,0,0)',
+                transform: 'translate3d(0,0,0)'
+            }}
+        >
             <motion.div
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
