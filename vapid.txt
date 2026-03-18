@@ -1,0 +1,6 @@
+@supabase_supabase-js.js?v=2c9bf59d:11339  POST https://vixjdwwihxvaobvpfych.supabase.co/rest/v1/customers?on_conflict=phone&select=* 403 (Forbidden)
+(anonymous) @ @supabase_supabase-js.js?v=2c9bf59d:11339
+(anonymous) @ @supabase_supabase-js.js?v=2c9bf59d:11353
+await in (anonymous)
+then @ @supabase_supabase-js.js?v=2c9bf59d:310Understand this error
+Cart.jsx:289 {code: '42501', details: null, hint: null, message: 'new row violates row-level security policy (USING expression) for table "customers"'}{"publicKey":"BLc5wkJ8of9NaFV6m2Yrv8F77rYKvx-R3jqYsKHmoFtegf-j3Gcwikdsw51oaTxXonF2-5OSu-GKhXl4tFXllYk","privateKey":"b2iT5IKS65Y7dxxec057TrZBFATFqe_9Z8NY2GzRJks"}

@@ -248,6 +248,16 @@ const Cart = () => {
                 throw new Error(result.error || 'Error al procesar inventario');
             }
 
+            // 🔔 TRIGGER PUSH NOTIFICATION FOR NEW ORDER
+            supabase.functions.invoke('notify-admins', {
+                body: {
+                    title: '¡Nuevo Pedido! 🎉',
+                    body: `${formData.first_name} ${formData.last_name} realizó un pedido por L. ${finalTotal.toFixed(2)}`,
+                    url: '/admin/orders',
+                    target_role: 'admin'
+                }
+            }).catch(err => console.error('Error invoking notify-admins:', err));
+
             addToast('Pedido registrado con éxito');
 
             // 3. WhatsApp Redirect

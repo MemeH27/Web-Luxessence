@@ -65,6 +65,71 @@ const AdminLayout = () => {
         };
     }, [resetSessionTimer]);
 
+    // Background tasks (Low stock & Expiring Invoices)
+    useEffect(() => {
+        const runBackgroundChecks = async () => {
+            try {
+                const LAST_CHECK_KEY = 'lux_last_notification_check';
+                const lastCheck = localStorage.getItem(LAST_CHECK_KEY);
+                const now = Date.now();
+                // Check once every 24 hours
+                if (lastCheck && now - parseInt(lastCheck) < 24 * 60 * 60 * 1000) {
+                    return;
+                }
+
+                // 1. Check Low Stock (< 5)
+                const { data: lowStockProducts, error: stockError } = await supabase
+                    .from('products')
+                    .select('name, stock')
+                    .limit(5)
+                    .lt('stock', 5);
+
+                if (!stockError && lowStockProducts && lowStockProducts.length > 0) {
+                    await supabase.functions.invoke('notify-admins', {
+                        body: {
+                            title: 'Stock Bajo 📦',
+                            body: `${lowStockProducts.length} productos tienen menos de 5 unidades. (Ej: ${lowStockProducts[0].name})`,
+                            url: '/admin/inventory',
+                            target_role: 'admin'
+                        }
+                    });
+                }
+
+                // 2. Check Pending Invoices near due date (approx 30 days old)
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                const twentyFiveDaysAgo = new Date();
+                twentyFiveDaysAgo.setDate(twentyFiveDaysAgo.getDate() - 25);
+
+                const { data: expiringInvoices, error: invoiceError } = await supabase
+                    .from('sales')
+                    .select('id, total, customers(first_name, last_name)')
+                    .eq('payment_method', 'Crédito')
+                    .eq('is_paid', false)
+                    .lte('created_at', twentyFiveDaysAgo.toISOString())
+                    .gte('created_at', thirtyDaysAgo.toISOString())
+                    .limit(3);
+
+                if (!invoiceError && expiringInvoices && expiringInvoices.length > 0) {
+                    await supabase.functions.invoke('notify-admins', {
+                        body: {
+                            title: 'Facturas por vencer ⏳',
+                            body: `${expiringInvoices.length} factura(s) de crédito están a punto de cumplir 30 días sin cancelar.`,
+                            url: '/admin/sales',
+                            target_role: 'admin'
+                        }
+                    });
+                }
+
+                localStorage.setItem(LAST_CHECK_KEY, now.toString());
+            } catch (err) {
+                console.error("Error en revision de notificaciones de fondo:", err);
+            }
+        };
+
+        runBackgroundChecks();
+    }, []);
+
     const handleLogout = async () => {
         localStorage.removeItem('lux_auth');
         localStorage.removeItem('lux_last_activity');

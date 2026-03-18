@@ -24,7 +24,7 @@ export const usePushNotifications = () => {
     const [loading, setLoading] = useState(false);
 
     // ⚠️ REEMPLAZA ESTA CADENA POR TU LLAVE PÚBLICA (USANDO npx web-push generate-vapid-keys)
-    const PUBLIC_VAPID_KEY = 'BPbA-9HbvNPwc6sIlvusgNoTaKOPycFFO3EjksfoYhEt_s1ReSkU0L0og48uX8ztUeuHk0GMWQ6vZzDWQ3c3Sq4'; 
+    const PUBLIC_VAPID_KEY = 'BLc5wkJ8of9NaFV6m2Yrv8F77rYKvx-R3jqYsKHmoFtegf-j3Gcwikdsw51oaTxXonF2-5OSu-GKhXl4tFXllYk'; 
 
     useEffect(() => {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -58,6 +58,13 @@ export const usePushNotifications = () => {
             }
 
             const registration = await navigator.serviceWorker.ready;
+
+            // PREVENT InvalidAccessError by clearing old invalid subscriptions first
+            const existingSubscription = await registration.pushManager.getSubscription();
+            if (existingSubscription) {
+                await existingSubscription.unsubscribe();
+            }
+
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
@@ -78,7 +85,17 @@ export const usePushNotifications = () => {
             if (error) throw error;
 
             setIsSubscribed(true);
-            addToast('¡Alertas LuxOS activadas! 🎉Recibirás noticias exclusivas.', 'success');
+            addToast('¡Alertas LuxOS activadas! 🎉 Recibirás noticias exclusivas.', 'success');
+
+            // Disparar test de notificacion inmediatamente a todos los suscritos (incluyendote recien)
+            await supabase.functions.invoke('notify-admins', {
+                body: {
+                    title: '¡Push Configurado! ✅',
+                    body: 'Tus alertas en tiempo real de LuxOS están activas. Recibirás pedidos y alertas de stock aquí.',
+                    url: '/admin/dashboard',
+                    target_role: 'admin'
+                }
+            }).catch(console.error);
         } catch (error) {
             console.error('Subscription error:', error);
             addToast(error.name === 'InvalidCharacterError' ? 'La llave VAPID configurada no es válida (Base64).' : error.message, 'error');

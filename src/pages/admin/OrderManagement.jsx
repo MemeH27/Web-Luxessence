@@ -76,25 +76,30 @@ const OrderManagement = () => {
             const orderToDelete = orders.find(o => o.id === id);
             if (!orderToDelete) return;
 
-            if (orderToDelete.status === 'processed') {
-                // Processed order: restock ONCE here, then delete linked sale and payments
-                for (const item of orderToDelete.items) {
-                    const baseId = item.id || item.product_id;
-                    const { data: prod } = await supabase.from('products').select('stock, variants').eq('id', baseId).single();
-                    if (prod) {
-                        const revertQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
+            // Step 1: ALWAYS restore stock because it was deducted during checkout via process_order_v2
+            for (const item of orderToDelete.items) {
+                // Ignore promo or metadata items that don't have stock
+                if (item.is_promo_metadata || item.is_gift_metadata) continue;
 
-                        if (item.is_variant && item.variant_id) {
-                            const updatedVariants = prod.variants.map(v =>
-                                v.id === item.variant_id ? { ...v, stock: v.stock + item.quantity } : v
-                            );
-                            const newTotalStock = updatedVariants.reduce((acc, v) => acc + v.stock, 0);
-                            await supabase.from('products').update({ stock: newTotalStock, variants: updatedVariants }).eq('id', baseId);
-                        } else {
-                            await supabase.from('products').update({ stock: prod.stock + revertQty }).eq('id', baseId);
-                        }
+                const baseId = item.id || item.product_id;
+                const { data: prod } = await supabase.from('products').select('stock, variants').eq('id', baseId).single();
+                
+                if (prod) {
+                    const revertQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
+
+                    if (item.is_variant && item.variant_id) {
+                        const updatedVariants = (prod.variants || []).map(v =>
+                            v.id === item.variant_id ? { ...v, stock: v.stock + item.quantity } : v
+                        );
+                        const newTotalStock = updatedVariants.reduce((acc, v) => acc + v.stock, 0);
+                        await supabase.from('products').update({ stock: newTotalStock, variants: updatedVariants }).eq('id', baseId);
+                    } else {
+                        await supabase.from('products').update({ stock: prod.stock + revertQty }).eq('id', baseId);
                     }
                 }
+            }
+
+            if (orderToDelete.status === 'processed') {
                 // Delete linked payments first (FK constraint)
                 const { data: linkedSale } = await supabase.from('sales').select('id').eq('order_id', id).single();
                 if (linkedSale) {
