@@ -639,31 +639,33 @@ const SalesHistory = () => {
                 )}
 
                 {isInvoiceOpen && selectedSale && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center md:p-6">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsInvoiceOpen(false)} className="absolute inset-0 bg-primary/20 backdrop-blur-sm" />
-                        <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="relative bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                            <div className="p-6 pt-safe border-b border-primary/5 flex justify-between items-center bg-primary/5">
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40">Factura Digital</p>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => shareInvoicePNG(invoiceRef.current, selectedSale)}
-                                        className="p-3 bg-white hover:bg-green-500 hover:text-white rounded-xl transition-all shadow-sm text-primary"
-                                        title="Enviar por WhatsApp/Compartir"
-                                    >
-                                        <Share2 className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => downloadInvoicePNG(invoiceRef.current, selectedSale)}
-                                        className="p-3 bg-white hover:bg-blue-500 hover:text-white rounded-xl transition-all shadow-sm text-primary"
-                                        title="Descargar Foto"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={handlePrint} className="p-3 bg-white hover:bg-primary hover:text-white rounded-xl transition-all shadow-sm text-primary" title="Imprimir"><Printer className="w-4 h-4" /></button>
+                        <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="relative bg-white md:rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-full md:h-auto md:max-h-[90vh]">
+                            <div className="p-6 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-6 border-b border-primary/5 flex justify-between items-center bg-primary/5">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 hidden sm:block">Factura Digital</p>
+                                <div className="flex gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => shareInvoicePNG(invoiceRef.current, selectedSale)}
+                                            className="p-3 bg-white hover:bg-green-500 hover:text-white rounded-xl transition-all shadow-sm text-primary"
+                                            title="Enviar por WhatsApp/Compartir"
+                                        >
+                                            <Share2 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => downloadInvoicePNG(invoiceRef.current, selectedSale)}
+                                            className="p-3 bg-white hover:bg-blue-500 hover:text-white rounded-xl transition-all shadow-sm text-primary"
+                                            title="Descargar Foto"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={handlePrint} className="p-3 bg-white hover:bg-primary hover:text-white rounded-xl transition-all shadow-sm text-primary" title="Imprimir"><Printer className="w-4 h-4" /></button>
+                                    </div>
                                     <button onClick={() => setIsInvoiceOpen(false)} className="p-3 bg-white hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm text-primary" title="Cerrar"><X className="w-4 h-4" /></button>
                                 </div>
                             </div>
-                            <div className="flex-1 overflow-y-auto no-scrollbar">
+                            <div className="flex-1 overflow-y-auto no-scrollbar pb-safe">
                                 <InvoiceTemplate ref={invoiceRef} saleData={selectedSale} />
                             </div>
                         </motion.div>
@@ -673,8 +675,8 @@ const SalesHistory = () => {
                 {isProfitOpen && selectedSale && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 text-luxury-black">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsProfitOpen(false)} className="absolute inset-0 bg-primary/20 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                            <div className="p-10 space-y-8 flex-1 overflow-y-auto custom-scrollbar pt-safe">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white md:rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-full md:h-auto md:max-h-[90vh]">
+                            <div className="p-10 space-y-8 flex-1 overflow-y-auto custom-scrollbar pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-10">
                                 <div className="space-y-1">
                                     <h3 className="text-3xl font-serif font-bold italic text-primary">Análisis de Rentabilidad</h3>
                                     <div className="flex justify-between items-center">

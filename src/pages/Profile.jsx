@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, UserCircle, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown, Award, LogOut, Sparkles, Star, Gift, LayoutDashboard, RefreshCw, CheckCircle2, PartyPopper } from 'lucide-react';
+import { User, UserCircle, Mail, Phone, MapPin, Save, ShieldCheck, Clock, Package, ChevronUp, ChevronDown, Award, LogOut, Sparkles, Star, Gift, LayoutDashboard, RefreshCw, CheckCircle2, PartyPopper, Bell, BellOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Link } from 'react-router-dom';
 import { ADMIN_EMAIL } from '../lib/constants';
@@ -10,6 +10,7 @@ import { useUpdate } from '../context/UpdateContext';
 import { APP_VERSION } from '../lib/version';
 import OrderTracker from '../components/profile/OrderTracker';
 import AnimatedIcon from '../components/profile/AnimatedIcon';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const Profile = () => {
     const { addToast } = useToast();
@@ -29,6 +30,8 @@ const Profile = () => {
     });
     const [loyaltyStamps, setLoyaltyStamps] = useState(0);
     const [showFullHistory, setShowFullHistory] = useState(false);
+    const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
+    const { isSubscribed, subscribe, unsubscribe, loading: pushLoading } = usePushNotifications();
 
     useEffect(() => {
         fetchProfile();
@@ -317,6 +320,18 @@ const Profile = () => {
                         </Link>
                     )}
                     <button
+                        onClick={() => setIsNotifyModalOpen(true)}
+                        className={`w-14 h-14 rounded-[1.25rem] flex items-center justify-center transition-all shadow-xl active:scale-95 relative group ${isSubscribed ? 'bg-green-500/10 border border-green-500/20' : 'bg-primary'}`}
+                    >
+                        <Bell className={`w-6 h-6 ${isSubscribed ? 'text-green-600' : 'text-secondary-light'}`} />
+                        {isSubscribed && (
+                            <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+                        )}
+                        <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-secondary text-secondary-light text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                            Alertas Lux
+                        </div>
+                    </button>
+                    <button
                         onClick={handleLogout}
                         className="flex-1 relative overflow-hidden group flex items-center justify-center gap-2 bg-white/70 backdrop-blur-xl border border-primary/10 text-primary py-3.5 px-2 rounded-[1.25rem] text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_10px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.06)] hover:bg-white hover:border-primary/20 hover:-translate-y-0.5 active:translate-y-0"
                     >
@@ -324,15 +339,7 @@ const Profile = () => {
                         <LogOut className="w-4 h-4 text-primary/40 group-hover:text-primary transition-colors relative z-10" />
                         <span className="relative z-10 leading-none mt-0.5">Cerrar Sesión</span>
                     </button>
-                    {/*
-                    <button
-                        onClick={requestNotifications}
-                        className="flex-1 relative overflow-hidden group flex items-center justify-center gap-2 bg-secondary text-primary py-3.5 px-2 rounded-[1.25rem] text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all shadow-xl hover:shadow-secondary/20 hover:-translate-y-0.5 active:translate-y-0"
-                    >
-                        <ShieldCheck className="w-4 h-4 active:rotate-12 transition-transform relative z-10" />
-                        <span className="relative z-10 leading-none mt-0.5">Alertas Lux</span>
-                    </button>
-                    */}
+
                 </div>
             </header>
 
@@ -467,7 +474,9 @@ const Profile = () => {
                     </form>
 
                     {/* Loyalty Card */}
-                    <div className="glass-panel p-10 rounded-[3rem] space-y-8 bg-gradient-to-br from-primary to-primary-light text-secondary-light relative overflow-hidden shadow-2xl">
+                    <div className="p-10 rounded-[3rem] space-y-8 bg-gradient-to-br from-[#711116] via-[#8B151C] to-[#4A0B0E] text-secondary-light relative overflow-hidden shadow-[0_40px_80px_-15px_rgba(113,17,22,0.4)] border border-white/10">
+                        <div className="absolute inset-0 bg-[url('/img/pattern.png')] opacity-10 mix-blend-overlay" />
+
                         <div className="relative z-10 flex flex-col xl:flex-row gap-6 items-center xl:items-start justify-between text-center xl:text-left">
                             <div className="flex flex-col items-center xl:items-start space-y-3 xl:space-y-1">
                                 <div className="flex flex-col xl:flex-row items-center gap-3 xl:gap-4">
@@ -667,8 +676,82 @@ const Profile = () => {
                         <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-primary/[0.02] rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
                         <div className="absolute bottom-0 left-0 w-[40rem] h-[40rem] bg-primary/[0.01] rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
                     </div>
+                    {/* Notifications section now in Modal */}
                 </div>
             </div >
+
+            <AnimatePresence>
+                {isNotifyModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsNotifyModalOpen(false)}
+                            className="absolute inset-0 bg-secondary/80 backdrop-blur-md"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white w-full max-w-lg rounded-[3.5rem] p-10 md:p-14 relative overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-primary/10"
+                        >
+                            <div className="relative z-10 flex flex-col items-center text-center space-y-8">
+                                <div className={`w-24 h-24 rounded-3xl flex items-center justify-center transition-all duration-700 shadow-2xl ${isSubscribed ? 'bg-green-500/10' : 'bg-primary/10'}`}>
+                                    <Bell className={`w-12 h-12 ${isSubscribed ? 'text-green-600' : 'text-primary'}`} />
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <h3 className="text-3xl font-serif font-bold italic text-primary leading-tight">Mantenlo Siempre Exclusivo</h3>
+                                    <p className="text-primary/60 text-base leading-relaxed font-medium">
+                                        Recibe antes que nadie notificaciones sobre nuestros nuevos lanzamientos de lujo, ofertas limitadas y noticias de la casa Luxessence.
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-col gap-4 w-full">
+                                    <button
+                                        onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (isSubscribed) await unsubscribe();
+                                            else await subscribe();
+                                        }}
+                                        disabled={pushLoading}
+                                        className={`w-full py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 ${isSubscribed 
+                                            ? 'bg-green-600 text-white hover:bg-green-700 shadow-[0_20px_40px_rgba(22,163,74,0.3)]' 
+                                            : 'bg-primary text-secondary-light shadow-[0_20px_40px_rgba(184,134,11,0.3)]'
+                                        }`}
+                                    >
+                                        {pushLoading ? (
+                                            <RefreshCw className="w-5 h-5 animate-spin" />
+                                        ) : isSubscribed ? (
+                                            <>Desactivar Notificaciones</>
+                                        ) : (
+                                            <>Activar Notificaciones de Lujo</>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setIsNotifyModalOpen(false)}
+                                        className="text-[10px] font-black uppercase tracking-widest text-primary/30 hover:text-primary transition-colors"
+                                    >
+                                        Quizás más tarde
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            <style>{`
+                .glass-panel {
+                    background: rgba(255, 255, 255, 0.7);
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                    border: 1px solid rgba(113, 17, 22, 0.05);
+                }
+            `}</style>
 
             <footer className="pt-12 pb-6 flex flex-col items-center gap-4 border-t border-primary/5">
                 <div className="flex flex-col items-center gap-3">

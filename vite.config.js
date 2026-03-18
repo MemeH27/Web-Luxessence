@@ -7,7 +7,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'prompt',
+      injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'img/*.{png,svg,ico}'],
       workbox: {
         globPatterns: ['**/*.{js,css,html}'],

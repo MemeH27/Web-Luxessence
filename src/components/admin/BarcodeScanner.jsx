@@ -170,7 +170,7 @@ const BarcodeScanner = ({ onScan, onClose }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10000] bg-black flex flex-col pt-safe pb-safe"
+            className="fixed inset-0 z-[10000] bg-black flex flex-col pt-[calc(env(safe-area-inset-top)+1rem)] pb-safe"
         >
             {/* Header */}
             <div className="p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">

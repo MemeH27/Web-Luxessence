@@ -566,7 +566,7 @@ const ProductManagement = () => {
                 {isModalOpen && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-                        <motion.div initial={{ scale: 0.9, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-4xl rounded-[4rem] p-10 md:p-14 pt-safe relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10">
+                        <motion.div initial={{ scale: 0.9, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-4xl rounded-[4rem] p-10 md:p-14 pt-[calc(env(safe-area-inset-top)+1.5rem)] md:pt-14 relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10">
                             <div className="flex justify-between items-center mb-10">
                                 <div className="space-y-1">
                                     <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-primary">{editingProduct ? 'Perfil de Producto' : 'Nueva Referencia'}</h2>

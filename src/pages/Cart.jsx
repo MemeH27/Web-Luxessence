@@ -477,7 +477,7 @@ const Cart = () => {
                 </div>
 
                 {/* Summary & Form */}
-                <div className={`fixed lg:relative lg:col-span-3 inset-x-0 bottom-0 z-[150] lg:z-0 lg:block transition-all duration-700 ${isSummaryExpanded ? 'h-[85vh] lg:h-auto' : 'h-[140px] lg:h-auto'}`}>
+                <div className={`fixed lg:relative lg:col-span-3 inset-x-0 bottom-0 z-[150] lg:z-0 lg:block transition-all duration-300 ease-out ${isSummaryExpanded ? 'h-[85vh] lg:h-auto' : 'h-[140px] lg:h-auto'}`}>
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}

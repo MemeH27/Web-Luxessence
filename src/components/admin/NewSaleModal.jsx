@@ -474,7 +474,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                 <div className="relative bg-white w-full max-w-6xl h-[100dvh] md:h-[90vh] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
                     {/* Header (Compact) */}
-                    <div className="bg-primary text-secondary-light px-6 py-4 pt-safe flex justify-between items-center shrink-0">
+                    <div className="bg-primary text-secondary-light px-6 py-4 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-4 flex justify-between items-center shrink-0">
                         <div>
                             <h2 className="text-xl font-serif font-bold italic h-6">Nueva Venta</h2>
                             <p className="text-xs opacity-70">Terminal Luxessence</p>

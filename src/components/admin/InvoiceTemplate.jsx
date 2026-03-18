@@ -75,7 +75,7 @@ const InvoiceContent = ({ sale, customer, items, payments, totalPaid, balanceDue
                         {items.filter(i => !i.is_promo_metadata).length} {items.filter(i => !i.is_promo_metadata).length === 1 ? 'Artículo' : 'Artículos'}
                     </p>
                 </div>
-                <div className="rounded-[2rem] border border-primary/5 bg-gray-50/50 overflow-hidden shadow-sm">
+                <div className={`rounded-[2rem] border border-primary/5 bg-gray-50/50 overflow-hidden ${isExport ? '' : 'shadow-sm'}`}>
                     <table className="w-full text-left">
                         <thead>
                             <tr className={`bg-primary text-white uppercase font-black tracking-[0.2em] ${isExport ? 'text-[10px]' : 'text-[9px] md:text-[10px]'}`}>
@@ -182,7 +182,7 @@ const InvoiceContent = ({ sale, customer, items, payments, totalPaid, balanceDue
                     </div>
 
                     {/* Final Balance/Total Area */}
-                    <div className="relative bg-primary p-5 px-7 rounded-2xl shadow-xl overflow-hidden group">
+                    <div className={`relative bg-primary p-5 px-7 rounded-2xl overflow-hidden group ${isExport ? '' : 'shadow-xl'}`}>
                         <Receipt className="absolute -right-1 -bottom-1 w-16 h-16 text-white/5 rotate-12 transition-transform group-hover:scale-110" />
                         <div className="relative z-10 space-y-0.5">
                             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 whitespace-nowrap">
