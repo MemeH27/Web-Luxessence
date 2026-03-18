@@ -189,7 +189,7 @@ const ProductDetail = () => {
 
     if (loading) {
         return (
-            <div className="pt-40 px-4 max-w-7xl mx-auto flex flex-col md:flex-row gap-12">
+            <div className="pt-40 pt-safe px-4 max-w-7xl mx-auto flex flex-col md:flex-row gap-12">
                 <Skeleton className="w-full md:w-1/2 aspect-square rounded-[3rem]" />
                 <div className="flex-1 space-y-8">
                     <Skeleton className="h-12 w-3/4" />
@@ -206,7 +206,7 @@ const ProductDetail = () => {
     return (
         <>
             <div className="relative">
-                <div className="relative pt-24 pb-12 md:pt-40 md:pb-20 px-4 max-w-7xl mx-auto">
+                <div className="relative pt-24 pb-12 md:pt-40 md:pb-20 px-4 max-w-7xl mx-auto pt-safe">
                     {/* Back Link */}
                     <button
                         onClick={() => navigate('/catalog')}

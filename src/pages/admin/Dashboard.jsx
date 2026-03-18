@@ -35,7 +35,7 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
-            const { data: allProducts } = await supabase.from('products').select('cost, stock, price');
+            const { data: allProducts } = await supabase.from('products').select('id, cost, stock, price');
             const { count: custCount } = await supabase.from('customers').select('*', { count: 'exact', head: true });
             const { count: ordCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
 
@@ -83,7 +83,9 @@ const Dashboard = () => {
                 let saleCost = 0;
                 const items = sale.order_id?.items || [];
                 items.forEach(item => {
-                    saleCost += (item.cost || item.price * 0.6) * item.quantity;
+                    const productRef = allProducts?.find(p => p.id === (item.product_id || item.id));
+                    const cost = item.cost || productRef?.cost || (item.price * 0.6);
+                    saleCost += cost * item.quantity;
                 });
                 totalCost += saleCost;
 

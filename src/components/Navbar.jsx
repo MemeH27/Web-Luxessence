@@ -561,7 +561,7 @@ const Navbar = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[300] bg-primary/40 backdrop-blur-2xl px-4 flex flex-col items-center pt-24"
+                        className="fixed inset-0 z-[300] bg-primary/40 backdrop-blur-2xl px-4 flex flex-col items-center pt-24 pt-safe"
                     >
                         <motion.button
                             initial={{ scale: 0 }}
@@ -572,7 +572,8 @@ const Navbar = () => {
                                 setSearchQuery('');
                                 setSearchResults([]);
                             }}
-                            className="absolute top-10 right-10 p-3 bg-white text-primary rounded-full shadow-2xl z-[310]"
+                            className="absolute right-10 p-3 bg-white text-primary rounded-full shadow-2xl z-[310]"
+                            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 2.5rem)' }}
                         >
                             <X className="w-6 h-6" />
                         </motion.button>
@@ -660,11 +661,12 @@ const Navbar = () => {
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-secondary-light w-full max-w-lg md:max-w-2xl rounded-[3rem] p-8 md:p-16 relative z-10 shadow-3xl border border-primary/10 overflow-hidden"
+                            className="bg-secondary-light w-full max-w-lg md:max-w-2xl rounded-[3rem] p-8 md:p-16 pt-safe relative z-10 shadow-3xl border border-primary/10 overflow-hidden"
                         >
                             <button
                                 onClick={() => setIsAuthOpen(false)}
-                                className="absolute top-6 right-6 p-2 hover:bg-primary/5 rounded-full transition-colors text-primary"
+                                className="absolute right-6 p-2 hover:bg-primary/5 rounded-full transition-all text-primary"
+                                style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}
                             >
                                 <X className="w-6 h-6" />
                             </button>

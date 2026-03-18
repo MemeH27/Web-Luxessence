@@ -9,6 +9,7 @@ CREATE TABLE categories (
 -- 2. Products
 CREATE TABLE products (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  sku TEXT UNIQUE,
   name TEXT NOT NULL,
   description TEXT,
   price DECIMAL(10,2) NOT NULL,
@@ -16,8 +17,11 @@ CREATE TABLE products (
   stock INTEGER DEFAULT 0,
   category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   image_url TEXT,
+  hover_image_url TEXT,
   is_new_arrival BOOLEAN DEFAULT false,
   is_gift_option BOOLEAN DEFAULT false,
+  is_coming_soon BOOLEAN DEFAULT false,
+  variants JSONB DEFAULT '[]'::JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

@@ -152,7 +152,7 @@ const Home = () => {
     return (
         <div className="space-y-12 md:space-y-16 pb-0">
             {/* Cinematic Premium Hero */}
-            <section className="relative h-[85vh] md:h-[90vh] flex justify-center items-center overflow-hidden px-6 md:px-12 pt-24 md:pt-0">
+            <section className="relative h-[85vh] md:h-[90vh] flex justify-center items-center overflow-hidden px-6 md:px-12 pt-24 pt-safe md:pt-0">
                 <motion.div
                     initial={{ scale: 1.1 }}
                     animate={{ scale: 1 }}

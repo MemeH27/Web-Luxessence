@@ -481,7 +481,7 @@ const Cart = () => {
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`glass-card p-6 md:p-10 rounded-t-[3rem] lg:rounded-[4rem] bg-white shadow-2xl border-primary/10 relative overflow-hidden h-full flex flex-col ${isSummaryExpanded ? 'overflow-y-auto' : 'overflow-hidden'}`}
+                        className={`glass-card p-6 md:p-10 rounded-t-[3rem] lg:rounded-[4rem] bg-white shadow-2xl border-primary/10 relative overflow-hidden h-full flex flex-col ${isSummaryExpanded ? 'overflow-y-auto' : 'overflow-hidden'} pb-safe`}
                     >
                         {/* Mobile Toggle Handle */}
                         <div

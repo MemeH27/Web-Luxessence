@@ -113,7 +113,7 @@ function UpdatePrompt() {
                 <div className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full pointer-events-none"
                     style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)', filter: 'blur(20px)' }} />
 
-                <div className="relative z-10 px-7 pt-8 pb-7 flex flex-col items-center text-center">
+                <div className="relative z-10 px-7 pt-8 pb-7 pt-safe pb-safe flex flex-col items-center text-center">
 
                     {/* Icon */}
                     <div

@@ -19,6 +19,7 @@ const SalesHistory = () => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [filterMethod, setFilterMethod] = useState('all'); // Contado, Crédito, all
     const [creditStatus, setCreditStatus] = useState('all'); // pending, paid, all
+    const [allProducts, setAllProducts] = useState([]);
 
     // Server-side Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -58,10 +59,16 @@ const SalesHistory = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Fetch sales with server-side pagination and filtering
+    // Fetch sales and products
     useEffect(() => {
         fetchSales();
+        fetchAllProducts();
     }, [currentPage, filterPeriod, filterMethod, creditStatus, selectedDate, debouncedSearch]);
+
+    const fetchAllProducts = async () => {
+        const { data } = await supabase.from('products').select('id, cost, name, price');
+        setAllProducts(data || []);
+    };
 
     const buildDateRange = () => {
         let startDate = new Date(selectedDate);
@@ -328,9 +335,30 @@ const SalesHistory = () => {
     }, [debouncedSearch, filterPeriod, filterMethod, selectedDate]);
 
     const calculateSaleMetrics = (sale) => {
-        const cost = sale.total_cost || sale.orders?.items?.reduce((acc, item) => acc + ((item.cost || 0) * item.quantity), 0) || 0;
-        const profit = sale.total_profit || (sale.total - cost);
-        return { cost, profit };
+        if (!sale || !sale.orders?.items) return { cost: 0, profit: 0, items: [] };
+
+        const detailedItems = sale.orders.items.map(item => {
+            // Find product in allProducts to get current cost if not in item
+            const productRef = allProducts.find(p => p.id === (item.product_id || item.id));
+            const cost = item.cost || productRef?.cost || 0;
+            const itemTotalCost = cost * item.quantity;
+            const itemTotalRevenue = item.price * item.quantity;
+            const itemProfit = itemTotalRevenue - itemTotalCost;
+
+            return {
+                ...item,
+                cost: cost,
+                totalCost: itemTotalCost,
+                totalRevenue: itemTotalRevenue,
+                profit: itemProfit
+            };
+        });
+
+        const totalCost = detailedItems.reduce((acc, item) => acc + item.totalCost, 0);
+        // Note: profit is based on sale total (which has discount) minus costs
+        const profit = sale.total - totalCost;
+
+        return { cost: totalCost, profit, items: detailedItems };
     };
 
     // For credit sales, pending = total - already paid; for contado unpaid = full total
@@ -573,8 +601,8 @@ const SalesHistory = () => {
                 {isDetailsModalOpen && selectedSale && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsDetailsModalOpen(false)} className="absolute inset-0 bg-primary/20 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl">
-                            <div className="p-10 space-y-8">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                            <div className="p-10 space-y-8 pt-safe">
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
                                         <h3 className="text-3xl font-serif font-bold italic text-primary">Detalle de Productos</h3>
@@ -614,7 +642,7 @@ const SalesHistory = () => {
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsInvoiceOpen(false)} className="absolute inset-0 bg-primary/20 backdrop-blur-sm" />
                         <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="relative bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                            <div className="p-6 border-b border-primary/5 flex justify-between items-center bg-primary/5">
+                            <div className="p-6 pt-safe border-b border-primary/5 flex justify-between items-center bg-primary/5">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40">Factura Digital</p>
                                 <div className="flex gap-2">
                                     <button
@@ -645,34 +673,74 @@ const SalesHistory = () => {
                 {isProfitOpen && selectedSale && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 text-luxury-black">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsProfitOpen(false)} className="absolute inset-0 bg-primary/20 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-[3rem] w-full max-w-md overflow-hidden shadow-2xl">
-                            <div className="p-10 space-y-8">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                            <div className="p-10 space-y-8 flex-1 overflow-y-auto custom-scrollbar pt-safe">
                                 <div className="space-y-1">
-                                    <h3 className="text-2xl font-serif font-bold italic text-primary">Análisis de Rentabilidad</h3>
-                                    <p className="text-[10px] text-primary/30 uppercase font-black">ID: #{selectedSale.id.slice(0, 8)}</p>
+                                    <h3 className="text-3xl font-serif font-bold italic text-primary">Análisis de Rentabilidad</h3>
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-[10px] text-primary/30 uppercase font-black">ID: #{selectedSale.id.slice(0, 8)}</p>
+                                        <p className="text-[10px] text-primary/30 uppercase font-black">{new Date(selectedSale.created_at).toLocaleDateString()}</p>
+                                    </div>
                                 </div>
 
+                                {/* Detailed Breakdown Table */}
                                 <div className="space-y-4">
-                                    <div className="p-6 bg-primary/5 rounded-2xl flex justify-between items-center border border-primary/5">
-                                        <span className="text-xs font-bold text-primary/60 italic">Venta Bruta</span>
-                                        <span className="text-xl font-sans font-black text-primary">L. {selectedSale.total.toLocaleString()}</span>
+                                    <h4 className="text-[10px] font-black uppercase text-primary/40 tracking-widest border-b border-primary/5 pb-2">Desglose por Producto</h4>
+                                    <div className="space-y-3">
+                                        {calculateSaleMetrics(selectedSale).items.map((item, idx) => (
+                                            <div key={idx} className="bg-primary/5 p-4 rounded-2xl border border-primary/5 space-y-3">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <p className="font-bold text-primary text-sm">{item.name}</p>
+                                                        <p className="text-[10px] text-primary/40 uppercase font-black">Cantidad: {item.quantity}</p>
+                                                    </div>
+                                                    <span className={`text-xs font-black px-2 py-1 rounded-lg ${item.profit >= 0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+                                                        Ganancia: L. {item.profit.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-4 border-t border-primary/5 pt-3">
+                                                    <div>
+                                                        <p className="text-[8px] uppercase font-black text-primary/30">Costo Total</p>
+                                                        <p className="text-xs font-bold text-red-500">L. {item.totalCost.toLocaleString()}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[8px] uppercase font-black text-primary/30">Venta Total</p>
+                                                        <p className="text-xs font-bold text-primary">L. {item.totalRevenue.toLocaleString()}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[8px] uppercase font-black text-primary/30">Márgen</p>
+                                                        <p className="text-xs font-bold text-green-600">
+                                                            {item.totalCost > 0 ? (((item.totalRevenue - item.totalCost) / item.totalCost) * 100).toFixed(1) : '100'}%
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <div className="p-6 bg-red-500/5 rounded-2xl flex justify-between items-center border border-red-500/5">
-                                        <span className="text-xs font-bold text-red-500/60 italic">Costo de Mercancía</span>
-                                        <span className="text-xl font-sans font-black text-red-500">L. {calculateSaleMetrics(selectedSale).cost.toLocaleString()}</span>
-                                    </div>
-                                    <div className="p-8 bg-green-500/10 rounded-3xl flex flex-col items-center gap-2 border-2 border-green-500/20 shadow-inner">
-                                        <span className="text-[10px] font-black uppercase text-green-600 tracking-widest">Utilidad Real Generada</span>
-                                        <span className="text-4xl font-sans font-black text-green-600 italic">L. {calculateSaleMetrics(selectedSale).profit.toLocaleString()}</span>
-                                        <span className="text-[8px] text-green-600/40 font-black uppercase">
-                                            +{calculateSaleMetrics(selectedSale).cost > 0
-                                                ? ((calculateSaleMetrics(selectedSale).profit / calculateSaleMetrics(selectedSale).cost) * 100).toFixed(1)
-                                                : '0.0'}% ROI
-                                        </span>
-                                    </div>
+
+                                    {/* Global Discount */}
+                                    {selectedSale.discount > 0 && (
+                                        <div className="bg-orange-500/5 p-4 rounded-2xl border border-orange-500/10 flex justify-between items-center">
+                                            <span className="text-[10px] font-black uppercase text-orange-600">Descuento Global Aplicado</span>
+                                            <span className="text-sm font-bold text-orange-600">- L. {selectedSale.discount.toLocaleString()}</span>
+                                        </div>
+                                    )}
                                 </div>
 
-                                <button onClick={() => setIsProfitOpen(false)} className="w-full btn-primary !py-4">Entendido</button>
+                                {/* Final Summary */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+                                    <div className="p-6 bg-red-500/5 rounded-2xl flex flex-col gap-1 border border-red-500/5">
+                                        <span className="text-[9px] font-black uppercase text-red-500/40">Inversión (Total Costo)</span>
+                                        <span className="text-2xl font-sans font-black text-red-500">L. {calculateSaleMetrics(selectedSale).cost.toLocaleString()}</span>
+                                    </div>
+                                    <div className="p-6 bg-green-500/10 rounded-2xl flex flex-col gap-1 border-2 border-green-500/20 shadow-inner">
+                                        <span className="text-[9px] font-black uppercase text-green-600">Ganancia Total (Utilidad)</span>
+                                        <span className="text-3xl font-sans font-black text-green-600 italic">L. {calculateSaleMetrics(selectedSale).profit.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-8 bg-primary/5 border-t border-primary/5">
+                                <button onClick={() => setIsProfitOpen(false)} className="w-full btn-primary !py-5 uppercase tracking-[0.3em] font-black text-xs">Cerrar Análisis de Rentabilidad</button>
                             </div>
                         </motion.div>
                     </div>
@@ -682,7 +750,7 @@ const SalesHistory = () => {
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 text-luxury-black">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPaymentsModalOpen(false)} className="absolute inset-0 bg-primary/20 backdrop-blur-sm" />
                         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl">
-                            <div className="p-10 space-y-8">
+                            <div className="p-10 space-y-8 pt-safe">
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
                                         <h3 className="text-3xl font-serif font-bold italic text-primary">Control de Cuotas</h3>

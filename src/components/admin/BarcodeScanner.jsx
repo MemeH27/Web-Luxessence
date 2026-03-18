@@ -139,6 +139,32 @@ const BarcodeScanner = ({ onScan, onClose }) => {
         }
     };
 
+    const handleTapToFocus = async (e) => {
+        if (!scanner || !scanner.isScanning) return;
+        
+        try {
+            const track = scanner.getRunningTrack();
+            if (!track) return;
+
+            const capabilities = track.getCapabilities();
+            if (capabilities.focusMode && capabilities.focusMode.includes('manual')) {
+                // Try to focus at the center or near the tap point if possible
+                // Note: Web focuses are often limited, but setting manual might help
+                await track.applyConstraints({
+                    advanced: [{ focusMode: 'manual' }]
+                });
+                // Return to continuous after a delay
+                setTimeout(() => {
+                    track.applyConstraints({
+                        advanced: [{ focusMode: 'continuous' }]
+                    }).catch(() => {});
+                }, 2000);
+            }
+        } catch (err) {
+            console.warn("Tap to focus not supported:", err);
+        }
+    };
+
     return (
         <motion.div 
             initial={{ opacity: 0 }}
@@ -164,7 +190,11 @@ const BarcodeScanner = ({ onScan, onClose }) => {
 
             {/* Scanner Container */}
             <div className="flex-1 relative flex items-center justify-center p-4">
-                <div id="reader" className="w-full max-w-sm rounded-[2rem] overflow-hidden border-2 border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.1)]"></div>
+                <div 
+                    id="reader" 
+                    onClick={handleTapToFocus}
+                    className="w-full max-w-sm rounded-[2rem] overflow-hidden border-2 border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.1)] cursor-crosshair"
+                ></div>
                 
                 {/* Custom Overlay */}
                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">

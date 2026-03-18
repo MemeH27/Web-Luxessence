@@ -128,16 +128,44 @@ const ProductManagement = () => {
 
     const handleBarcodeScan = (code) => {
         setIsScannerOpen(false);
-        // Check if product with this SKU exists
-        const existingProduct = products.find(p => p.sku === code);
+        // Normalize code and search in products
+        const normalizedCode = code.trim();
+        const existingProduct = products.find(p => 
+            p.sku === normalizedCode || 
+            p.variants?.some(v => v.sku === normalizedCode)
+        );
+
         if (existingProduct) {
             handleOpenModal(existingProduct);
             addToast(`Producto encontrado: ${existingProduct.name}`, 'success');
         } else {
-            // New product, open modal and fill SKU
+            // New product or not found, open modal and fill SKU
             handleOpenModal();
-            setForm(prev => ({ ...prev, sku: code }));
-            addToast(`Nuevo código detectado: ${code}`, 'info');
+            setForm(prev => ({ ...prev, sku: normalizedCode }));
+            addToast(`Código detectado: ${normalizedCode}. Puedes darlo de alta ahora.`, 'info');
+        }
+    };
+
+    const handleDeleteCategory = async (id) => {
+        // Check if there are products in this category
+        const productsInCategory = products.filter(p => p.category_id === id);
+        if (productsInCategory.length > 0) {
+            addToast(`No se puede borrar: Hay ${productsInCategory.length} productos en esta categoría.`, 'error');
+            return;
+        }
+
+        if (confirm('¿Estás seguro de que quieres eliminar esta categoría?')) {
+            setLoading(true);
+            try {
+                const { error } = await supabase.from('categories').delete().eq('id', id);
+                if (error) throw error;
+                setCategories(categories.filter(c => c.id !== id));
+                addToast('Categoría eliminada');
+            } catch (err) {
+                addToast('Error al eliminar categoría', 'error');
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -220,7 +248,7 @@ const ProductManagement = () => {
     const addVariant = () => {
         setForm({
             ...form,
-            variants: [...(form.variants || []), { id: crypto.randomUUID(), name: '', stock: 0, image_url: '' }]
+            variants: [...(form.variants || []), { id: crypto.randomUUID(), name: '', sku: '', stock: 0, image_url: '' }]
         });
     };
 
@@ -249,6 +277,7 @@ const ProductManagement = () => {
 
         const payload = {
             ...cleanForm,
+            sku: form.sku?.trim() || null, // Ensure empty SKU is saved as NULL
             price: Number(form.price),
             cost: Number(form.cost),
             stock: totalStock,
@@ -537,7 +566,7 @@ const ProductManagement = () => {
                 {isModalOpen && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-                        <motion.div initial={{ scale: 0.9, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-4xl rounded-[4rem] p-10 md:p-14 relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10">
+                        <motion.div initial={{ scale: 0.9, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-4xl rounded-[4rem] p-10 md:p-14 pt-safe relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar border border-primary/10">
                             <div className="flex justify-between items-center mb-10">
                                 <div className="space-y-1">
                                     <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-primary">{editingProduct ? 'Perfil de Producto' : 'Nueva Referencia'}</h2>
@@ -699,14 +728,25 @@ const ProductManagement = () => {
                                                         onChange={(e) => updateVariant(idx, 'name', e.target.value)}
                                                         className="w-full bg-transparent border-b border-primary/5 focus:border-primary text-sm font-bold outline-none pb-1"
                                                     />
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-primary/20">Stock:</span>
-                                                        <input
-                                                            type="number"
-                                                            value={variant.stock}
-                                                            onChange={(e) => updateVariant(idx, 'stock', Number(e.target.value))}
-                                                            className="w-16 bg-primary/5 rounded px-2 py-1 text-xs font-bold outline-none"
-                                                        />
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-primary/20">SKU:</span>
+                                                            <input
+                                                                placeholder="OPCIONAL"
+                                                                value={variant.sku || ''}
+                                                                onChange={(e) => updateVariant(idx, 'sku', e.target.value)}
+                                                                className="flex-1 bg-primary/5 rounded px-2 py-1 text-xs font-bold outline-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-primary/20">Stock:</span>
+                                                            <input
+                                                                type="number"
+                                                                value={variant.stock}
+                                                                onChange={(e) => updateVariant(idx, 'stock', Number(e.target.value))}
+                                                                className="w-16 bg-primary/5 rounded px-2 py-1 text-xs font-bold outline-none"
+                                                            />
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -744,7 +784,7 @@ const ProductManagement = () => {
                 {isCategoryModalOpen && (
                     <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/40 backdrop-blur-md" onClick={() => { setIsCategoryModalOpen(false); setEditingCategory(null); }} />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-lg rounded-[2.5rem] p-10 relative z-10 shadow-2xl border border-primary/10 max-h-[90vh] overflow-y-auto no-scrollbar">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-secondary-light w-full max-w-lg rounded-[2.5rem] p-10 pt-safe relative z-10 shadow-2xl border border-primary/10 max-h-[90vh] overflow-y-auto no-scrollbar">
                             <h3 className="text-2xl font-serif font-bold italic text-primary mb-8">{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
 
                             <div className="space-y-8">
@@ -790,9 +830,14 @@ const ProductManagement = () => {
                                                     </div>
                                                     <span className="text-xs font-bold text-primary">{cat.name}</span>
                                                 </div>
-                                                <button onClick={() => handleEditCategory(cat)} className="p-2 text-primary/20 hover:text-primary transition-colors">
-                                                    <Edit3 className="w-4 h-4" />
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => handleEditCategory(cat)} className="p-2 text-primary/20 hover:text-primary transition-colors">
+                                                        <Edit3 className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteCategory(cat.id)} className="p-2 text-primary/10 hover:text-red-500 transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>

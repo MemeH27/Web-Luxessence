@@ -520,7 +520,7 @@ const Catalog = () => {
                         {isComboModalOpen && (
                             <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setIsComboModalOpen(false)} />
-                                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white w-full max-w-md rounded-[3rem] p-10 relative z-10 shadow-2xl border border-primary/10">
+                                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white w-full max-w-md rounded-[3rem] p-10 pt-safe relative z-10 shadow-2xl border border-primary/10">
                                     <div className="text-center space-y-4 mb-8">
                                         <h3 className="text-3xl font-serif font-bold italic text-primary">{selectedJibbitz?.name}</h3>
                                         <p className="text-[10px] uppercase font-black tracking-widest text-primary/40">Seleccione combos</p>
@@ -582,7 +582,7 @@ const Catalog = () => {
                                     exit={{ x: '100%' }}
                                     className="bg-white w-full max-w-xs h-[100dvh] relative z-10 shadow-2xl flex flex-col"
                                 >
-                                    <div className="p-6 flex items-center justify-between border-b border-primary/5">
+                                    <div className="p-6 pt-safe flex items-center justify-between border-b border-primary/5">
                                         <h2 className="text-lg font-serif font-black italic text-primary">Filtros</h2>
                                         <button onClick={() => setIsMobileFiltersOpen(false)} className="p-2 bg-primary/5 text-primary rounded-full">
                                             <X className="w-5 h-5" />

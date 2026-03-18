@@ -15,6 +15,7 @@ const AdminLayout = () => {
     const [sessionTimeLeft, setSessionTimeLeft] = useState(null);
     const [showSessionWarning, setShowSessionWarning] = useState(false);
     const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
+    const [isSaleMinimized, setIsSaleMinimized] = useState(false);
     const [isSaleButtonExpanded, setIsSaleButtonExpanded] = useState(false);
 
     // Session timeout management
@@ -109,7 +110,14 @@ const AdminLayout = () => {
 
                 <div className="px-4 mb-10 relative z-10">
                     <button
-                        onClick={() => setIsNewSaleOpen(true)}
+                        onClick={() => {
+                            if (isNewSaleOpen && isSaleMinimized) {
+                                setIsSaleMinimized(false);
+                            } else {
+                                setIsNewSaleOpen(true);
+                                setIsSaleMinimized(false);
+                            }
+                        }}
                         className="w-full bg-secondary hover:bg-white text-primary rounded-[2rem] py-5 px-8 flex items-center justify-between group transition-all duration-500 shadow-[0_20px_40px_rgba(212,175,55,0.2)] hover:shadow-secondary/30"
                     >
                         <div className="flex items-center gap-4">
@@ -215,7 +223,7 @@ const AdminLayout = () => {
                         animate={{ opacity: 1, y: 0 }}
                         className="max-w-7xl mx-auto"
                     >
-                        <Outlet context={{ setIsNewSaleOpen }} />
+                        <Outlet context={{ setIsNewSaleOpen, setIsSaleMinimized }} />
                     </motion.div>
                 </main>
 
@@ -224,10 +232,44 @@ const AdminLayout = () => {
                 {/* New Sale Modal */}
                 <NewSaleModal
                     isOpen={isNewSaleOpen}
-                    onClose={() => setIsNewSaleOpen(false)}
-                    onSaleComplete={() => window.location.reload()}
+                    isMinimized={isSaleMinimized}
+                    onMinimize={() => setIsSaleMinimized(true)}
+                    onRestore={() => setIsSaleMinimized(false)}
+                    onClose={() => { setIsNewSaleOpen(false); setIsSaleMinimized(false); }}
+                    onSaleComplete={() => {
+                        setIsNewSaleOpen(false); 
+                        setIsSaleMinimized(false);
+                        window.location.reload();
+                    }}
                 />
             </div>
+
+            {/* Floating Restore Button when Minimized */}
+            <AnimatePresence>
+                {isNewSaleOpen && isSaleMinimized && (
+                    <motion.div 
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="fixed bottom-6 right-6 z-[120]"
+                    >
+                        <button
+                            onClick={() => setIsSaleMinimized(false)}
+                            className="flex items-center gap-3 bg-primary text-secondary-light px-6 py-4 rounded-full shadow-2xl shadow-primary/40 border border-white/10 hover:scale-105 active:scale-95 transition-all group"
+                        >
+                            <div className="relative">
+                                <ShoppingCart className="w-5 h-5" />
+                                <span className="absolute -top-2 -right-2 bg-secondary text-primary text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse">!</span>
+                            </div>
+                            <div className="text-left">
+                                <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">Venta Pendiente</p>
+                                <p className="text-[8px] opacity-60 font-medium leading-none">Haz click para retomar</p>
+                            </div>
+                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Mobile Sidebar Overlay */}
             <AnimatePresence>
@@ -302,7 +344,15 @@ const AdminLayout = () => {
                                 <motion.div variants={{ hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } }} className="pt-8 mt-4 border-t border-white/5">
                                     <div className="text-[8px] font-black uppercase tracking-[0.3em] text-secondary-light/20 mb-6 pl-4">Accesos Directos</div>
                                     <button
-                                        onClick={() => { setIsNewSaleOpen(true); setIsMenuOpen(false); }}
+                                        onClick={() => { 
+                                            if (isNewSaleOpen && isSaleMinimized) {
+                                                setIsSaleMinimized(false);
+                                            } else {
+                                                setIsNewSaleOpen(true); 
+                                                setIsSaleMinimized(false);
+                                            }
+                                            setIsMenuOpen(false); 
+                                        }}
                                         className="w-full flex items-center gap-4 p-6 bg-secondary text-primary rounded-[2rem] transition-all border border-secondary shadow-lg mb-4"
                                     >
                                         <Plus className="w-5 h-5" />

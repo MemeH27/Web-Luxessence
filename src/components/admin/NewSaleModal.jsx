@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     X, Search, Plus, Minus, Trash2, ShoppingCart, User, Package,
-    DollarSign, CreditCard, Save, ArrowLeft, UserPlus, Tag, Camera
+    DollarSign, CreditCard, Save, ArrowLeft, UserPlus, Tag, Camera, Minimize2
 } from 'lucide-react';
 import BarcodeScanner from './BarcodeScanner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,7 +16,7 @@ const JIBBITZ_COMBOS = [
 
 const CONSUMIDOR_FINAL = { id: null, first_name: 'Consumidor', last_name: 'Final', phone: '0000-0000' };
 
-const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
+const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize, onRestore }) => {
     const { addToast } = useToast();
 
     // Core state
@@ -59,18 +59,20 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
     const [isScannerOpen, setIsScannerOpen] = useState(false);
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && !isMinimized) {
             fetchCustomers();
             fetchProducts();
             fetchCategories();
-            resetState();
+            if (cart.length === 0) {
+                resetState();
+            }
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
             setSaleDate(`${year}-${month}-${day}`);
         }
-    }, [isOpen]);
+    }, [isOpen, isMinimized]);
 
     const resetState = () => {
         setSelectedCustomer(CONSUMIDOR_FINAL);
@@ -167,6 +169,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                         variantId: variant.id,
                         name: `${productForVariant.name} (${variant.name})`,
                         price: productForVariant.price,
+                        cost: productForVariant.cost,
                         quantity: qty,
                         stock: variant.stock,
                         image: variant.image_url || productForVariant.image_url,
@@ -199,7 +202,14 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
 
     const handleBarcodeScan = (code) => {
         setIsScannerOpen(false);
-        const product = products.find(p => p.sku === code);
+        const normalizedCode = (code || '').trim();
+        let foundVariant = null;
+        const product = products.find(p => {
+            if (p.sku === normalizedCode) return true;
+            const v = p.variants?.find(v => v.sku === normalizedCode);
+            if (v) { foundVariant = v; return true; }
+            return false;
+        });
         
         if (product) {
             if (product.variants && product.variants.length > 0) {
@@ -229,6 +239,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 id: product.id,
                 name: product.name,
                 price: product.price,
+                cost: product.cost,
                 quantity: 1,
                 stock: product.stock,
                 image: product.image_url,
@@ -265,6 +276,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                         baseProductId: selectedJibbitz.id,
                         name: `${selectedJibbitz.name} (${combo.name})`,
                         price: combo.price,
+                        cost: selectedJibbitz.cost * combo.quantity,
                         quantity: qty,
                         stock: Math.floor(selectedJibbitz.stock / combo.quantity),
                         singleJibbitzCount: combo.quantity,
@@ -345,6 +357,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 name: item.name,
                 quantity: item.quantity,
                 price: item.price,
+                cost: item.cost,
                 is_combo: item.isCombo || false,
                 is_variant: item.isVariant || false,
                 combo_jibbitz_count: item.singleJibbitzCount || 1
@@ -447,8 +460,15 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
     if (!isOpen) return null;
 
     return (
-        <>
-            <div className="fixed inset-0 z-50 flex justify-center items-center md:py-8 px-0 md:px-4">
+        <AnimatePresence>
+            {!isMinimized && (
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                    className="fixed inset-0 z-50 flex justify-center items-center md:py-8 px-0 md:px-4"
+                >
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
                 <div className="relative bg-white w-full max-w-6xl h-[100dvh] md:h-[90vh] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
@@ -459,9 +479,19 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                             <h2 className="text-xl font-serif font-bold italic h-6">Nueva Venta</h2>
                             <p className="text-xs opacity-70">Terminal Luxessence</p>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={onMinimize} 
+                                className="p-2 hover:bg-white/10 rounded-lg transition-colors group flex items-center gap-2"
+                                title="Minimizar venta"
+                            >
+                                <span className="text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity hidden md:inline">Minimizar</span>
+                                <Minimize2 className="w-5 h-5" />
+                            </button>
+                            <button onClick={onClose} className="p-2 hover:bg-red-500/20 text-white/50 hover:text-red-400 rounded-lg transition-colors">
                             <X className="w-5 h-5" />
-                        </button>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-gray-50/50">
@@ -742,13 +772,13 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
 
                     {/* Mobile Floating Cart Trigger */}
                     {step === 1 && cart.length > 0 && (
-                        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-5px_10px_rgba(0,0,0,0.05)] flex items-center justify-between z-40">
+                        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 pb-safe bg-white border-t border-gray-200 shadow-[0_-5px_10px_rgba(0,0,0,0.05)] flex items-center justify-between z-40">
                             <div>
                                 <p className="text-xs text-gray-500 font-medium">Total ({cart.length} art.)</p>
                                 <p className="text-lg font-bold text-primary">L{total}</p>
                             </div>
                             <button onClick={() => setStep(2)} className="bg-primary text-white px-6 py-2.5 rounded-lg text-sm font-semibold shadow-md active:scale-95 transition-transform" > Continuar al pago </button>
-                            <div className="pb-safe" />
+
                         </div>
                     )}
                 </div>
@@ -756,7 +786,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 {/* Jibbitz Modal */}
                 <AnimatePresence>
                     {jibbitzModalOpen && selectedJibbitz && (
-                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pt-safe">
                             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setJibbitzModalOpen(false)} />
                             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm relative z-10" >
                                 <div className="flex justify-between items-start mb-4">
@@ -804,7 +834,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 {/* Create Customer Sub-Modal */}
                 <AnimatePresence>
                     {isNewCustomerModalOpen && (
-                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pt-safe">
                             <div className="absolute inset-0 bg-primary/20 backdrop-blur-md" onClick={() => setIsNewCustomerModalOpen(false)} />
                             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="bg-white rounded-[3rem] shadow-3xl w-full max-w-md p-10 relative z-10 border border-primary/10" >
                                 <div className="flex justify-between items-center mb-8">
@@ -865,7 +895,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                 {/* Variant Selection Modal */}
                 <AnimatePresence>
                     {variantModalOpen && productForVariant && (
-                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pt-safe">
                             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setVariantModalOpen(false)} />
                             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg relative z-10 max-h-[80vh] flex flex-col" >
                                 <div className="flex justify-between items-start mb-6">
@@ -918,7 +948,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                         </div>
                     )}
                 </AnimatePresence>
-            </div>
+
             <AnimatePresence>
                 {isScannerOpen && (
                     <BarcodeScanner 
@@ -927,7 +957,9 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete }) => {
                     />
                 )}
             </AnimatePresence>
-        </>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 };
 
