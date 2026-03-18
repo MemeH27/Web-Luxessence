@@ -13,9 +13,13 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'img/*.{png,svg,ico}'],
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,png,jpg,svg,gif,ico,woff2}'],
+      },
       workbox: {
         globPatterns: ['**/*.{js,css,html}'],
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
       },
       devOptions: {
