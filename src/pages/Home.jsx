@@ -40,7 +40,7 @@ const ProductGridItem = ({ product }) => (
                 <p className="text-[10px] uppercase tracking-widest text-primary/40 font-black truncate px-2">
                     {product.categories?.name}
                 </p>
-                <h3 className="font-serif italic text-lg text-primary leading-tight line-clamp-1 px-2 group-hover:underline transition-all decoration-secondary">
+                <h3 className="font-serif font-black text-lg text-primary leading-tight line-clamp-1 px-2 group-hover:underline transition-all decoration-secondary">
                     {product.name}
                 </h3>
                 <p className="text-primary font-bold">L. {Number(product.price).toLocaleString()}</p>

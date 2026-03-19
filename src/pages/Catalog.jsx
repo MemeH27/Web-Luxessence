@@ -435,10 +435,10 @@ const Catalog = () => {
                                         <div className={`flex flex-col cursor-pointer ${viewMode === 'list' ? 'flex-1 justify-center' : 'text-center'}`} onClick={() => openProductDetails(product)}>
                                             {/* Fix: Uniform Title Height Container */}
                                             <div className="space-y-1 h-[60px] flex flex-col justify-center">
-                                                <p className="text-[10px] uppercase tracking-widest text-primary/30 font-black italic">
+                                                <p className="text-[10px] uppercase tracking-widest text-primary/30 font-black">
                                                     {product.categories?.name}
                                                 </p>
-                                                <h3 className="text-sm md:text-base font-serif font-black italic text-primary leading-tight line-clamp-2 group-hover:underline decoration-secondary transition-all">
+                                                <h3 className="text-sm md:text-base font-serif font-black text-primary leading-tight line-clamp-2 group-hover:underline decoration-secondary transition-all">
                                                     {product.name}
                                                 </h3>
                                             </div>

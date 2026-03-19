@@ -341,6 +341,7 @@ const Navbar = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [selectedCategoryId, setSelectedCategoryId] = useState(null);
     const [dbCategories, setDbCategories] = useState([]);
 
     useEffect(() => {
@@ -383,19 +384,26 @@ const Navbar = () => {
         };
     }, [addToast]);
 
-    const handleSearch = async (query) => {
-        if (!query.trim()) {
+    const handleSearch = async (query, categoryId = null) => {
+        if (!query.trim() && !categoryId) {
             setSearchResults([]);
             return;
         }
 
         setIsSearching(true);
         try {
-            const { data } = await supabase
+            let request = supabase
                 .from('products')
                 .select('*, categories(name)')
-                .ilike('name', `%${query}%`)
                 .limit(4);
+
+            if (categoryId) {
+                request = request.eq('category_id', categoryId);
+            } else {
+                request = request.ilike('name', `%${query}%`);
+            }
+
+            const { data } = await request;
             setSearchResults(data || []);
         } catch (error) {
             console.error('Search error:', error);
@@ -403,6 +411,19 @@ const Navbar = () => {
             setIsSearching(false);
         }
     };
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (searchQuery) {
+                handleSearch(searchQuery, selectedCategoryId);
+            } else {
+                setSearchResults([]);
+                setSelectedCategoryId(null);
+            }
+        }, 400);
+
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery, selectedCategoryId]);
 
     useEffect(() => {
         if (isAuthOpen) {
@@ -573,120 +594,136 @@ const Navbar = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[300] bg-white/95 backdrop-blur-3xl px-6 flex flex-col items-center pt-[calc(10vh+env(safe-area-inset-top))] md:pt-[15vh] overflow-y-auto no-scrollbar selection:bg-primary/10"
+                        className="fixed inset-0 z-[300] bg-secondary-light/95 backdrop-blur-3xl flex flex-col items-center pt-[calc(6vh+env(safe-area-inset-top))] md:pt-[10vh] overflow-y-auto no-scrollbar selection:bg-primary/10"
                     >
-                        {/* Background Decorative Elements */}
+                        {/* Elegant Light Background Elements */}
                         <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-                            <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-                            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-secondary/20 rounded-full blur-[100px]" />
+                            <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+                            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-gold/10 rounded-full blur-[100px]" />
                         </div>
 
                         <motion.button
-                            initial={{ opacity: 0, scale: 0.8, rotate: -45 }}
-                            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
                             whileHover={{ rotate: 90, scale: 1.1 }}
                             onClick={() => {
                                 setIsSearchOpen(false);
                                 setSearchQuery('');
                                 setSearchResults([]);
                             }}
-                            className="fixed right-6 md:right-12 p-4 bg-primary text-white rounded-full hover:bg-primary-light shadow-2xl shadow-primary/30 transition-all duration-500 z-[320]"
-                            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}
+                            className="fixed right-6 md:right-16 p-3 bg-white border border-primary/10 text-primary rounded-full hover:bg-primary hover:text-white transition-all duration-500 z-[320] shadow-xl"
+                            style={{ top: 'calc(env(safe-area-inset-top, 1.5rem) + 1rem)' }}
                         >
-                            <X className="w-6 h-6" />
+                            <X className="w-5 h-5 md:w-6 md:h-6" />
                         </motion.button>
 
-                        <div className="w-full max-w-5xl mx-auto space-y-16 pb-32 relative z-10">
-                            {/* Search Header */}
-                            <div className="text-center space-y-3">
-                                <motion.div
-                                    initial={{ opacity: 0, y: -20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="inline-block px-5 py-1.5 bg-primary/5 rounded-full border border-primary/10 backdrop-blur-md"
-                                >
-                                    <span className="text-primary font-black uppercase tracking-[0.5em] text-[8px]">Sourcing & Excellence</span>
-                                </motion.div>
-                                <h2 className="text-5xl md:text-7xl font-serif font-black italic text-primary tracking-tighter">Buscador <span className="text-luxury-black/20">Global</span></h2>
-                            </div>
-
-                            <div className="relative group max-w-4xl mx-auto w-full">
-                                <Search className={`absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 md:w-12 md:h-12 transition-all duration-700 pointer-events-none ${searchQuery ? 'text-primary' : 'text-primary/10'}`} />
-                                <input
-                                    autoFocus
-                                    type="text"
-                                    placeholder="Encuentre su siguiente tesoro..."
-                                    className="w-full bg-transparent border-b-2 border-primary/10 py-10 pl-12 md:pl-20 pr-12 text-3xl md:text-6xl font-serif font-bold italic text-primary placeholder:text-primary/10 focus:border-primary transition-all outline-none"
-                                    value={searchQuery}
-                                    onChange={(e) => {
-                                        setSearchQuery(e.target.value);
-                                        handleSearch(e.target.value);
-                                    }}
-                                />
-                                {isSearching && (
-                                    <div className="absolute right-0 top-1/2 -translate-y-1/2">
-                                        <div className="w-8 h-8 border-4 border-primary/10 border-t-primary rounded-full animate-spin" />
+                        <div className="w-full max-w-4xl mx-auto space-y-12 md:space-y-16 pb-32 px-6 relative z-10">
+                            {/* Minimalist Search Header */}
+                            <div className="max-w-2xl mx-auto w-full group">
+                                <div className="relative flex items-center border-b-2 border-primary/10 group-focus-within:border-primary transition-all duration-500">
+                                    <Search className={`w-6 h-6 md:w-8 md:h-8 transition-all duration-500 shrink-0 ${searchQuery ? 'text-primary' : 'text-primary/20'}`} />
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        placeholder="Explore Luxessence..."
+                                        className="w-full bg-transparent py-6 md:py-8 pl-6 pr-16 md:pr-24 text-xl md:text-4xl font-sans font-black text-primary capitalize placeholder:italic placeholder:font-light transition-all outline-none"
+                                        value={searchQuery}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            const formatted = val ? val.charAt(0).toUpperCase() + val.slice(1) : '';
+                                            setSearchQuery(formatted);
+                                            setSelectedCategoryId(null); // Clear category filter when typing
+                                        }}
+                                    />
+                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                                        {searchQuery && (
+                                            <button 
+                                                onClick={() => { 
+                                                    setSearchQuery(''); 
+                                                    setSearchResults([]); 
+                                                    setSelectedCategoryId(null); 
+                                                }}
+                                                className="p-2 hover:bg-primary/5 rounded-full text-primary/40 hover:text-primary transition-all"
+                                            >
+                                                <X className="w-5 h-5 md:w-8 md:h-8" />
+                                            </button>
+                                        )}
+                                        {isSearching && (
+                                            <div className="w-5 h-5 md:w-8 md:h-8 border-2 border-primary/10 border-t-primary rounded-full animate-spin shrink-0 shadow-sm" />
+                                        )}
                                     </div>
-                                )}
+                                </div>
                             </div>
 
-                            <div className="space-y-12">
+                            <div className="space-y-10">
                                 {searchQuery && (
-                                    <div className="flex items-center gap-6">
-                                        <p className="text-[10px] uppercase tracking-[0.6em] font-black text-primary/30 whitespace-nowrap">
-                                            {searchResults.length > 0 ? 'Tesoros Encontrados' : 'Búsqueda de Curaduría'}
+                                    <div className="flex items-center gap-4 px-2">
+                                        <div className="w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_8px_rgba(113,17,22,0.5)]" />
+                                        <p className="text-[10px] uppercase tracking-[0.5em] font-black text-primary/40 whitespace-nowrap">
+                                            {searchResults.length > 0 ? 'RESULTADOS ENCONTRADOS' : 'BUSQUEDA ESPECIALIZADA'}
                                         </p>
-                                        <div className="h-px flex-1 bg-primary/5" />
+                                        <div className="h-[1px] flex-1 bg-primary/5" />
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="flex flex-col gap-3 md:gap-4 max-w-3xl mx-auto">
                                     <AnimatePresence mode="popLayout">
                                         {searchResults.length > 0 ? (
                                             searchResults.map((p, idx) => (
                                                 <motion.div
                                                     layout
-                                                    initial={{ opacity: 0, y: 30 }}
+                                                    initial={{ opacity: 0, y: 10 }}
                                                     animate={{ opacity: 1, y: 0 }}
-                                                    transition={{ delay: idx * 0.05, type: "spring", damping: 20 }}
+                                                    transition={{ delay: idx * 0.05 }}
                                                     key={p.id}
-                                                    className="group bg-white border border-primary/5 p-6 rounded-[2.5rem] flex items-center gap-8 transition-all hover:shadow-premium border-l-8 hover:border-l-primary"
+                                                    onClick={() => { navigate(`/product/${p.id}`); setIsSearchOpen(false); }}
+                                                    className="group relative flex items-center gap-3 md:gap-5 p-3 md:p-4 bg-white border border-primary/5 hover:border-primary/20 rounded-2xl md:rounded-[2rem] transition-all cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-0.5 overflow-hidden"
                                                 >
-                                                    <div className="w-28 h-28 bg-primary/5 rounded-[2rem] overflow-hidden shrink-0 relative shadow-inner">
+                                                    <div className="relative w-14 h-14 md:w-20 md:h-20 shrink-0 bg-secondary-light rounded-xl md:rounded-2xl overflow-hidden shadow-inner">
                                                         <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
                                                         {p.stock <= 0 && (
-                                                            <div className="absolute inset-0 bg-primary/60 backdrop-blur-md flex flex-col items-center justify-center p-2 text-center">
-                                                                <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none mb-1">Agotado</span>
-                                                                <span className="text-[7px] font-bold text-white/80 uppercase">Solo Solicitud</span>
+                                                            <div className="absolute inset-0 bg-primary/10 backdrop-blur-[2px] flex items-center justify-center p-1">
+                                                                <div className="bg-primary/80 backdrop-blur-md p-1.5 rounded-full scale-[0.6]">
+                                                                    <X className="w-3 h-3 text-white" />
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="flex-1 min-w-0 space-y-2">
-                                                        <div className="flex justify-between items-start">
-                                                            <div className="flex items-center gap-2">
-                                                                <Sparkles className="w-3 h-3 text-secondary animate-pulse" />
-                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-secondary truncate">{p.categories?.name}</p>
-                                                            </div>
-                                                            {p.stock > 0 && <span className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]" />}
+
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                                            <div className="h-[1px] w-3 bg-primary/20" />
+                                                            <p className="text-[7.5px] md:text-[8.5px] uppercase tracking-[0.2em] font-black text-primary/30 truncate">{p.categories?.name}</p>
                                                         </div>
-                                                        <h4 className="text-primary font-serif font-black italic text-2xl truncate leading-tight group-hover:text-luxury-black transition-colors">{p.name}</h4>
-                                                        
-                                                        <div className="flex items-center justify-between gap-4 pt-2">
-                                                            <p className="text-secondary-dark font-black text-lg">L. {Number(p.price).toLocaleString()}</p>
-                                                            
-                                                            <button
-                                                                onClick={() => {
-                                                                    navigate(`/product/${p.id}`);
-                                                                    setIsSearchOpen(false);
-                                                                }}
-                                                                className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${
-                                                                    p.stock > 0 
-                                                                    ? 'bg-primary text-white hover:bg-primary-light shadow-primary/20 hover:shadow-lg' 
-                                                                    : 'bg-primary/5 text-primary border border-primary/10 hover:bg-primary hover:text-white'
-                                                                }`}
+                                                        <h4 className="text-primary font-sans font-black text-sm md:text-lg truncate leading-tight mb-1">
+                                                            {p.name}
+                                                        </h4>
+                                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                                            <p className="text-luxury-black/60 text-[10px] md:text-sm font-bold tracking-tight">L. {Number(p.price).toLocaleString()}</p>
+                                                            {p.stock > 0 ? (
+                                                                <span className="text-[7.5px] text-green-600 font-bold uppercase tracking-wider flex items-center gap-1.5"><div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" /> Stok</span>
+                                                            ) : (
+                                                                <span className="text-[7.5px] text-primary font-bold uppercase tracking-wider flex items-center gap-1.5"><div className="w-1 h-1 bg-primary rounded-full animate-pulse shadow-[0_0_5px_rgba(113,17,22,0.5)]" /> Sourcing</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex shrink-0">
+                                                        {p.stock > 0 ? (
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); navigate(`/product/${p.id}`); setIsSearchOpen(false); }}
+                                                                className="px-3 py-1.5 md:px-5 md:py-2.5 bg-primary text-white text-[9px] font-black uppercase tracking-[0.1em] rounded-full hover:bg-primary-light shadow-sm"
                                                             >
-                                                                {p.stock > 0 ? 'Ver Detalle' : 'Solicitar'}
+                                                                VER
                                                             </button>
-                                                        </div>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); navigate(`/product/${p.id}`); setIsSearchOpen(false); }}
+                                                                className="px-3 py-1.5 md:px-5 md:py-2.5 bg-gold/10 text-gold-dark border border-gold/40 text-[9px] font-black uppercase tracking-[0.1em] rounded-full hover:bg-gold hover:text-white"
+                                                            >
+                                                                SOLICITAR
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </motion.div>
                                             ))
@@ -694,32 +731,24 @@ const Navbar = () => {
                                             <motion.div 
                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{ opacity: 1, scale: 1 }}
-                                                className="col-span-full py-24 text-center space-y-10 bg-white rounded-[4rem] border border-primary/5 p-16 shadow-2xl relative overflow-hidden"
+                                                className="py-16 md:py-24 text-center space-y-8 bg-white border border-primary/5 rounded-[3rem] p-10 max-w-2xl mx-auto shadow-2xl relative overflow-hidden"
                                             >
-                                                <div className="absolute top-0 right-0 p-8 opacity-5">
-                                                    <Search className="w-64 h-64 text-primary" />
-                                                </div>
-                                                <div className="w-28 h-28 bg-primary/5 rounded-full flex items-center justify-center mx-auto ring-[20px] ring-primary/[0.02]">
-                                                    <Search className="w-12 h-12 text-primary/20" />
+                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-primary/5 blur-[100px] pointer-events-none" />
+                                                <div className="w-16 h-16 md:w-20 md:h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-4 ring-8 ring-primary/[0.02]">
+                                                    <Search className="w-8 h-8 text-primary/20" />
                                                 </div>
                                                 <div className="space-y-4 relative z-10">
-                                                    <h3 className="text-primary text-4xl md:text-5xl font-serif font-black italic">Sin coincidencias...</h3>
-                                                    <p className="text-luxury-black/50 text-base max-w-lg mx-auto leading-relaxed font-medium">
-                                                        Este tesoro no se encuentra en nuestro inventario actual, pero no se preocupe. Nuestro equipo de <span className="text-primary font-bold italic">Sourcing Directo</span> puede localizarlo para usted en las boutiques más exclusivas.
+                                                    <h3 className="text-primary text-2xl md:text-4xl font-serif font-black italic uppercase tracking-tighter">No localizado</h3>
+                                                    <p className="text-luxury-black/50 text-sm md:text-base max-w-sm mx-auto leading-relaxed font-medium italic">
+                                                        ¿Busca algo específico? Nuestro equipo puede sourcing esta pieza solo para usted.
                                                     </p>
                                                 </div>
-                                                <div className="pt-6 flex flex-col md:flex-row items-center justify-center gap-6 relative z-10">
+                                                <div className="pt-6 flex flex-col md:flex-row items-center justify-center gap-4 relative z-10">
                                                     <button
                                                         onClick={() => { navigate('/contact'); setIsSearchOpen(false); }}
-                                                        className="px-12 py-6 bg-primary text-white text-[11px] font-black uppercase tracking-[0.4em] rounded-full shadow-[0_20px_40px_rgba(var(--primary-rgb),0.3)] hover:-translate-y-2 transition-all flex items-center gap-4"
+                                                        className="w-full md:w-auto px-10 py-5 bg-gold text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-full hover:bg-gold-dark transition-all shadow-xl shadow-gold/20 flex items-center justify-center gap-3"
                                                     >
-                                                        SOLICITUD ESPECIAL <ArrowRight className="w-5 h-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { navigate('/catalog'); setIsSearchOpen(false); }}
-                                                        className="px-12 py-6 bg-primary/5 text-primary text-[11px] font-black uppercase tracking-[0.4em] rounded-full border border-primary/10 hover:bg-primary/10 transition-all font-serif italic font-bold"
-                                                    >
-                                                        Explorar Todo el Catálogo
+                                                        SOLICITAR PIEZA <ArrowRight className="w-4 h-4" />
                                                     </button>
                                                 </div>
                                             </motion.div>
@@ -727,26 +756,29 @@ const Navbar = () => {
                                             <motion.div 
                                                 initial={{ opacity: 0 }}
                                                 animate={{ opacity: 1 }}
-                                                className="col-span-full py-16 space-y-12"
+                                                className="py-10 space-y-12"
                                             >
-                                                <div className="space-y-4">
-                                                    <p className="text-primary/20 text-[10px] font-black uppercase tracking-[0.8em] italic text-center">Explorar por Especialidad</p>
-                                                    <div className="flex flex-wrap justify-center gap-4 pt-6">
-                                                        {dbCategories.length > 0 ? dbCategories.slice(0, 8).map(cat => (
+                                                <div className="space-y-6">
+                                                    <p className="text-primary/20 text-[9px] font-black uppercase tracking-[0.8em] italic text-center">Búsqueda por Especialidad</p>
+                                                    <div className="flex flex-wrap justify-center gap-2.5 max-w-3xl mx-auto pt-4 px-4">
+                                                        {dbCategories.length > 0 ? dbCategories.slice(0, 12).map(cat => (
                                                             <button 
                                                                 key={cat.id}
-                                                                onClick={() => { setSearchQuery(cat.name); handleSearch(cat.name); }}
-                                                                className="px-8 py-4 rounded-2xl bg-white border border-primary/10 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40 hover:bg-primary hover:text-white hover:scale-105 hover:shadow-xl transition-all group flex items-center gap-3"
+                                                                onClick={() => { 
+                                                                    setSelectedCategoryId(cat.id);
+                                                                    setSearchQuery(cat.name); 
+                                                                    handleSearch(cat.name, cat.id); 
+                                                                }}
+                                                                className="px-5 py-2.5 rounded-full bg-white border border-primary/10 text-[9px] md:text-[10px] font-black uppercase tracking-[0.15em] text-primary/40 hover:bg-primary hover:border-primary hover:text-white transition-all shadow-sm"
                                                             >
-                                                                <span>{cat.name}</span>
-                                                                <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+                                                                {cat.name}
                                                             </button>
                                                         )) : (
                                                             ['Cuidado Personal', 'Fragancias', 'Accesorios', 'Lujo'].map(tag => (
                                                                 <button 
                                                                     key={tag}
                                                                     onClick={() => { setSearchQuery(tag); handleSearch(tag); }}
-                                                                    className="px-8 py-4 rounded-2xl bg-white border border-primary/5 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40 hover:bg-primary hover:text-white hover:scale-105 transition-all shadow-sm"
+                                                                    className="px-5 py-2.5 rounded-full bg-white border border-primary/5 text-[10px] font-black uppercase tracking-[0.15em] text-primary/40 hover:bg-primary hover:text-white transition-all shadow-sm"
                                                                 >
                                                                     {tag}
                                                                 </button>
@@ -755,8 +787,9 @@ const Navbar = () => {
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="pt-20 text-center opacity-30 select-none">
-                                                    <p className="font-serif italic text-6xl text-primary/5 lowercase">Luxessence Curated Sourcing</p>
+                                                <div className="pt-20 text-center select-none opacity-20 relative px-4">
+                                                    <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
+                                                    <p className="relative z-10 bg-secondary-light px-8 md:px-12 font-serif italic text-3xl md:text-5xl text-primary lowercase tracking-tight">Luxessence Sourcing</p>
                                                 </div>
                                             </motion.div>
                                         )}
