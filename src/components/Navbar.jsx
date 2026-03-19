@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useId } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ShoppingBag, User, LogOut, Mail, Lock, UserCircle, ArrowRight, ChevronDown, Search, ShoppingCart, Eye, EyeOff, LayoutDashboard } from 'lucide-react';
+import { Menu, X, ShoppingBag, User, LogOut, Mail, Lock, UserCircle, ArrowRight, ChevronDown, Search, ShoppingCart, Eye, EyeOff, LayoutDashboard, Sparkles } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
@@ -560,38 +560,49 @@ const Navbar = () => {
                 />
             </motion.nav>
 
-            {/* Premium Search Overlay */}
+            {/* Premium Search Overlay - Luxury Light Edition */}
             <AnimatePresence>
                 {isSearchOpen && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[300] bg-primary/40 backdrop-blur-2xl px-4 flex flex-col items-center pt-24 pt-safe"
+                        className="fixed inset-0 z-[300] bg-[#fafafa]/98 backdrop-blur-2xl px-4 flex flex-col items-center pt-[12vh] overflow-y-auto no-scrollbar"
                     >
                         <motion.button
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            whileHover={{ rotate: 90 }}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={{ rotate: 90, scale: 1.1 }}
                             onClick={() => {
                                 setIsSearchOpen(false);
                                 setSearchQuery('');
                                 setSearchResults([]);
                             }}
-                            className="absolute right-10 p-3 bg-white text-primary rounded-full shadow-2xl z-[310]"
-                            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 2.5rem)' }}
+                            className="absolute right-6 md:right-12 top-8 p-3 bg-primary/5 text-primary rounded-full hover:bg-primary hover:text-white transition-all duration-500 z-[320]"
                         >
                             <X className="w-6 h-6" />
                         </motion.button>
 
-                        <div className="w-full max-w-3xl space-y-12">
+                        <div className="w-full max-w-4xl mx-auto space-y-12 pb-24">
+                            {/* Search Header */}
+                            <div className="text-center space-y-4 mb-12">
+                                <motion.div
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="inline-block px-4 py-1.5 bg-primary/5 rounded-full border border-primary/10"
+                                >
+                                    <span className="text-primary font-black uppercase tracking-[0.4em] text-[9px]">Sourcing & Curaduría</span>
+                                </motion.div>
+                                <h2 className="text-4xl md:text-5xl font-serif font-bold italic text-primary">Buscador de Joyas</h2>
+                            </div>
+
                             <div className="relative group">
-                                <Search className={`absolute left-6 top-1/2 -translate-y-1/2 w-8 h-8 transition-colors duration-500 ${searchQuery ? 'text-primary' : 'text-primary/20'}`} />
+                                <Search className={`absolute left-8 top-1/2 -translate-y-1/2 w-8 h-8 transition-all duration-700 ${searchQuery ? 'text-primary' : 'text-primary/20'}`} />
                                 <input
                                     autoFocus
                                     type="text"
-                                    placeholder="¿Qué tesoro busca hoy?"
-                                    className="w-full bg-white/90 backdrop-blur-xl border-none rounded-[3rem] py-8 pl-20 pr-10 text-2xl md:text-4xl font-serif italic text-primary placeholder:text-primary/10 shadow-3xl focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                    placeholder="Ingrese el nombre del artículo..."
+                                    className="w-full bg-white border-b-2 border-primary/10 py-8 pl-24 pr-12 text-2xl md:text-4xl font-serif italic text-primary placeholder:text-primary/10 focus:border-primary transition-all outline-none"
                                     value={searchQuery}
                                     onChange={(e) => {
                                         setSearchQuery(e.target.value);
@@ -599,52 +610,133 @@ const Navbar = () => {
                                     }}
                                 />
                                 {isSearching && (
-                                    <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                                        <div className="w-6 h-6 border-4 border-primary/10 border-t-primary rounded-full animate-spin" />
+                                    <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                                        <div className="w-6 h-6 border-3 border-primary/10 border-t-primary rounded-full animate-spin" />
                                     </div>
                                 )}
                             </div>
 
-                            <div className="space-y-6">
-                                <p className="text-[10px] uppercase tracking-[0.5em] font-black text-white/40 text-center">Resultados sugeridos</p>
+                            <div className="space-y-10">
+                                {searchResults.length > 0 && (
+                                    <div className="flex items-center gap-6">
+                                        <p className="text-[10px] uppercase tracking-[0.5em] font-black text-primary/30 whitespace-nowrap">Tesoros Disponibles</p>
+                                        <div className="h-px flex-1 bg-primary/5" />
+                                    </div>
+                                )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                                    {searchResults.length > 0 ? (
-                                        searchResults.map(p => (
-                                            <button
-                                                key={p.id}
-                                                onClick={() => {
-                                                    navigate(`/product/${p.id}`);
-                                                    setIsSearchOpen(false);
-                                                    setSearchQuery('');
-                                                }}
-                                                className="group bg-white/10 hover:bg-white backdrop-blur-xl border border-white/20 p-6 rounded-[2.5rem] flex items-center gap-6 transition-all text-left overflow-hidden"
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <AnimatePresence mode="popLayout">
+                                        {searchResults.length > 0 ? (
+                                            searchResults.map((p, idx) => (
+                                                <motion.div
+                                                    layout
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: idx * 0.05 }}
+                                                    key={p.id}
+                                                    className="group bg-white border border-primary/5 p-5 rounded-3xl flex items-center gap-6 transition-all hover:shadow-premium border-l-4 hover:border-l-primary"
+                                                >
+                                                    <div className="w-24 h-24 bg-primary/5 rounded-2xl overflow-hidden shrink-0 relative">
+                                                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                                        {p.stock <= 0 && (
+                                                            <div className="absolute inset-0 bg-primary/40 backdrop-blur-[2px] flex items-center justify-center">
+                                                                <span className="text-[8px] font-black text-white uppercase tracking-widest rotate-[-15deg]">Sin Stock</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0 space-y-2">
+                                                        <div className="flex justify-between items-start">
+                                                            <p className="text-[9px] uppercase tracking-widest font-black text-primary/30 italic truncate">{p.categories?.name}</p>
+                                                            {p.stock > 0 && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+                                                        </div>
+                                                        <h4 className="text-primary font-serif font-bold italic text-xl truncate leading-tight">{p.name}</h4>
+                                                        
+                                                        <div className="flex items-center justify-between gap-4 pt-1">
+                                                            <p className="text-primary/40 font-black text-sm">L. {Number(p.price).toLocaleString()}</p>
+                                                            
+                                                            {p.stock > 0 ? (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigate(`/product/${p.id}`);
+                                                                        setIsSearchOpen(false);
+                                                                    }}
+                                                                    className="px-4 py-2 bg-primary text-white text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-primary-light transition-colors"
+                                                                >
+                                                                    Ver Pieza
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigate('/contact');
+                                                                        setIsSearchOpen(false);
+                                                                    }}
+                                                                    className="px-4 py-2 bg-primary/5 text-primary text-[8px] font-black uppercase tracking-widest rounded-full hover:bg-primary hover:text-white transition-all border border-primary/10"
+                                                                >
+                                                                    Solicitar
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {p.stock <= 0 && (
+                                                            <p className="text-[10px] text-primary/50 font-medium italic leading-tight">Agotado temporalmente. Puede solicitar una pieza nueva.</p>
+                                                        )}
+                                                    </div>
+                                                </motion.div>
+                                            ))
+                                        ) : searchQuery && !isSearching ? (
+                                            <motion.div 
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                className="col-span-full py-20 text-center space-y-8 bg-white rounded-[3rem] border border-primary/5 p-12 shadow-sm"
                                             >
-                                                <div className="w-20 h-20 bg-primary/5 rounded-2xl overflow-hidden shrink-0">
-                                                    <img src={p.image_url} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                                                <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mx-auto ring-8 ring-primary/[0.02]">
+                                                    <Search className="w-10 h-10 text-primary/10" />
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[8px] uppercase tracking-widest font-black text-primary/30 group-hover:text-primary/40 italic">{p.categories?.name}</p>
-                                                    <h4 className="text-white group-hover:text-primary font-serif font-bold italic text-lg leading-tight transition-colors">{p.name}</h4>
-                                                    <p className="text-white/40 group-hover:text-primary/60 font-black text-xs leading-none pt-1">L. {Number(p.price).toLocaleString()}</p>
+                                                <div className="space-y-3">
+                                                    <p className="text-primary/60 text-3xl font-serif italic">No se encontraron tesoros con ese nombre.</p>
+                                                    <p className="text-luxury-black/40 text-sm max-w-md mx-auto leading-relaxed">
+                                                        Nuestro equipo buscador de tesoros (Sourcing) puede encontrar esa fragancia o accesorio exclusivo para usted directamente en las mejores boutiques.
+                                                    </p>
                                                 </div>
-                                            </button>
-                                        ))
-                                    ) : searchQuery && !isSearching ? (
-                                        <div className="col-span-full py-20 text-center space-y-4">
-                                            <p className="text-white/20 text-2xl font-serif italic">No se encontraron tesoros con ese nombre.</p>
-                                            <button
-                                                onClick={() => { navigate('/catalog'); setIsSearchOpen(false); }}
-                                                className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] border-b border-white/20 hover:text-white transition-colors"
+                                                <div className="pt-4 flex flex-col md:flex-row items-center justify-center gap-4">
+                                                    <button
+                                                        onClick={() => { navigate('/contact'); setIsSearchOpen(false); }}
+                                                        className="px-10 py-5 bg-primary text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-full shadow-2xl shadow-primary/20 hover:-translate-y-1 transition-all flex items-center gap-3"
+                                                    >
+                                                        ENVIAR SOLICITUD ESPECIAL <ArrowRight className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { navigate('/catalog'); setIsSearchOpen(false); }}
+                                                        className="px-10 py-5 bg-primary/5 text-primary text-[10px] font-black uppercase tracking-[0.3em] rounded-full border border-primary/10 hover:bg-primary/10 transition-all"
+                                                    >
+                                                        Explorar Catálogo
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        ) : !searchQuery && (
+                                            <motion.div 
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                className="col-span-full py-40 text-center space-y-6"
                                             >
-                                                Explorar catálogo completo
-                                            </button>
-                                        </div>
-                                    ) : !searchQuery && (
-                                        <div className="col-span-full py-20 text-center space-y-4">
-                                            <p className="text-white/20 text-sm font-black uppercase tracking-[0.3em] italic">Comience a escribir para descubrir...</p>
-                                        </div>
-                                    )}
+                                                <div className="flex justify-center gap-2 mb-8 animate-bounce">
+                                                    {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 bg-primary/20 rounded-full" />)}
+                                                </div>
+                                                <p className="text-primary/20 text-sm font-black uppercase tracking-[0.5em] italic">Descubra la Curaduría Luxessence...</p>
+                                                <div className="flex flex-wrap justify-center gap-2 pt-8">
+                                                    {['Nichos', 'Relojes', 'Premium', 'Joyas'].map(tag => (
+                                                        <button 
+                                                            key={tag}
+                                                            onClick={() => { setSearchQuery(tag); handleSearch(tag); }}
+                                                            className="px-5 py-2.5 rounded-full bg-white border border-primary/5 text-[9px] font-black uppercase tracking-widest text-primary/40 hover:bg-primary hover:text-white transition-all shadow-sm"
+                                                        >
+                                                            {tag}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                             </div>
                         </div>

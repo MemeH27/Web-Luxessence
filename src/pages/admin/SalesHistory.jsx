@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { exportToExcel } from '../../utils/export';
 import { shareInvoicePNG, downloadInvoicePNG } from '../../utils/billing';
-import { Search, Calendar, Download, Trash2, Eye, DollarSign, CreditCard, Receipt, TrendingUp, Share2, Printer, X, ShoppingCart, Percent, Heart, Filter, Phone } from 'lucide-react';
+import { Search, Calendar, Download, Trash2, Eye, DollarSign, CreditCard, Receipt, TrendingUp, Share2, Printer, X, ShoppingCart, Percent, Heart, Filter, Phone, Pencil } from 'lucide-react';
 import SecurityModal from '../../components/admin/SecurityModal';
 import Pagination from '../../components/admin/Pagination';
 import InvoiceTemplate from '../../components/admin/InvoiceTemplate';
+import NewSaleModal from '../../components/admin/NewSaleModal';
 import { useToast } from '../../context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReactToPrint } from 'react-to-print';
@@ -37,6 +38,7 @@ const SalesHistory = () => {
     const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
     const [selectedSale, setSelectedSale] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isEditMinimized, setIsEditMinimized] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [editForm, setEditForm] = useState({ total: 0, discount: 0, payment_method: '', is_paid: false });
     const [paymentForm, setPaymentForm] = useState({ amount: '', notes: '', date: new Date().toISOString().split('T')[0] });
@@ -199,12 +201,6 @@ const SalesHistory = () => {
 
     const handleOpenEdit = (sale) => {
         setSelectedSale(sale);
-        setEditForm({
-            total: sale.total,
-            discount: sale.discount,
-            payment_method: sale.payment_method,
-            is_paid: sale.is_paid
-        });
         setSecurityAction({ type: 'edit', id: sale.id });
         setIsSecurityOpen(true);
     };
@@ -508,6 +504,7 @@ const SalesHistory = () => {
                                         <div className="flex items-center justify-between border-t border-primary/5 pt-4 md:pt-6">
                                             <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
                                                 <button onClick={() => { setSelectedSale(sale); setIsInvoiceOpen(true); }} className="p-4 bg-primary/5 rounded-2xl text-primary/40 active:bg-primary active:text-white transition-all" title="Ver Factura"><Receipt className="w-5 h-5" /></button>
+                                                <button onClick={() => handleOpenEdit(sale)} className="p-4 bg-blue-500/5 rounded-2xl text-blue-500/40 active:bg-blue-600 active:text-white transition-all" title="Modificar"><Pencil className="w-5 h-5" /></button>
                                                 {sale.payment_method === 'Crédito' && (
                                                     <button onClick={() => handleOpenPayments(sale)} className="p-4 bg-orange-500/5 rounded-2xl text-orange-500/40 active:bg-orange-600 active:text-white transition-all" title="Cuotas"><CreditCard className="w-5 h-5" /></button>
                                                 )}
@@ -859,6 +856,20 @@ const SalesHistory = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            <NewSaleModal 
+                isOpen={isEditModalOpen}
+                isMinimized={isEditMinimized}
+                onMinimize={() => setIsEditMinimized(true)}
+                onRestore={() => setIsEditMinimized(false)}
+                onClose={() => { setIsEditModalOpen(false); setIsEditMinimized(false); }}
+                onSaleComplete={() => {
+                    setIsEditModalOpen(false);
+                    fetchSales();
+                }}
+                isEditing={true}
+                saleToEdit={selectedSale}
+            />
         </div>
     );
 };
