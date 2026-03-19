@@ -395,27 +395,9 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                 combo_jibbitz_count: item.singleJibbitzCount || 1
             }));
 
-            // Handle guest customer creation if needed
-            let customerId = selectedCustomer?.id;
-            if (customerId === 'temp') {
-                try {
-                    const { data: tempCust, error: tempError } = await supabase
-                        .from('customers')
-                        .insert({
-                            first_name: selectedCustomer.first_name,
-                            last_name: '(Invitado)',
-                            phone: `INV-${Date.now().toString().slice(-6)}`,
-                            address: 'Venta Presencial'
-                        })
-                        .select()
-                        .single();
-                    if (tempError) throw tempError;
-                    customerId = tempCust.id;
-                } catch (err) {
-                    console.error('Error creating guest customer:', err);
-                    customerId = null;
-                }
-            }
+            // Guest Handling: Guests don't get saved to database anymore
+            let customerId = selectedCustomer?.id === 'temp' ? null : selectedCustomer?.id;
+            const guestName = selectedCustomer?.id === 'temp' ? selectedCustomer.first_name : null;
 
             const now = new Date();
             const [year, month, day] = saleDate.split('-').map(Number);
@@ -484,6 +466,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                     total: finalTotal,
                     items: orderItems,
                     delivery_mode: 'mostrador',
+                    notes: guestName ? `Invitado: ${guestName}` : null,
                     created_at: isoTimestamp
                 }).select().single();
 
@@ -715,9 +698,9 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                                                     ) : searchCustomer.trim() ? (
                                                         <div className="p-2 space-y-2">
                                                             <p className="text-[10px] uppercase font-black text-gray-400 text-center">No hay coincidencias</p>
-                                                            <button onClick={() => { setSelectedCustomer({ id: 'temp', first_name: searchCustomer, last_name: '(Invitado)' }); setShowCustomerDropdown(false); }} className="w-full px-4 py-3 bg-secondary/10 hover:bg-secondary/20 text-secondary text-xs font-black uppercase rounded-xl border border-secondary/20 flex flex-col items-center gap-1 transition-all" >
-                                                                <span>USAR "{searchCustomer}"</span>
-                                                                <span className="text-[9px] opacity-60">Como Invitado (Venta de una sola vez)</span>
+                                                            <button onClick={() => { setSelectedCustomer({ id: 'temp', first_name: searchCustomer, last_name: '(Invitado)' }); setShowCustomerDropdown(false); }} className="w-full px-4 py-3 bg-secondary/20 hover:bg-secondary/30 text-primary text-xs font-black uppercase rounded-xl border border-secondary flex flex-col items-center gap-1 transition-all" >
+                                                                <span className="text-primary font-bold">USAR "{searchCustomer}"</span>
+                                                                <span className="text-[10px] text-primary/60 font-medium">Como Invitado (Venta de una sola vez)</span>
                                                             </button>
                                                             <button onClick={() => { setIsNewCustomerModalOpen(true); setShowCustomerDropdown(false); }} className="w-full px-4 py-3 bg-primary text-secondary-light text-[10px] font-black uppercase rounded-xl shadow-lg" > Registrar Nuevo Perfil Real </button>
                                                         </div>

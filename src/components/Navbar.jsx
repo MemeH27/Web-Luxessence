@@ -341,6 +341,7 @@ const Navbar = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [dbCategories, setDbCategories] = useState([]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -369,6 +370,11 @@ const Navbar = () => {
             setAuthMode('login');
         };
         window.addEventListener('open-auth-modal', handleOpenAuth);
+
+        // Fetch Real Categories for Search
+        supabase.from('categories').select('id, name').order('name').then(({ data }) => {
+            if (data) setDbCategories(data);
+        });
 
         return () => {
             window.removeEventListener('scroll', handleScroll);
@@ -560,49 +566,56 @@ const Navbar = () => {
                 />
             </motion.nav>
 
-            {/* Premium Search Overlay - Luxury Light Edition */}
+            {/* Premium Search Overlay - Luxury Glass Edition */}
             <AnimatePresence>
                 {isSearchOpen && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[300] bg-[#fafafa]/98 backdrop-blur-2xl px-4 flex flex-col items-center pt-[12vh] overflow-y-auto no-scrollbar"
+                        className="fixed inset-0 z-[300] bg-white/95 backdrop-blur-3xl px-6 flex flex-col items-center pt-[calc(10vh+env(safe-area-inset-top))] md:pt-[15vh] overflow-y-auto no-scrollbar selection:bg-primary/10"
                     >
+                        {/* Background Decorative Elements */}
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                            <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+                            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-secondary/20 rounded-full blur-[100px]" />
+                        </div>
+
                         <motion.button
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
+                            initial={{ opacity: 0, scale: 0.8, rotate: -45 }}
+                            animate={{ opacity: 1, scale: 1, rotate: 0 }}
                             whileHover={{ rotate: 90, scale: 1.1 }}
                             onClick={() => {
                                 setIsSearchOpen(false);
                                 setSearchQuery('');
                                 setSearchResults([]);
                             }}
-                            className="absolute right-6 md:right-12 top-8 p-3 bg-primary/5 text-primary rounded-full hover:bg-primary hover:text-white transition-all duration-500 z-[320]"
+                            className="fixed right-6 md:right-12 p-4 bg-primary text-white rounded-full hover:bg-primary-light shadow-2xl shadow-primary/30 transition-all duration-500 z-[320]"
+                            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}
                         >
                             <X className="w-6 h-6" />
                         </motion.button>
 
-                        <div className="w-full max-w-4xl mx-auto space-y-12 pb-24">
+                        <div className="w-full max-w-5xl mx-auto space-y-16 pb-32 relative z-10">
                             {/* Search Header */}
-                            <div className="text-center space-y-4 mb-12">
+                            <div className="text-center space-y-3">
                                 <motion.div
                                     initial={{ opacity: 0, y: -20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="inline-block px-4 py-1.5 bg-primary/5 rounded-full border border-primary/10"
+                                    className="inline-block px-5 py-1.5 bg-primary/5 rounded-full border border-primary/10 backdrop-blur-md"
                                 >
-                                    <span className="text-primary font-black uppercase tracking-[0.4em] text-[9px]">Sourcing & Curaduría</span>
+                                    <span className="text-primary font-black uppercase tracking-[0.5em] text-[8px]">Sourcing & Excellence</span>
                                 </motion.div>
-                                <h2 className="text-4xl md:text-5xl font-serif font-bold italic text-primary">Buscador de Joyas</h2>
+                                <h2 className="text-5xl md:text-7xl font-serif font-black italic text-primary tracking-tighter">Buscador <span className="text-luxury-black/20">Global</span></h2>
                             </div>
 
-                            <div className="relative group">
-                                <Search className={`absolute left-8 top-1/2 -translate-y-1/2 w-8 h-8 transition-all duration-700 ${searchQuery ? 'text-primary' : 'text-primary/20'}`} />
+                            <div className="relative group max-w-4xl mx-auto w-full">
+                                <Search className={`absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 md:w-12 md:h-12 transition-all duration-700 pointer-events-none ${searchQuery ? 'text-primary' : 'text-primary/10'}`} />
                                 <input
                                     autoFocus
                                     type="text"
-                                    placeholder="Ingrese el nombre del artículo..."
-                                    className="w-full bg-white border-b-2 border-primary/10 py-8 pl-24 pr-12 text-2xl md:text-4xl font-serif italic text-primary placeholder:text-primary/10 focus:border-primary transition-all outline-none"
+                                    placeholder="Encuentre su siguiente tesoro..."
+                                    className="w-full bg-transparent border-b-2 border-primary/10 py-10 pl-12 md:pl-20 pr-12 text-3xl md:text-6xl font-serif font-bold italic text-primary placeholder:text-primary/10 focus:border-primary transition-all outline-none"
                                     value={searchQuery}
                                     onChange={(e) => {
                                         setSearchQuery(e.target.value);
@@ -610,106 +623,103 @@ const Navbar = () => {
                                     }}
                                 />
                                 {isSearching && (
-                                    <div className="absolute right-8 top-1/2 -translate-y-1/2">
-                                        <div className="w-6 h-6 border-3 border-primary/10 border-t-primary rounded-full animate-spin" />
+                                    <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                                        <div className="w-8 h-8 border-4 border-primary/10 border-t-primary rounded-full animate-spin" />
                                     </div>
                                 )}
                             </div>
 
-                            <div className="space-y-10">
-                                {searchResults.length > 0 && (
+                            <div className="space-y-12">
+                                {searchQuery && (
                                     <div className="flex items-center gap-6">
-                                        <p className="text-[10px] uppercase tracking-[0.5em] font-black text-primary/30 whitespace-nowrap">Tesoros Disponibles</p>
+                                        <p className="text-[10px] uppercase tracking-[0.6em] font-black text-primary/30 whitespace-nowrap">
+                                            {searchResults.length > 0 ? 'Tesoros Encontrados' : 'Búsqueda de Curaduría'}
+                                        </p>
                                         <div className="h-px flex-1 bg-primary/5" />
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <AnimatePresence mode="popLayout">
                                         {searchResults.length > 0 ? (
                                             searchResults.map((p, idx) => (
                                                 <motion.div
                                                     layout
-                                                    initial={{ opacity: 0, y: 20 }}
+                                                    initial={{ opacity: 0, y: 30 }}
                                                     animate={{ opacity: 1, y: 0 }}
-                                                    transition={{ delay: idx * 0.05 }}
+                                                    transition={{ delay: idx * 0.05, type: "spring", damping: 20 }}
                                                     key={p.id}
-                                                    className="group bg-white border border-primary/5 p-5 rounded-3xl flex items-center gap-6 transition-all hover:shadow-premium border-l-4 hover:border-l-primary"
+                                                    className="group bg-white border border-primary/5 p-6 rounded-[2.5rem] flex items-center gap-8 transition-all hover:shadow-premium border-l-8 hover:border-l-primary"
                                                 >
-                                                    <div className="w-24 h-24 bg-primary/5 rounded-2xl overflow-hidden shrink-0 relative">
-                                                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                                    <div className="w-28 h-28 bg-primary/5 rounded-[2rem] overflow-hidden shrink-0 relative shadow-inner">
+                                                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
                                                         {p.stock <= 0 && (
-                                                            <div className="absolute inset-0 bg-primary/40 backdrop-blur-[2px] flex items-center justify-center">
-                                                                <span className="text-[8px] font-black text-white uppercase tracking-widest rotate-[-15deg]">Sin Stock</span>
+                                                            <div className="absolute inset-0 bg-primary/60 backdrop-blur-md flex flex-col items-center justify-center p-2 text-center">
+                                                                <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none mb-1">Agotado</span>
+                                                                <span className="text-[7px] font-bold text-white/80 uppercase">Solo Solicitud</span>
                                                             </div>
                                                         )}
                                                     </div>
                                                     <div className="flex-1 min-w-0 space-y-2">
                                                         <div className="flex justify-between items-start">
-                                                            <p className="text-[9px] uppercase tracking-widest font-black text-primary/30 italic truncate">{p.categories?.name}</p>
-                                                            {p.stock > 0 && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+                                                            <div className="flex items-center gap-2">
+                                                                <Sparkles className="w-3 h-3 text-secondary animate-pulse" />
+                                                                <p className="text-[9px] uppercase tracking-[0.2em] font-black text-secondary truncate">{p.categories?.name}</p>
+                                                            </div>
+                                                            {p.stock > 0 && <span className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]" />}
                                                         </div>
-                                                        <h4 className="text-primary font-serif font-bold italic text-xl truncate leading-tight">{p.name}</h4>
+                                                        <h4 className="text-primary font-serif font-black italic text-2xl truncate leading-tight group-hover:text-luxury-black transition-colors">{p.name}</h4>
                                                         
-                                                        <div className="flex items-center justify-between gap-4 pt-1">
-                                                            <p className="text-primary/40 font-black text-sm">L. {Number(p.price).toLocaleString()}</p>
+                                                        <div className="flex items-center justify-between gap-4 pt-2">
+                                                            <p className="text-secondary-dark font-black text-lg">L. {Number(p.price).toLocaleString()}</p>
                                                             
-                                                            {p.stock > 0 ? (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        navigate(`/product/${p.id}`);
-                                                                        setIsSearchOpen(false);
-                                                                    }}
-                                                                    className="px-4 py-2 bg-primary text-white text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-primary-light transition-colors"
-                                                                >
-                                                                    Ver Pieza
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        navigate('/contact');
-                                                                        setIsSearchOpen(false);
-                                                                    }}
-                                                                    className="px-4 py-2 bg-primary/5 text-primary text-[8px] font-black uppercase tracking-widest rounded-full hover:bg-primary hover:text-white transition-all border border-primary/10"
-                                                                >
-                                                                    Solicitar
-                                                                </button>
-                                                            )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    navigate(`/product/${p.id}`);
+                                                                    setIsSearchOpen(false);
+                                                                }}
+                                                                className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${
+                                                                    p.stock > 0 
+                                                                    ? 'bg-primary text-white hover:bg-primary-light shadow-primary/20 hover:shadow-lg' 
+                                                                    : 'bg-primary/5 text-primary border border-primary/10 hover:bg-primary hover:text-white'
+                                                                }`}
+                                                            >
+                                                                {p.stock > 0 ? 'Ver Detalle' : 'Solicitar'}
+                                                            </button>
                                                         </div>
-
-                                                        {p.stock <= 0 && (
-                                                            <p className="text-[10px] text-primary/50 font-medium italic leading-tight">Agotado temporalmente. Puede solicitar una pieza nueva.</p>
-                                                        )}
                                                     </div>
                                                 </motion.div>
                                             ))
                                         ) : searchQuery && !isSearching ? (
                                             <motion.div 
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                className="col-span-full py-20 text-center space-y-8 bg-white rounded-[3rem] border border-primary/5 p-12 shadow-sm"
+                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                className="col-span-full py-24 text-center space-y-10 bg-white rounded-[4rem] border border-primary/5 p-16 shadow-2xl relative overflow-hidden"
                                             >
-                                                <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mx-auto ring-8 ring-primary/[0.02]">
-                                                    <Search className="w-10 h-10 text-primary/10" />
+                                                <div className="absolute top-0 right-0 p-8 opacity-5">
+                                                    <Search className="w-64 h-64 text-primary" />
                                                 </div>
-                                                <div className="space-y-3">
-                                                    <p className="text-primary/60 text-3xl font-serif italic">No se encontraron tesoros con ese nombre.</p>
-                                                    <p className="text-luxury-black/40 text-sm max-w-md mx-auto leading-relaxed">
-                                                        Nuestro equipo buscador de tesoros (Sourcing) puede encontrar esa fragancia o accesorio exclusivo para usted directamente en las mejores boutiques.
+                                                <div className="w-28 h-28 bg-primary/5 rounded-full flex items-center justify-center mx-auto ring-[20px] ring-primary/[0.02]">
+                                                    <Search className="w-12 h-12 text-primary/20" />
+                                                </div>
+                                                <div className="space-y-4 relative z-10">
+                                                    <h3 className="text-primary text-4xl md:text-5xl font-serif font-black italic">Sin coincidencias...</h3>
+                                                    <p className="text-luxury-black/50 text-base max-w-lg mx-auto leading-relaxed font-medium">
+                                                        Este tesoro no se encuentra en nuestro inventario actual, pero no se preocupe. Nuestro equipo de <span className="text-primary font-bold italic">Sourcing Directo</span> puede localizarlo para usted en las boutiques más exclusivas.
                                                     </p>
                                                 </div>
-                                                <div className="pt-4 flex flex-col md:flex-row items-center justify-center gap-4">
+                                                <div className="pt-6 flex flex-col md:flex-row items-center justify-center gap-6 relative z-10">
                                                     <button
                                                         onClick={() => { navigate('/contact'); setIsSearchOpen(false); }}
-                                                        className="px-10 py-5 bg-primary text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-full shadow-2xl shadow-primary/20 hover:-translate-y-1 transition-all flex items-center gap-3"
+                                                        className="px-12 py-6 bg-primary text-white text-[11px] font-black uppercase tracking-[0.4em] rounded-full shadow-[0_20px_40px_rgba(var(--primary-rgb),0.3)] hover:-translate-y-2 transition-all flex items-center gap-4"
                                                     >
-                                                        ENVIAR SOLICITUD ESPECIAL <ArrowRight className="w-4 h-4" />
+                                                        SOLICITUD ESPECIAL <ArrowRight className="w-5 h-5" />
                                                     </button>
                                                     <button
                                                         onClick={() => { navigate('/catalog'); setIsSearchOpen(false); }}
-                                                        className="px-10 py-5 bg-primary/5 text-primary text-[10px] font-black uppercase tracking-[0.3em] rounded-full border border-primary/10 hover:bg-primary/10 transition-all"
+                                                        className="px-12 py-6 bg-primary/5 text-primary text-[11px] font-black uppercase tracking-[0.4em] rounded-full border border-primary/10 hover:bg-primary/10 transition-all font-serif italic font-bold"
                                                     >
-                                                        Explorar Catálogo
+                                                        Explorar Todo el Catálogo
                                                     </button>
                                                 </div>
                                             </motion.div>
@@ -717,22 +727,36 @@ const Navbar = () => {
                                             <motion.div 
                                                 initial={{ opacity: 0 }}
                                                 animate={{ opacity: 1 }}
-                                                className="col-span-full py-40 text-center space-y-6"
+                                                className="col-span-full py-16 space-y-12"
                                             >
-                                                <div className="flex justify-center gap-2 mb-8 animate-bounce">
-                                                    {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 bg-primary/20 rounded-full" />)}
+                                                <div className="space-y-4">
+                                                    <p className="text-primary/20 text-[10px] font-black uppercase tracking-[0.8em] italic text-center">Explorar por Especialidad</p>
+                                                    <div className="flex flex-wrap justify-center gap-4 pt-6">
+                                                        {dbCategories.length > 0 ? dbCategories.slice(0, 8).map(cat => (
+                                                            <button 
+                                                                key={cat.id}
+                                                                onClick={() => { setSearchQuery(cat.name); handleSearch(cat.name); }}
+                                                                className="px-8 py-4 rounded-2xl bg-white border border-primary/10 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40 hover:bg-primary hover:text-white hover:scale-105 hover:shadow-xl transition-all group flex items-center gap-3"
+                                                            >
+                                                                <span>{cat.name}</span>
+                                                                <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+                                                            </button>
+                                                        )) : (
+                                                            ['Cuidado Personal', 'Fragancias', 'Accesorios', 'Lujo'].map(tag => (
+                                                                <button 
+                                                                    key={tag}
+                                                                    onClick={() => { setSearchQuery(tag); handleSearch(tag); }}
+                                                                    className="px-8 py-4 rounded-2xl bg-white border border-primary/5 text-[11px] font-black uppercase tracking-[0.2em] text-primary/40 hover:bg-primary hover:text-white hover:scale-105 transition-all shadow-sm"
+                                                                >
+                                                                    {tag}
+                                                                </button>
+                                                            ))
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <p className="text-primary/20 text-sm font-black uppercase tracking-[0.5em] italic">Descubra la Curaduría Luxessence...</p>
-                                                <div className="flex flex-wrap justify-center gap-2 pt-8">
-                                                    {['Nichos', 'Relojes', 'Premium', 'Joyas'].map(tag => (
-                                                        <button 
-                                                            key={tag}
-                                                            onClick={() => { setSearchQuery(tag); handleSearch(tag); }}
-                                                            className="px-5 py-2.5 rounded-full bg-white border border-primary/5 text-[9px] font-black uppercase tracking-widest text-primary/40 hover:bg-primary hover:text-white transition-all shadow-sm"
-                                                        >
-                                                            {tag}
-                                                        </button>
-                                                    ))}
+                                                
+                                                <div className="pt-20 text-center opacity-30 select-none">
+                                                    <p className="font-serif italic text-6xl text-primary/5 lowercase">Luxessence Curated Sourcing</p>
                                                 </div>
                                             </motion.div>
                                         )}

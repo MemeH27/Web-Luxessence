@@ -491,7 +491,10 @@ const SalesHistory = () => {
                                     <div key={sale.id} className="p-5 md:p-8 space-y-4 md:space-y-6 hover:bg-primary/[0.02] transition-all">
                                         <div className="flex justify-between items-start">
                                             <div className="space-y-1">
-                                                <p className="text-sm font-black text-primary uppercase">{sale.customers?.first_name} {sale.customers?.last_name}</p>
+                                                <p className="text-sm font-black text-primary uppercase">
+                                                    {sale.customers ? `${sale.customers.first_name} ${sale.customers.last_name}` : 
+                                                     (sale.orders?.notes?.startsWith('Invitado:') ? sale.orders.notes.replace('Invitado:', '').trim() : 'Consumidor Final')}
+                                                </p>
                                                 <div className="flex items-center gap-3">
                                                     <p className="text-[10px] text-primary/30 font-bold italic">{new Date(sale.created_at).toLocaleDateString()}</p>
                                                     <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${sale.payment_method === 'Contado' ? 'bg-green-500/10 text-green-600' : 'bg-orange-500/10 text-orange-600'}`}>
@@ -672,8 +675,8 @@ const SalesHistory = () => {
                 {isProfitOpen && selectedSale && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 text-luxury-black">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsProfitOpen(false)} className="absolute inset-0 bg-primary/20 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white md:rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-full md:h-auto md:max-h-[90vh]">
-                            <div className="p-10 space-y-8 flex-1 overflow-y-auto custom-scrollbar pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-10">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-[2rem] md:rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[90vh] md:h-auto md:max-h-[85vh]">
+                            <div className="p-10 space-y-8 flex-1 overflow-y-auto custom-scrollbar pt-[calc(env(safe-area-inset-top)+2rem)] md:pt-10">
                                 <div className="space-y-1">
                                     <h3 className="text-3xl font-serif font-bold italic text-primary">Análisis de Rentabilidad</h3>
                                     <div className="flex justify-between items-center">

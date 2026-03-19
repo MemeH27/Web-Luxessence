@@ -45,7 +45,10 @@ const InvoiceContent = ({ sale, customer, items, payments, totalPaid, balanceDue
                 <div className="space-y-4">
                     <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest border-l-2 border-primary pl-3 whitespace-nowrap">Datos del Comprador</p>
                     <div className="space-y-1">
-                        <h3 className="text-2xl font-serif font-bold italic text-primary">{customer?.first_name} {customer?.last_name}</h3>
+                        <h3 className="text-2xl font-serif font-bold italic text-primary">
+                            {customer ? `${customer.first_name} ${customer.last_name}` : 
+                             (sale.order?.notes?.startsWith('Invitado:') ? sale.order.notes.replace('Invitado:', '').trim() : 'Consumidor Final')}
+                        </h3>
                         <div className="text-sm text-gray-500 space-y-1 font-medium">
                             <p className="flex items-center gap-2 font-bold"><Phone className="w-4 h-4 text-gray-400" /> {customer?.phone}</p>
                             <p className="flex items-start gap-2 max-w-xs">{customer?.address || 'Honduras'}</p>
