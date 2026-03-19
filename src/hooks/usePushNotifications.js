@@ -24,7 +24,7 @@ export const usePushNotifications = () => {
     const [loading, setLoading] = useState(false);
 
     // ⚠️ REEMPLAZA ESTA CADENA POR TU LLAVE PÚBLICA (USANDO npx web-push generate-vapid-keys)
-    const PUBLIC_VAPID_KEY = 'BLc5wkJ8of9NaFV6m2Yrv8F77rYKvx-R3jqYsKHmoFtegf-j3Gcwikdsw51oaTxXonF2-5OSu-GKhXl4tFXllYk'; 
+    const PUBLIC_VAPID_KEY = 'BAgx6hSpq2Yd0gB4-rgjCnBCVa7jY-B38MtjDbmH8sopk8bxjXay-XjNVLKuLsYcB39sIJqMhki8xk7oZoJCEZE'; 
 
     useEffect(() => {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -87,15 +87,15 @@ export const usePushNotifications = () => {
             setIsSubscribed(true);
             addToast('¡Alertas LuxOS activadas! 🎉 Recibirás noticias exclusivas.', 'success');
 
-            // Disparar test de notificacion inmediatamente a todos los suscritos (incluyendote recien)
-            await supabase.functions.invoke('notify-admins', {
-                body: {
-                    title: '¡Push Configurado! ✅',
-                    body: 'Tus alertas en tiempo real de LuxOS están activas. Recibirás pedidos y alertas de stock aquí.',
-                    url: '/admin/dashboard',
-                    target_role: 'admin'
-                }
-            }).catch(console.error);
+            // 🧪 ENVIAR NOTIFICACIÓN DE PRUEBA AL ACTIVAR (Directamente a esta suscripción)
+                await supabase.functions.invoke('notify-admins', {
+                    body: {
+                        title: '¡Push Activado con Éxito! 🎉',
+                        body: 'Ahora recibirás alertas en tiempo real sobre pedidos, stock y promociones de Luxessence.',
+                        url: '/profile',
+                        subscription: subscription // Enviar directamente a esta suscripción
+                    }
+                }).catch(console.error);
         } catch (error) {
             console.error('Subscription error:', error);
             addToast(error.name === 'InvalidCharacterError' ? 'La llave VAPID configurada no es válida (Base64).' : error.message, 'error');

@@ -132,9 +132,21 @@ const Promotions = () => {
         const payload = { ...form, new_prices: formattedPrices };
 
         try {
-            const { error } = editingPromotion
+            const { error, data: newPromo } = editingPromotion
                 ? await supabase.from('promotions').update(payload).eq('id', editingPromotion.id)
-                : await supabase.from('promotions').insert(payload);
+                : await supabase.from('promotions').insert(payload).select().single();
+
+            if (!error && !editingPromotion) {
+                // 🔔 Notify Users of New Promotion
+                supabase.functions.invoke('notify-admins', {
+                    body: {
+                        title: `🎁 ${payload.title} - ${payload.discount_badge}`,
+                        body: payload.description || '¡Tenemos una nueva promoción exclusiva para ti! Entra y descúbrela.',
+                        url: '/catalog',
+                        target_role: 'all'
+                    }
+                }).catch(console.error);
+            }
 
             if (error) throw error;
             addToast('Promoción guardada correctamente');

@@ -172,28 +172,75 @@ const OrderManagement = () => {
 
             if (saleError) throw saleError;
 
-            // Update Stock
+            // Update Stock & Check for Low Stock
             for (const item of selectedOrder.items) {
                 if (item.is_promo_metadata) continue; // Skip metadata items
                 const baseId = item.id || item.product_id;
-                const { data: prod } = await supabase.from('products').select('stock, variants').eq('id', baseId).single();
+                const { data: prod } = await supabase.from('products').select('name, stock, variants').eq('id', baseId).single();
 
                 if (prod) {
+                    let newStock;
                     if (item.is_variant && item.variant_id) {
                         const updatedVariants = prod.variants.map(v =>
                             v.id === item.variant_id ? { ...v, stock: Math.max(0, v.stock - item.quantity) } : v
                         );
-                        const newTotalStock = updatedVariants.reduce((acc, v) => acc + v.stock, 0);
-                        await supabase.from('products').update({ stock: newTotalStock, variants: updatedVariants }).eq('id', baseId);
+                        newStock = updatedVariants.reduce((acc, v) => acc + v.stock, 0);
+                        await supabase.from('products').update({ stock: newStock, variants: updatedVariants }).eq('id', baseId);
                     } else {
                         const deductQty = item.is_combo ? (item.quantity * (item.combo_jibbitz_count || 1)) : item.quantity;
-                        const newStock = Math.max(0, prod.stock - deductQty);
+                        newStock = Math.max(0, prod.stock - deductQty);
                         await supabase.from('products').update({ stock: newStock }).eq('id', baseId);
+                    }
+
+                    // 🔔 Notify Admin if stock is low
+                    if (newStock <= 5) {
+                        supabase.functions.invoke('notify-admins', {
+                            body: {
+                                title: '⚠️ Stock Bajo',
+                                body: `El producto "${prod.name}" tiene solo ${newStock} unidades.`,
+                                url: '/admin/products',
+                                target_role: 'admin'
+                            }
+                        }).catch(console.error);
                     }
                 }
             }
 
             await supabase.from('orders').update({ status: 'processed' }).eq('id', selectedOrder.id);
+            
+            // 🔔 Notify Customer that order is processed
+            if (selectedOrder.client_email) {
+                supabase.functions.invoke('notify-admins', {
+                    body: {
+                        title: '✅ Pedido Procesado',
+                        body: `Tu pedido ha sido procesado con éxito, comunícate con los números de Luxessence para coordinar la entrega.`,
+                        url: '/profile',
+                        email: selectedOrder.client_email
+                    }
+                }).catch(console.error);
+            }
+
+            // 🔔 Notify ALL Admins about the new sale (amount included)
+            supabase.functions.invoke('notify-admins', {
+                body: {
+                    title: '💰 Venta Realizada',
+                    body: `Se ha registrado una nueva venta por L. ${finalTotal.toFixed(2)}`,
+                    url: '/admin/sales',
+                    target_role: 'admin'
+                }
+            }).catch(console.error);
+
+            // 🔔 Notify Admin if it's a pending account (Crédito)
+            if (paymentMethod === 'Crédito') {
+                supabase.functions.invoke('notify-admins', {
+                    body: {
+                        title: '💳 Cuenta Pendiente',
+                        body: `Se registró una venta al crédito para ${selectedOrder.customers?.first_name} por L. ${finalTotal.toFixed(2)}`,
+                        url: '/admin/sales',
+                        target_role: 'admin'
+                    }
+                }).catch(console.error);
+            }
 
             // Loyalty Stamps Logic - Fetch fresh count
             if (selectedOrder.customer_id) {

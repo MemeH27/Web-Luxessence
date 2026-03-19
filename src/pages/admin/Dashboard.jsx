@@ -66,7 +66,7 @@ const Dashboard = () => {
 
             const { data: allSalesForCredits } = await supabase
                 .from('sales')
-                .select('id, total, is_paid, payments(amount)')
+                .select('id, total, is_paid, created_at, payments(amount)')
                 .eq('is_paid', false);
 
             const realPending = allSalesForCredits?.reduce((acc, sale) => {
@@ -115,6 +115,24 @@ const Dashboard = () => {
                 .map(([name, count]) => ({ name, count }))
                 .sort((a,b) => b.count - a.count)
                 .slice(0, 3);
+
+            // 🔔 Check for Upcoming Due Dates (Credits nearing 30 days old)
+            const upcomingDues = allSalesForCredits?.filter(sale => {
+                const daysOld = Math.floor((new Date() - new Date(sale.created_at)) / (1000 * 60 * 60 * 24));
+                return daysOld >= 25; // 5 days alert window
+            }) || [];
+
+            if (upcomingDues.length > 0 && !sessionStorage.getItem('notified_dues_today')) {
+                supabase.functions.invoke('notify-admins', {
+                    body: {
+                        title: '📅 Facturas por Vencer',
+                        body: `Hay ${upcomingDues.length} cuentas por cobrar próximas a vencer.`,
+                        url: '/admin/sales',
+                        target_role: 'admin'
+                    }
+                }).catch(console.error);
+                sessionStorage.setItem('notified_dues_today', 'true');
+            }
 
             setStats({
                 revenue: totalRevenue,

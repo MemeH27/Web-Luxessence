@@ -410,7 +410,20 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                         await supabase.from('products').update({ stock: newStock, variants: updatedVariants }).eq('id', baseId);
                     } else {
                         const qtyToDeduct = item.isCombo ? (item.quantity * item.singleJibbitzCount) : item.quantity;
-                        await supabase.from('products').update({ stock: prod.stock - qtyToDeduct }).eq('id', baseId);
+                        const finalStock = prod.stock - qtyToDeduct;
+                        await supabase.from('products').update({ stock: finalStock }).eq('id', baseId);
+                        
+                        // 🔔 Low Stock Alert
+                        if (finalStock <= 5) {
+                            supabase.functions.invoke('notify-admins', {
+                                body: {
+                                    title: '⚠️ Stock Bajo',
+                                    body: `El producto "${item.name}" tiene solo ${finalStock} unidades.`,
+                                    url: '/admin/products',
+                                    target_role: 'admin'
+                                }
+                            }).catch(console.error);
+                        }
                     }
                 }
             }
@@ -446,6 +459,17 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
             }
 
             addToast('¡Venta realizada con éxito! 🎉', 'success');
+            
+            // 🔔 Notify ALL Admins about the new manual sale
+            supabase.functions.invoke('notify-admins', {
+                body: {
+                    title: '💰 Venta Presencial',
+                    body: `Se ha registrado una nueva venta por L. ${total.toFixed(2)}`,
+                    url: '/admin/sales',
+                    target_role: 'admin'
+                }
+            }).catch(console.error);
+
             if (onSaleComplete) onSaleComplete(sale);
             onClose();
 

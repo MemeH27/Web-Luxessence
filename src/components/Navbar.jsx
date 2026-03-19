@@ -466,7 +466,13 @@ const Navbar = () => {
                     .from('customers')
                     .select('id')
                     .eq('email', email)
-                    .single();
+                    .maybeSingle();
+
+                if (existingUser) {
+                    setLoading(false);
+                    setError('Este correo electrónico ya está registrado. Por favor, inicie sesión.');
+                    return;
+                }
 
                 result = await supabase.auth.signUp({
                     email,

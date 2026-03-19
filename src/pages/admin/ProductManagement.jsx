@@ -285,9 +285,37 @@ const ProductManagement = () => {
         };
 
         try {
-            const { error } = editingProduct
+            const { error, data: newProd } = editingProduct
                 ? await supabase.from('products').update(payload).eq('id', editingProduct.id)
-                : await supabase.from('products').insert(payload);
+                : await supabase.from('products').insert(payload).select().single();
+
+            if (!error) {
+                if (!editingProduct) {
+                    // 🔔 Notify Users of New Product or Upcoming Item
+                    supabase.functions.invoke('notify-admins', {
+                        body: {
+                            title: payload.is_coming_soon ? '⏳ ¡Próximamente en Luxessence!' : '✨ Nuevo Tesoro en Luxessence',
+                            body: payload.is_coming_soon 
+                                ? `Muy pronto podrás adquirir "${payload.name}". ¡Mantente atento!`
+                                : `Descubre "${payload.name}" en nuestro catálogo. ¡No te lo pierdas!`,
+                            url: '/catalog',
+                            target_role: 'all'
+                        }
+                    }).catch(console.error);
+                }
+
+                // 🔔 Notify Admin if stock is low (either on create or update)
+                if (totalStock <= 5 && totalStock > 0) {
+                    supabase.functions.invoke('notify-admins', {
+                        body: {
+                            title: '⚠️ Stock Bajo',
+                            body: `El producto "${payload.name}" tiene solo ${totalStock} unidades.`,
+                            url: '/admin/products',
+                            target_role: 'admin'
+                        }
+                    }).catch(console.error);
+                }
+            }
 
             if (error) {
                 console.error('Error saving product:', error);
