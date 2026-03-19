@@ -14,7 +14,7 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-async function sendPushNotifications(subs: any[], title: string, body: string, url: string, supabase: any) {
+async function sendPushNotifications(subs: any[], title: string, body: string, url: string, icon: string, badge: string, supabase: any) {
     webpush.setVapidDetails(
         'mailto:luxessence504@gmail.com',
         Deno.env.get('VAPID_PUBLIC_KEY')!,
@@ -25,7 +25,7 @@ async function sendPushNotifications(subs: any[], title: string, body: string, u
         try {
             return await webpush.sendNotification(
                 sub.subscription_json,
-                JSON.stringify({ title, body, url })
+                JSON.stringify({ title, body, url, icon, badge })
             )
         } catch (err: any) {
             if (err.statusCode === 404 || err.statusCode === 410) {
@@ -65,6 +65,8 @@ serve(async (req) => {
             title = 'Aviso de Luxessence', 
             body = 'Tienes una nueva actualización.', 
             url = '/', 
+            icon = '/img/logo-blanco.png',
+            badge = '/img/logo-blanco.png',
             target_role = 'admin', 
             user_id: target_user_id,
             email: target_email, // New: Target by email
@@ -74,7 +76,7 @@ serve(async (req) => {
         const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
 
         if (specific_sub) {
-            return await sendPushNotifications([{ subscription_json: specific_sub }], title, body, url, supabase)
+            return await sendPushNotifications([{ subscription_json: specific_sub }], title, body, url, icon, badge, supabase)
         }
 
         let query = supabase.from('push_subscriptions').select('subscription_json, user_id')
@@ -118,7 +120,7 @@ serve(async (req) => {
             })
         }
 
-        return await sendPushNotifications(subs, title, body, url, supabase)
+        return await sendPushNotifications(subs, title, body, url, icon, badge, supabase)
 
     } catch (error: any) {
         console.error('Edge Function Error:', error)

@@ -17,8 +17,8 @@ self.addEventListener('push', (event) => {
         const data = event.data.json();
         const options = {
             body: data.body,
-            icon: '/img/logo-luxessence.svg',
-            badge: '/img/logo-luxessence.svg',
+            icon: data.icon || '/img/logoluxessence.png',
+            badge: data.badge || '/img/logoluxessence.png',
             vibrate: [100, 50, 100],
             data: {
                 url: data.url || '/admin/dashboard'
