@@ -85,13 +85,13 @@ export const usePushNotifications = () => {
             if (error) throw error;
 
             setIsSubscribed(true);
-            addToast('¡Alertas LuxOS activadas! 🎉 Recibirás noticias exclusivas.', 'success');
+            addToast('¡Actualizaciones activadas! 🎉 Recibirás promociones antes que nadie.', 'success');
 
             // 🧪 ENVIAR NOTIFICACIÓN DE PRUEBA AL ACTIVAR (Directamente a esta suscripción)
                 await supabase.functions.invoke('notify-admins', {
                     body: {
-                        title: '¡Push Activado con Éxito! 🎉',
-                        body: 'Ahora recibirás alertas en tiempo real sobre pedidos, stock y promociones de Luxessence.',
+                        title: '¡Actualizaciones activas! 🎉',
+                        body: 'Recibe promociones y novedades antes que nadie.',
                         url: '/profile',
                         subscription: subscription // Enviar directamente a esta suscripción
                     }

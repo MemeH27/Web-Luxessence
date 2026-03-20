@@ -98,28 +98,39 @@ const AdminLayout = () => {
                 // 2. Check Pending Invoices near due date (approx 30 days old)
                 const thirtyDaysAgo = new Date();
                 thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                const twentyFiveDaysAgo = new Date();
-                twentyFiveDaysAgo.setDate(twentyFiveDaysAgo.getDate() - 25);
+                const twentySevenDaysAgo = new Date();
+                twentySevenDaysAgo.setDate(twentySevenDaysAgo.getDate() - 27);
 
                 const { data: expiringInvoices, error: invoiceError } = await supabase
                     .from('sales')
                     .select('id, total, customers(first_name, last_name)')
                     .eq('payment_method', 'Crédito')
                     .eq('is_paid', false)
-                    .lte('created_at', twentyFiveDaysAgo.toISOString())
+                    .lte('created_at', twentySevenDaysAgo.toISOString())
                     .gte('created_at', thirtyDaysAgo.toISOString())
                     .limit(3);
 
                 if (!invoiceError && expiringInvoices && expiringInvoices.length > 0) {
-                    await supabase.functions.invoke('notify-admins', {
-                        body: {
-                            title: 'Facturas por vencer ⏳',
-                            body: `${expiringInvoices.length} factura(s) de crédito están a punto de cumplir 30 días sin cancelar.`,
-                            url: '/admin/sales',
-                            target_role: 'admin'
-                        }
-                    });
+                    for (const invoice of expiringInvoices) {
+                        await supabase.functions.invoke('notify-admins', {
+                            body: {
+                                title: 'Factura por Vencer ⏳',
+                                body: `La factura de ${invoice.customers?.first_name} por L. ${invoice.total} está por cumplir 30 días.`,
+                                url: `/admin/sales?id=${invoice.id}`,
+                                target_role: 'admin'
+                            }
+                        }).catch(console.error);
+                    }
                 }
+
+                // 3. Auto-unmark New Arrivals (7 days)
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                await supabase
+                    .from('products')
+                    .update({ is_new_arrival: false })
+                    .eq('is_new_arrival', true)
+                    .lt('created_at', sevenDaysAgo.toISOString());
 
                 localStorage.setItem(LAST_CHECK_KEY, now.toString());
             } catch (err) {

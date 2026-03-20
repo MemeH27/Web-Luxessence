@@ -257,7 +257,7 @@ const ProductDetail = () => {
                                 {product.variants?.length > 0 && (
                                     <div className="space-y-4 pt-6 border-t border-primary/10">
                                         <div className="flex items-center justify-between mb-2">
-                                            <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-primary/40 font-sans">Selecciona una Fragancia</h4>
+                                            <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-primary/40 font-sans">Selecciona una opción disponible</h4>
                                         </div>
 
                                         <div className="relative group/slider">

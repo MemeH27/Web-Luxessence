@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import BottomNav from './BottomNav';
 import Footer from './Footer';
+import BackToTop from './BackToTop';
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
@@ -61,6 +62,7 @@ const Layout = ({ children }) => {
 
             {!location.pathname.startsWith('/product/') && <Footer />}
             <BottomNav />
+            <BackToTop />
 
             {/* Decorative Brand Colors */}
             <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/3 rounded-full blur-[150px] -z-10 pointer-events-none" />

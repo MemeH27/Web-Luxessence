@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     X, Search, Plus, Minus, Trash2, ShoppingCart, User, Package,
-    DollarSign, CreditCard, Save, ArrowLeft, UserPlus, Tag, Camera, Minimize2, Edit
+    DollarSign, CreditCard, Save, ArrowLeft, UserPlus, Tag, Camera, Minimize2, Edit, Gift
 } from 'lucide-react';
 import BarcodeScanner from './BarcodeScanner';
 import SecurityModal from './SecurityModal';
@@ -82,12 +82,15 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                     const items = saleToEdit.orders?.items || [];
                     const initialCart = items.map(item => {
                         const uniqueId = item.is_variant ? `${item.product_id}-${item.variant_id}` : (item.is_combo ? `${item.product_id}-combo` : item.product_id);
+                        const isGift = item.price === 0 && item.name.includes('(REGALO POR LA COMPRA)');
                         return {
                             id: uniqueId,
                             baseProductId: item.product_id,
                             variantId: item.variant_id,
                             name: item.name,
                             price: item.price,
+                            isGift: isGift,
+                            originalPrice: isGift ? 0 : item.price, // We don't know the original price easily if it was already a gift, but 0 is safe for now or we could try to find it from products
                             cost: item.cost,
                             quantity: item.quantity,
                             stock: 999, // Will be fetchable from products mapping if needed
@@ -346,6 +349,31 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
         setCart(cart.filter(item => !(item.id === id && item.isCombo === isCombo && item.isVariant === isVariant)));
     };
 
+    const toggleGift = (id, isCombo, isVariant) => {
+        setCart(prev => prev.map(item => {
+            if (item.id === id && item.isCombo === isCombo && item.isVariant === isVariant) {
+                const isGift = !item.isGift;
+                if (isGift) {
+                    return {
+                        ...item,
+                        isGift: true,
+                        originalPrice: item.price,
+                        price: 0,
+                        name: item.name.includes('(REGALO POR LA COMPRA)') ? item.name : `${item.name} (REGALO POR LA COMPRA)`
+                    };
+                } else {
+                    return {
+                        ...item,
+                        isGift: false,
+                        price: item.originalPrice || 0,
+                        name: item.name.replace(' (REGALO POR LA COMPRA)', '')
+                    };
+                }
+            }
+            return item;
+        }));
+    };
+
     const handleCreateCustomer = async (e) => {
         e.preventDefault();
         try {
@@ -466,7 +494,6 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                     total: finalTotal,
                     items: orderItems,
                     delivery_mode: 'mostrador',
-                    notes: guestName ? `Invitado: ${guestName}` : null,
                     created_at: isoTimestamp
                 }).select().single();
 
@@ -515,12 +542,12 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                         const finalStock = prod.stock - qtyToDeduct;
                         await supabase.from('products').update({ stock: finalStock }).eq('id', baseId);
                         
-                        if (finalStock <= 5) {
+                        if (prod.stock > 5 && finalStock <= 5) {
                             supabase.functions.invoke('notify-admins', {
                                 body: {
                                     title: '⚠️ Stock Bajo',
                                     body: `El producto "${item.name}" tiene solo ${finalStock} unidades.`,
-                                    url: '/admin/products',
+                                    url: `/admin/inventory`, // Can filter or focus on this item later
                                     target_role: 'admin'
                                 }
                             }).catch(console.error);
@@ -648,8 +675,17 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start">
-                                                    <h5 className="text-xs font-semibold text-gray-900 truncate pr-2" title={item.name}>{item.name}</h5>
-                                                    <button onClick={() => removeFromCart(item.id, item.isCombo, item.isVariant)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+                                                    <h5 className="text-[10px] sm:text-xs font-semibold text-gray-900 truncate pr-2" title={item.name}>{item.name}</h5>
+                                                    <div className="flex items-center gap-1">
+                                                        <button 
+                                                            onClick={() => toggleGift(item.id, item.isCombo, item.isVariant)} 
+                                                            className={`p-1.5 rounded-lg transition-all active:scale-95 ${item.isGift ? 'bg-secondary/20 text-secondary' : 'bg-gray-100 text-gray-400 hover:text-secondary hover:bg-secondary/10'}`}
+                                                            title={item.isGift ? 'Quitar Regalo' : 'Marcar como Regalo'}
+                                                        >
+                                                            <Gift className={`w-3.5 h-3.5 ${item.isGift ? 'fill-current' : ''}`} />
+                                                        </button>
+                                                        <button onClick={() => removeFromCart(item.id, item.isCombo, item.isVariant)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Eliminar"><X className="w-4 h-4" /></button>
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center justify-between mt-2">
                                                     <div className="flex items-center bg-gray-50 border border-gray-200 rounded">

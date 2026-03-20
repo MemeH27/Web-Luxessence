@@ -119,18 +119,20 @@ const Dashboard = () => {
             // 🔔 Check for Upcoming Due Dates (Credits nearing 30 days old)
             const upcomingDues = allSalesForCredits?.filter(sale => {
                 const daysOld = Math.floor((new Date() - new Date(sale.created_at)) / (1000 * 60 * 60 * 24));
-                return daysOld >= 25; // 5 days alert window
+                return daysOld >= 27 && daysOld <= 30; // 3 days alert window before 1 month
             }) || [];
 
             if (upcomingDues.length > 0 && !sessionStorage.getItem('notified_dues_today')) {
-                supabase.functions.invoke('notify-admins', {
-                    body: {
-                        title: '📅 Facturas por Vencer',
-                        body: `Hay ${upcomingDues.length} cuentas por cobrar próximas a vencer.`,
-                        url: '/admin/sales',
-                        target_role: 'admin'
-                    }
-                }).catch(console.error);
+                for (const invoice of upcomingDues) {
+                    supabase.functions.invoke('notify-admins', {
+                        body: {
+                            title: 'Factura por Vencer ⏳',
+                            body: `La factura de ${invoice.customers?.first_name} por L. ${invoice.total} está por cumplir 30 días.`,
+                            url: `/admin/sales?id=${invoice.id}`,
+                            target_role: 'admin'
+                        }
+                    }).catch(console.error);
+                }
                 sessionStorage.setItem('notified_dues_today', 'true');
             }
 
@@ -379,9 +381,9 @@ const Dashboard = () => {
                                                 <span className="text-primary/60">{cat.name}</span>
                                                 <span className="text-primary">{cat.count} vtas</span>
                                             </div>
-                                            <div className="w-full h-1 bg-primary/5 rounded-full overflow-hidden">
-                                                <div className="h-full bg-gold" style={{ width: `${(cat.count / stats.topCategories[0].count) * 100}%` }} />
-                                            </div>
+                                             <div className="w-full h-1 bg-primary/5 rounded-full overflow-hidden">
+                                                 <div className="h-full bg-gold" style={{ width: `${stats.topCategories.length > 0 ? (cat.count / stats.topCategories[0].count) * 100 : 0}%` }} />
+                                             </div>
                                         </div>
                                     ))}
                                 </div>

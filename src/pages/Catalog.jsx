@@ -23,6 +23,12 @@ const Catalog = () => {
     const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
     const [sortBy, setSortBy] = useState('newest');
     const [showOnlyInStock, setShowOnlyInStock] = useState(true);
+    const [visibleCount, setVisibleCount] = useState(8);
+
+    // Reset visible count when filters change
+    useEffect(() => {
+        setVisibleCount(8);
+    }, [search, selectedCategory, sortBy, showOnlyInStock]);
 
 
 
@@ -370,7 +376,7 @@ const Catalog = () => {
                                     : "flex flex-col gap-12 pb-32"
                                 }
                             >
-                                {filteredProducts.map((product) => (
+                                {filteredProducts.slice(0, visibleCount).map((product) => (
                                     <motion.div
                                         layout
                                         initial={{ opacity: 0, scale: 0.95 }}
@@ -504,6 +510,16 @@ const Catalog = () => {
                                         </div>
                                     </motion.div>
                                 ))}
+                                {visibleCount < filteredProducts.length && (
+                                    <div className="col-span-full flex justify-center pt-12 pb-24">
+                                        <button 
+                                            onClick={() => setVisibleCount(prev => prev + 4)}
+                                            className="px-12 py-4 bg-primary text-secondary-light text-[10px] font-black uppercase tracking-[0.3em] rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all outline-none border border-white/10"
+                                        >
+                                            Mostrar Más
+                                        </button>
+                                    </div>
+                                )}
                             </motion.div>
                         </AnimatePresence>
                     )}

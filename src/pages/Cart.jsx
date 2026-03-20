@@ -73,8 +73,12 @@ const Cart = () => {
     const [promoCode, setPromoCode] = useState('');
     const [appliedDiscount, setAppliedDiscount] = useState(0); // 0 or 0.05
     const [validatingPromo, setValidatingPromo] = useState(false);
-    const [giftWrap, setGiftWrap] = useState(false);
-    const giftWrapFee = giftWrap ? 75 : 0;
+    const [giftOptions, setGiftOptions] = useState({ 
+        enabled: false, 
+        style: 'luxury', // luxury, birthday, classic
+        message: '' 
+    });
+    const giftWrapFee = giftOptions.enabled ? 75 : 0;
 
     const deliveryFee = deliveryMode === 'domicilio' ? 50 : 0;
     const discountAmount = subtotal * appliedDiscount;
@@ -253,8 +257,9 @@ const Cart = () => {
                 body: {
                     title: '¡Nuevo Pedido! 🎉',
                     body: `${formData.first_name} ${formData.last_name} realizó un pedido por L. ${finalTotal.toFixed(2)}`,
-                    url: '/admin/orders',
-                    target_role: 'admin'
+                    url: result.order_id ? `/admin/orders?id=${result.order_id}` : '/admin/orders',
+                    target_role: 'admin',
+                    user_name: formData.first_name // Pass name for personalization in the function if supported
                 }
             }).catch(err => console.error('Error invoking notify-admins:', err));
 
@@ -276,8 +281,8 @@ const Cart = () => {
                 }).join('%0A') +
                 `%0A--------------------------%0A` +
                 (deliveryFee > 0 ? `*Envío:* L. ${deliveryFee}%0A` : '') +
-                (giftWrap ? `*Empaque de Regalo:* L. ${giftWrapFee}%0A` : '') +
-                (discountAmount > 0 ? `*Descuento Cupón (5%):* -L. ${discountAmount.toFixed(2)}%0A` : '') +
+                (giftOptions.enabled ? `*Presentación de Regalo:* ${giftOptions.style.toUpperCase()}%0A` : '') +
+                (giftOptions.message ? `*Mensaje:* "${giftOptions.message}"%0A` : '') +
                 `*TOTAL: L. ${finalTotal.toFixed(2)}*%0A` +
                 `--------------------------%0A` +
                 `_Espere nuestra confirmación para el envío._`;
@@ -677,53 +682,64 @@ const Cart = () => {
                                     </div>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={() => setGiftWrap(!giftWrap)}
-                                    className={`w-full group relative p-6 rounded-3xl border transition-all duration-700 overflow-hidden flex items-center justify-between ${giftWrap ? 'bg-primary border-primary shadow-2xl' : 'bg-white border-primary/10'}`}
-                                >
-                                    <div className="flex items-center gap-4 relative z-10">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-700 ${giftWrap ? 'bg-secondary text-primary' : 'bg-primary/5 text-primary/40'}`}>
+                                <div className="space-y-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGiftOptions({ ...giftOptions, enabled: !giftOptions.enabled })}
+                                        className={`w-full group relative p-6 rounded-3xl border transition-all duration-700 overflow-hidden flex items-center justify-between ${giftOptions.enabled ? 'bg-primary border-primary shadow-2xl' : 'bg-white border-primary/10'}`}
+                                    >
+                                        <div className="flex items-center gap-4 relative z-10">
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-700 ${giftOptions.enabled ? 'bg-secondary text-primary' : 'bg-primary/5 text-primary/40'}`}>
+                                                <motion.div animate={giftOptions.enabled ? { rotate: [0, -10, 10, -5, 5, 0], scale: [1, 1.1, 1] } : {}} transition={{ duration: 0.5 }}>
+                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
+                                                </motion.div>
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-[10px] font-black uppercase tracking-widest ${giftOptions.enabled ? 'text-secondary-light' : 'text-primary/40'}`}>Experiencia de Regalo</p>
+                                                <p className={`text-base font-serif italic font-bold ${giftOptions.enabled ? 'text-white' : 'text-primary'}`}>¿Es una sorpresa?</p>
+                                            </div>
+                                        </div>
+                                        <span className={`text-sm font-black relative z-10 ${giftOptions.enabled ? 'text-secondary' : 'text-primary/60'}`}>L. {giftWrapFee}</span>
+                                    </button>
+
+                                    <AnimatePresence>
+                                        {giftOptions.enabled && (
                                             <motion.div
-                                                animate={giftWrap ? {
-                                                    rotate: [0, -10, 10, -5, 5, 0],
-                                                    scale: [1, 1.1, 1]
-                                                } : {}}
-                                                transition={{ duration: 0.5 }}
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                className="overflow-hidden space-y-4"
                                             >
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M20 12v10H4V12" />
-                                                    <path d="M2 7h20v5H2z" />
-                                                    <path d="M12 22V7" />
-                                                    <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-                                                    <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
-                                                </svg>
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    {[
+                                                        { id: 'luxury', label: 'Lujo Oro', desc: 'Seda y Lazo' },
+                                                        { id: 'birthday', label: 'Cumpleaños', desc: 'Papel Premium' },
+                                                        { id: 'classic', label: 'Clásico', desc: 'BolsA Lux' }
+                                                    ].map((style) => (
+                                                        <button
+                                                            key={style.id}
+                                                            type="button"
+                                                            onClick={() => setGiftOptions({ ...giftOptions, style: style.id })}
+                                                            className={`p-4 rounded-2xl border text-center transition-all ${giftOptions.style === style.id ? 'bg-secondary text-primary border-secondary shadow-lg' : 'bg-white text-primary/40 border-primary/10 hover:border-primary/20'}`}
+                                                        >
+                                                            <p className="text-[9px] font-black uppercase tracking-tighter mb-1">{style.label}</p>
+                                                            <p className="text-[7px] italic opacity-60 leading-none">{style.desc}</p>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="relative group">
+                                                    <textarea
+                                                        placeholder="Agrega una nota corta para el destinatario..."
+                                                        className="w-full bg-white border border-primary/10 rounded-2xl py-4 px-6 outline-none focus:ring-1 focus:ring-primary transition-all text-xs italic resize-none"
+                                                        rows="2"
+                                                        value={giftOptions.message}
+                                                        onChange={(e) => setGiftOptions({ ...giftOptions, message: e.target.value })}
+                                                    />
+                                                </div>
                                             </motion.div>
-                                        </div>
-                                        <div className="text-left">
-                                            <p className={`text-[10px] font-black uppercase tracking-widest ${giftWrap ? 'text-secondary-light' : 'text-primary/40'}`}>Presentación Premium</p>
-                                            <p className={`text-base font-serif italic font-bold ${giftWrap ? 'text-white' : 'text-primary'}`}>¿Es un regalo?</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col items-end relative z-10">
-                                        <span className={`text-sm font-black ${giftWrap ? 'text-secondary' : 'text-primary/60'}`}>L. {giftWrapFee}</span>
-                                        {giftWrap && (
-                                            <motion.span
-                                                initial={{ opacity: 0, scale: 0.8 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                className="text-[8px] font-black text-secondary-light tracking-tighter uppercase mt-1"
-                                            >
-                                                Añadido
-                                            </motion.span>
                                         )}
-                                    </div>
-                                    {giftWrap && (
-                                        <motion.div
-                                            layoutId="gift-glow"
-                                            className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10"
-                                        />
-                                    )}
-                                </button>
+                                    </AnimatePresence>
+                                </div>
 
                                 <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest font-black text-primary/40 bg-primary/5 p-4 rounded-2xl italic">
                                     <ShieldCheck className="w-4 h-4 text-green-600" /> Transacción Segura vía WhatsApp

@@ -17,6 +17,7 @@ const CustomerManagement = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', address: '', loyalty_stamps: 0 });
+    const [stampFilter, setStampFilter] = useState('all'); // all, 0, 1, 2, 3, 4, 5
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -145,10 +146,12 @@ const CustomerManagement = () => {
         exportToExcel(exportData, 'Directorio_Clientes_Luxessence', 'Clientes');
     };
 
-    const filteredCustomers = customers.filter(c =>
-        `${c.first_name} ${c.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm)
-    );
+    const filteredCustomers = customers.filter(c => {
+        const matchesSearch = `${c.first_name} ${c.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.phone.includes(searchTerm);
+        const matchesStamps = stampFilter === 'all' || (c.loyalty_stamps || 0) === parseInt(stampFilter);
+        return matchesSearch && matchesStamps;
+    });
 
     const paginatedCustomers = filteredCustomers.slice(
         (currentPage - 1) * itemsPerPage,
@@ -157,7 +160,7 @@ const CustomerManagement = () => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, stampFilter]); // Added stampFilter to dependencies
 
     return (
         <div className="space-y-12 pb-20">
@@ -189,6 +192,22 @@ const CustomerManagement = () => {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
+                        </div>
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <label className="text-[10px] uppercase tracking-widest font-black text-primary/40 whitespace-nowrap">Filtrar por Sellos:</label>
+                            <select 
+                                value={stampFilter}
+                                onChange={(e) => setStampFilter(e.target.value)}
+                                className="bg-primary/5 border border-primary/10 rounded-xl px-4 py-3 text-xs font-bold text-primary outline-none focus:ring-1 focus:ring-primary transition-all"
+                            >
+                                <option value="all">Todos</option>
+                                <option value="0">0 Sellos</option>
+                                <option value="1">1 Sello</option>
+                                <option value="2">2 Sellos</option>
+                                <option value="3">3 Sellos</option>
+                                <option value="4">4 Sellos</option>
+                                <option value="5">5 Sellos</option>
+                            </select>
                         </div>
                         <p className="text-[10px] uppercase tracking-[0.2em] font-black text-primary/40 bg-white/50 px-6 py-2 rounded-full border border-primary/5">
                             {filteredCustomers.length} Clientes Identificados
