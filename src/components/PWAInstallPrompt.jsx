@@ -20,13 +20,14 @@ const PWAInstallPrompt = () => {
         
         if (isStandalone) return;
 
-        // 3. Show after delay
+        // 3. Show after a short delay to ensure user is seated
         const timer = setTimeout(() => {
             const hasDismissed = localStorage.getItem('pwa-prompt-dismissed');
+            // We show it if not dismissed OR if it's been a while (optional)
             if (!hasDismissed) {
                 setIsVisible(true);
             }
-        }, 8000); // 8 seconds delay
+        }, 3000); // 3 seconds delay for a better first impression
 
         return () => clearTimeout(timer);
     }, []);

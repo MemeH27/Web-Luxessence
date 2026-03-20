@@ -1,4 +1,4 @@
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = '2.1.0';
 
 // Tipos de cambio para el modal de actualización:
 // 'new'     → nueva funcionalidad para el usuario
@@ -6,6 +6,9 @@ export const APP_VERSION = '2.0.0';
 // 'improve' → mejora de experiencia/diseño
 // 'system'  → cambio interno/admin (se muestra solo como "Mejora de estabilidad")
 export const UPDATE_CHANGELOG = [
-    { type: 'improve', text: 'Mejoras generales en la interfaz y experiencia de la web' },
-    { type: 'fix', text: 'Corrección de errores y optimización de rendimiento' },
+    { type: 'new', text: 'Sistema de regalos exclusivos en compras' },
+    { type: 'new', text: 'Notificaciones inteligentes automatizadas' },
+    { type: 'improve', text: 'Optimización de carga en el catálogo móvil' },
+    { type: 'fix', text: 'Mejoras en la estabilidad de las notificaciones push' },
 ];
+
