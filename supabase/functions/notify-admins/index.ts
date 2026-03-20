@@ -65,8 +65,8 @@ serve(async (req) => {
             title = 'Aviso de Luxessence', 
             body = 'Tienes una nueva actualización.', 
             url = '/', 
-            icon = '/img/logo-blanco.png',
-            badge = '/img/logo-blanco.png',
+            icon = '/img/logoluxessence.png',
+            badge = '/img/logoluxessence.png',
             target_role = 'admin', 
             user_id: target_user_id,
             email: target_email, // New: Target by email

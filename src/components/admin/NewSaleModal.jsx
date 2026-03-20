@@ -395,7 +395,10 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                 .single();
             if (error) throw error;
 
-            setCustomers([...customers, data]);
+            setCustomers(prev => {
+                const filtered = prev.filter(c => c.id !== data.id);
+                return [...filtered, data];
+            });
             setSelectedCustomer(data);
             setIsNewCustomerModalOpen(false);
             setSearchCustomer(`${data.first_name} ${data.last_name}`);
@@ -425,7 +428,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
 
             // Guest Handling: Guests don't get saved to database anymore
             let customerId = selectedCustomer?.id === 'temp' ? null : selectedCustomer?.id;
-            const guestName = selectedCustomer?.id === 'temp' ? selectedCustomer.first_name : null;
+            const guestName = selectedCustomer?.id === 'temp' ? `Invitado: ${selectedCustomer.first_name}` : null;
 
             const now = new Date();
             const [year, month, day] = saleDate.split('-').map(Number);
@@ -459,6 +462,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                     customer_id: customerId,
                     total: finalTotal,
                     items: orderItems,
+                    notes: guestName,
                     created_at: isoTimestamp
                 }).eq('id', saleToEdit.order_id);
                 if (orderError) throw orderError;
@@ -493,6 +497,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                     status: 'processed',
                     total: finalTotal,
                     items: orderItems,
+                    notes: guestName,
                     delivery_mode: 'mostrador',
                     created_at: isoTimestamp
                 }).select().single();
@@ -623,16 +628,16 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                                 </div>
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                     <button onClick={() => setSelectedCategory('all')} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors border ${selectedCategory === 'all' ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary/50'}`} > Todos </button>
-                                    {categories.map(cat => (
-                                        <button key={cat.id} onClick={() => setSelectedCategory(cat.id)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors border ${selectedCategory === cat.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary/50'}`} > {cat.name} </button>
+                                    {categories.map((cat, idx) => (
+                                        <button key={cat.id || idx} onClick={() => setSelectedCategory(cat.id)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors border ${selectedCategory === cat.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary/50'}`} > {cat.name} </button>
                                     ))}
                                 </div>
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
                                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {filteredProducts.map(product => (
-                                        <button key={product.id} onClick={() => handleProductClick(product)} className="bg-white border border-gray-100 rounded-xl p-3 text-left hover:border-primary/40 hover:shadow-md transition-all flex flex-col group relative" >
+                                    {filteredProducts.map((product, idx) => (
+                                        <button key={product.id || idx} onClick={() => handleProductClick(product)} className="bg-white border border-gray-100 rounded-xl p-3 text-left hover:border-primary/40 hover:shadow-md transition-all flex flex-col group relative" >
                                             <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden mb-3 relative">
                                                 {product.image_url ? <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Package className="w-8 h-8" /></div>}
                                                 <div className="absolute top-2 right-2 bg-white/90 px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-700 shadow-sm border border-gray-100">Stock: {product.stock}</div>

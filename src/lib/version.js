@@ -1,14 +1,14 @@
-export const APP_VERSION = '2.1.0';
+export const APP_VERSION = '2.1.1';
 
-// Tipos de cambio para el modal de actualización:
-// 'new'     → nueva funcionalidad para el usuario
-// 'fix'     → corrección de error visible para el usuario
-// 'improve' → mejora de experiencia/diseño
-// 'system'  → cambio interno/admin (se muestra solo como "Mejora de estabilidad")
-export const UPDATE_CHANGELOG = [
-    { type: 'new', text: 'Sistema de regalos exclusivos en compras' },
-    { type: 'new', text: 'Notificaciones inteligentes automatizadas' },
-    { type: 'improve', text: 'Optimización de carga en el catálogo móvil' },
-    { type: 'fix', text: 'Mejoras en la estabilidad de las notificaciones push' },
-];
-
+export const UPDATE_CHANGELOG = {
+    version: APP_VERSION,
+    date: '2024-03-20',
+    features: [
+        "Corrección: Guardado de nombres para invitados en ventas",
+        "Mejora: Estabilidad en la lista de clientes y productos (Keys)",
+        "Notificaciones: Logo oficial Luxessence actualizado",
+        "Sistema de regalos exclusivos en compras",
+        "Notificaciones inteligentes automatizadas",
+        "Optimización de carga en el catálogo móvil"
+    ]
+};
