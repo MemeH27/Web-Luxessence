@@ -458,14 +458,27 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                 }
 
                 // 2. Update Order
-                const { error: orderError } = await supabase.from('orders').update({
+                const orderData = {
                     customer_id: customerId,
                     total: finalTotal,
                     items: orderItems,
-                    notes: guestName,
                     created_at: isoTimestamp
+                };
+
+                // Add notes ONLY if it doesn't cause errors (handled by catching in caller, 
+                // but since we know it's missing for some users, we'll try to use it and catch)
+                const { error: orderError } = await supabase.from('orders').update({
+                    ...orderData,
+                    notes: guestName
                 }).eq('id', saleToEdit.order_id);
-                if (orderError) throw orderError;
+                
+                if (orderError && orderError.code === 'PGRST204') {
+                    // Column doesn't exist, retry without it
+                    const { error: retryError } = await supabase.from('orders').update(orderData).eq('id', saleToEdit.order_id);
+                    if (retryError) throw retryError;
+                } else if (orderError) {
+                    throw orderError;
+                }
 
                 // 3. Update Sale
                 const { error: saleError } = await supabase.from('sales').update({
@@ -492,17 +505,31 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                 }
             } else {
                 // Regular New Sale
-                const { data: order, error: orderError } = await supabase.from('orders').insert({
+                const baseOrderData = {
                     customer_id: customerId,
                     status: 'processed',
                     total: finalTotal,
                     items: orderItems,
-                    notes: guestName,
                     delivery_mode: 'mostrador',
                     created_at: isoTimestamp
+                };
+
+                let order;
+                const { data: orderWithNotes, error: orderError } = await supabase.from('orders').insert({
+                    ...baseOrderData,
+                    notes: guestName
                 }).select().single();
 
-                if (orderError) throw orderError;
+                if (orderError && orderError.code === 'PGRST204') {
+                    // Fallback if 'notes' column is missing
+                    const { data: retryData, error: retryError } = await supabase.from('orders').insert(baseOrderData).select().single();
+                    if (retryError) throw retryError;
+                    order = retryData;
+                } else if (orderError) {
+                    throw orderError;
+                } else {
+                    order = orderWithNotes;
+                }
 
                 // Create Sale
                 const { data: sale, error: saleError } = await supabase.from('sales').insert({
@@ -516,6 +543,16 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                 }).select().single();
 
                 if (saleError) throw saleError;
+
+                // Send push notification for new sale
+                supabase.functions.invoke('notify-admins', {
+                    body: {
+                        title: '💰 Nueva Venta Admin',
+                        body: `${selectedCustomer.first_name || 'Invitado'} ${selectedCustomer.last_name || ''} - L. ${finalTotal}`,
+                        url: `/admin/sales`,
+                        target_role: 'admin'
+                    }
+                }).catch(console.error);
 
                 // Record Payment if Contado
                 if (paymentMethod === 'Contado') {
@@ -587,6 +624,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
         <AnimatePresence>
             {!isMinimized && (
                 <motion.div 
+                    key="sale-modal-main"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
@@ -629,7 +667,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                     <button onClick={() => setSelectedCategory('all')} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors border ${selectedCategory === 'all' ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary/50'}`} > Todos </button>
                                     {categories.map((cat, idx) => (
-                                        <button key={cat.id || idx} onClick={() => setSelectedCategory(cat.id)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors border ${selectedCategory === cat.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary/50'}`} > {cat.name} </button>
+                                        <button key={cat.id || `cat-${idx}`} onClick={() => setSelectedCategory(cat.id)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors border ${selectedCategory === cat.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary/50'}`} > {cat.name} </button>
                                     ))}
                                 </div>
                             </div>
@@ -637,7 +675,7 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                             <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
                                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                                     {filteredProducts.map((product, idx) => (
-                                        <button key={product.id || idx} onClick={() => handleProductClick(product)} className="bg-white border border-gray-100 rounded-xl p-3 text-left hover:border-primary/40 hover:shadow-md transition-all flex flex-col group relative" >
+                                        <button key={product.id ? `prod-${product.id}` : `prod-idx-${idx}`} onClick={() => handleProductClick(product)} className="bg-white border border-gray-100 rounded-xl p-3 text-left hover:border-primary/40 hover:shadow-md transition-all flex flex-col group relative" >
                                             <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden mb-3 relative">
                                                 {product.image_url ? <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Package className="w-8 h-8" /></div>}
                                                 <div className="absolute top-2 right-2 bg-white/90 px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-700 shadow-sm border border-gray-100">Stock: {product.stock}</div>
@@ -673,8 +711,8 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                                         <p className="text-sm">Agrega productos</p>
                                     </div>
                                 ) : (
-                                    cart.map(item => (
-                                        <div key={item.id} className="flex gap-3 bg-white border border-gray-100 rounded-lg p-2.5 shadow-sm">
+                                    cart.map((item, cartIdx) => (
+                                        <div key={item.id ? `cart-${item.id}-${cartIdx}` : `cart-idx-${cartIdx}`} className="flex gap-3 bg-white border border-gray-100 rounded-lg p-2.5 shadow-sm">
                                             <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden shrink-0">
                                                 {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <Package className="w-5 h-5 m-auto text-gray-300 mt-3" />}
                                             </div>
@@ -862,8 +900,8 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg relative z-10 max-h-[80vh] flex flex-col" >
                                 <h4 className="font-bold text-xl mb-4">{productForVariant.name}</h4>
                                 <div className="flex-1 overflow-y-auto space-y-3 mb-6 no-scrollbar">
-                                    {productForVariant.variants.map(variant => (
-                                        <div key={variant.id} className="flex gap-4 items-center p-3 border border-gray-100 rounded-xl bg-gray-50/50 hover:bg-white transition-all" >
+                                    {productForVariant?.variants?.map((variant, vIdx) => (
+                                        <div key={variant.id || `v-${vIdx}`} className="flex gap-4 items-center p-3 border border-gray-100 rounded-xl bg-gray-50/50 hover:bg-white transition-all" >
                                             <div className="w-14 h-14 bg-white rounded-lg overflow-hidden shrink-0">
                                                 {variant.image_url ? <img src={variant.image_url} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 m-auto mt-4 text-gray-200" />}
                                             </div>
@@ -885,10 +923,10 @@ const NewSaleModal = ({ isOpen, onClose, onSaleComplete, isMinimized, onMinimize
                     )}
                 </AnimatePresence>
 
-                {isScannerOpen && <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setIsScannerOpen(false)} />}
+                {isScannerOpen && <BarcodeScanner key="scanner" onScan={handleBarcodeScan} onClose={() => setIsScannerOpen(false)} />}
                 </motion.div>
             )}
-            <SecurityModal isOpen={isSecurityOpen} onClose={() => setIsSecurityOpen(false)} onConfirm={handleProcessSale} title="Confirmar Modificación" />
+            <SecurityModal key="security-modal" isOpen={isSecurityOpen} onClose={() => setIsSecurityOpen(false)} onConfirm={handleProcessSale} title="Confirmar Modificación" />
         </AnimatePresence>
     );
 };

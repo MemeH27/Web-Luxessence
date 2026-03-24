@@ -315,7 +315,6 @@ const AdminLayout = () => {
                     onSaleComplete={() => {
                         setIsNewSaleOpen(false); 
                         setIsSaleMinimized(false);
-                        window.location.reload();
                     }}
                 />
             </div>
