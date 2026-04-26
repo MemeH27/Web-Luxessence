@@ -6,7 +6,7 @@ const CartContext = createContext();
 export const useCart = () => useContext(CartContext);
 
 const CART_VERSION = 'v2';
-const RESERVATION_TIME_MINS = 3; // Tiempo en minutos para la reserva
+const RESERVATION_TIME_MINS = 5; // Tiempo en minutos para la reserva
 const EXTENSION_TIME_MINS = 5;    // Tiempo extra al dar clic en extender
 
 export const CartProvider = ({ children }) => {
@@ -87,16 +87,27 @@ export const CartProvider = ({ children }) => {
             if (error) throw error;
 
             const now = new Date();
-            let anyRemoved = false;
+            let anyChanged = false;
             let warningItem = null;
 
-            const updatedCart = cart.filter(item => {
+            const updatedCart = cart.map(item => {
                 const variantId = item.comboConfig?.id || '';
                 const res = reservations?.find(r => r.product_id === item.id && r.variant_id === variantId);
 
-                if (!res || new Date(res.expires_at) <= now) {
-                    anyRemoved = true;
-                    return false; // Remove from cart
+                const isExpired = !res || new Date(res.expires_at) <= now;
+
+                if (isExpired) {
+                    if (!item.reservationExpired) {
+                        anyChanged = true;
+                        return { ...item, reservationExpired: true };
+                    }
+                    return item;
+                }
+
+                // If not expired but it was marked as expired locally, reset it
+                if (item.reservationExpired) {
+                    anyChanged = true;
+                    return { ...item, reservationExpired: false };
                 }
 
                 // Check for 1 minute warning
@@ -105,26 +116,26 @@ export const CartProvider = ({ children }) => {
                     warningItem = { ...item, timeLeft: Math.round(timeDiff / 1000) };
                 }
 
-                return true;
+                return item;
             });
 
-            // Track earliest expiry for the UI timer
-            if (reservations && reservations.length > 0) {
-                const minExpiry = reservations.reduce((min, r) => {
+            // Track earliest expiry for the UI timer (only for non-expired ones)
+            const activeReservations = reservations?.filter(r => new Date(r.expires_at) > now) || [];
+            if (activeReservations.length > 0) {
+                const minExpiry = activeReservations.reduce((min, r) => {
                     const expiry = new Date(r.expires_at).getTime();
                     return expiry < min ? expiry : min;
-                }, new Date(reservations[0].expires_at).getTime());
+                }, new Date(activeReservations[0].expires_at).getTime());
                 setEarliestExpiry(minExpiry);
             } else {
                 setEarliestExpiry(null);
             }
 
-            if (anyRemoved) {
+            if (anyChanged) {
                 setCart(updatedCart);
-                setExpirationWarning(null);
-            } else {
-                setExpirationWarning(warningItem);
             }
+            
+            setExpirationWarning(warningItem);
         } catch (err) {
             console.error('Error syncing stock:', err);
         } finally {

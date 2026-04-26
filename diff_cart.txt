@@ -1,0 +1,13 @@
+﻿diff --git a/src/context/CartContext.jsx b/src/context/CartContext.jsx
+index 73be309..457dbaf 100644
+--- a/src/context/CartContext.jsx
++++ b/src/context/CartContext.jsx
+@@ -6,7 +6,7 @@ const CartContext = createContext();
+ export const useCart = () => useContext(CartContext);
+ 
+ const CART_VERSION = 'v2';
+-const RESERVATION_TIME_MINS = 3; // Tiempo en minutos para la reserva
++const RESERVATION_TIME_MINS = 5; // Tiempo en minutos para la reserva
+ const EXTENSION_TIME_MINS = 5;    // Tiempo extra al dar clic en extender
+ 
+ export const CartProvider = ({ children }) => {

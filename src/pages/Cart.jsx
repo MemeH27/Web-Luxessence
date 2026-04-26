@@ -233,7 +233,7 @@ const Cart = () => {
             if (appliedDiscount > 0) {
                 orderItems.push({ is_promo_metadata: true, promo_code_used: promoCode.trim().toUpperCase(), discount_amount: discountAmount });
             }
-            if (giftWrap) {
+            if (giftOptions.enabled) {
                 orderItems.push({ is_gift_metadata: true, fee: giftWrapFee });
             }
 
@@ -529,7 +529,7 @@ const Cart = () => {
                                             {deliveryMode === 'pickup' ? 'No Aplica' : (deliveryFee === 0 ? 'Gratis' : `L. ${deliveryFee}`)}
                                         </span>
                                     </div>
-                                    {giftWrap && (
+                                    {giftOptions.enabled && (
                                         <div className="flex justify-between text-xs text-primary/40 uppercase tracking-widest font-black italic">
                                             <span>Empaque de Regalo</span>
                                             <span>L. {giftWrapFee}</span>
