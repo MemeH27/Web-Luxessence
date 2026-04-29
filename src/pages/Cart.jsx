@@ -65,6 +65,7 @@ const Cart = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ type: null, message: null }); // { type: 'success' | 'error', message: string }
+    const [orderConfirmed, setOrderConfirmed] = useState({ show: false, whatsappUrl: '' });
     const [formData, setFormData] = useState({
         first_name: '', last_name: '', phone: '', address: '', city: '', department: ''
     });
@@ -265,7 +266,7 @@ const Cart = () => {
 
             addToast('Pedido registrado con éxito');
 
-            // 3. WhatsApp Redirect
+            // 3. WhatsApp Redirect URL
             const message = `*NUEVO PEDIDO LUXESSENCE*%0A` +
                 `--------------------------%0A` +
                 `*Cliente:* ${formData.first_name} ${formData.last_name}%0A` +
@@ -287,9 +288,12 @@ const Cart = () => {
                 `--------------------------%0A` +
                 `_Espere nuestra confirmación para el envío._`;
 
-            window.open(`https://wa.me/50433135869?text=${message}`, '_blank');
+            const whatsappUrl = `https://wa.me/50433135869?text=${message}`;
+            
             clearCart();
-            setStatus({ type: 'success', message: '¡Pedido enviado con éxito! Redirigiendo a WhatsApp...' });
+            setOrderConfirmed({ show: true, whatsappUrl });
+            // Remove the auto-open: window.open(...)
+            setStatus({ type: 'success', message: '¡Pedido enviado con éxito!' });
         } catch (error) {
             console.error(error);
             setStatus({ type: 'error', message: 'Error al procesar el pedido. Por favor intente de nuevo.' });
@@ -297,6 +301,73 @@ const Cart = () => {
             setLoading(false);
         }
     };
+
+    if (orderConfirmed.show) {
+        return (
+            <div className="min-h-screen bg-secondary-light flex items-center justify-center px-6">
+                <AnimatePresence>
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className="max-w-md w-full bg-white backdrop-blur-3xl p-8 md:p-12 rounded-[3rem] border border-primary/10 shadow-2xl relative overflow-hidden"
+                    >
+                        {/* Decorative background */}
+                        <div className="absolute inset-0 pointer-events-none">
+                            <motion.div
+                                animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1] }}
+                                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                                className="absolute top-0 right-0 w-48 h-48 bg-green-500/20 rounded-full blur-[80px]"
+                            />
+                        </div>
+
+                        <div className="relative z-10 flex flex-col items-center text-center space-y-6">
+                            <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                                className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-2"
+                            >
+                                <svg className="w-12 h-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </motion.div>
+
+                            <h2 className="text-3xl font-serif font-bold italic text-primary leading-tight">
+                                ¡Pedido Confirmado!
+                            </h2>
+                            <p className="text-primary/60 text-sm font-medium leading-relaxed">
+                                Hemos recibido tu orden en nuestro sistema. Para una atención más personalizada y rápida, pulsa el botón abajo para enviarnos los detalles de tu compra por WhatsApp.
+                            </p>
+                            
+                            <div className="w-full h-[1px] bg-primary/10 my-4" />
+                            
+                            <p className="text-xs uppercase tracking-widest font-black text-primary/40 italic">
+                                ¿Quieres enviarnos tu pedido por WhatsApp?
+                            </p>
+
+                            <button
+                                onClick={() => window.open(orderConfirmed.whatsappUrl, '_blank')}
+                                className="btn-primary w-full !py-5 rounded-2xl flex items-center justify-center gap-3 group shadow-xl hover:shadow-primary/30 transition-all font-black tracking-widest text-xs uppercase"
+                            >
+                                <Send className="w-4 h-4 group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform" />
+                                <span>ABRIR WHATSAPP</span>
+                            </button>
+                            
+                            <button
+                                onClick={() => {
+                                    setOrderConfirmed({ show: false, whatsappUrl: '' });
+                                    navigate('/catalog');
+                                }}
+                                className="text-xs font-bold text-primary/40 hover:text-primary transition-colors underline uppercase tracking-widest mt-2"
+                            >
+                                SEGUIR COMPRANDO
+                            </button>
+                        </div>
+                    </motion.div>
+                </AnimatePresence>
+            </div>
+        );
+    }
 
     if (cart.length === 0) {
         return (

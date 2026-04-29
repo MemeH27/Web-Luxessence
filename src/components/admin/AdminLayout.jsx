@@ -17,6 +17,43 @@ const AdminLayout = () => {
     const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
     const [isSaleMinimized, setIsSaleMinimized] = useState(false);
     const [isSaleButtonExpanded, setIsSaleButtonExpanded] = useState(false);
+    const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+
+    useEffect(() => {
+        const updateAppBadge = (count) => {
+            if ('setAppBadge' in navigator) {
+                if (count > 0) {
+                    navigator.setAppBadge(count).catch(console.error);
+                } else if ('clearAppBadge' in navigator) {
+                    navigator.clearAppBadge().catch(console.error);
+                }
+            }
+        };
+
+        const fetchPendingCount = async () => {
+            const { count } = await supabase
+                .from('orders')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'pending');
+            setPendingOrdersCount(count || 0);
+            updateAppBadge(count || 0);
+        };
+
+        fetchPendingCount();
+
+        const channel = supabase
+            .channel('orders-badge')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'orders' },
+                () => {
+                    fetchPendingCount();
+                }
+            )
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
+    }, []);
 
     // Session timeout management
     const resetSessionTimer = useCallback(() => {
@@ -221,6 +258,11 @@ const AdminLayout = () => {
                             >
                                 <item.icon className={`w-5 h-5 transition-transform duration-500 ${isActive ? 'stroke-[2.5px]' : 'group-hover:scale-110 group-hover:rotate-6'}`} />
                                 <span className="tracking-[0.2em] uppercase text-[9px] font-black italic">{item.name}</span>
+                                {item.name === 'Pedidos' && pendingOrdersCount > 0 && (
+                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-black animate-pulse shadow-lg shadow-red-500/20">
+                                        {pendingOrdersCount}
+                                    </div>
+                                )}
                                 {isActive && <motion.div layoutId="activeNav" className="absolute left-0 w-1.5 h-6 bg-primary rounded-full" />}
                             </Link>
                         );
@@ -410,6 +452,11 @@ const AdminLayout = () => {
                                                     <item.icon className={`w-5 h-5 transition-colors duration-300 ${isActive ? 'stroke-[2.5px] text-primary' : 'group-hover:text-primary'}`} />
                                                     <span className={`text-xs font-black uppercase tracking-widest leading-none transition-colors duration-300 ${isActive ? 'text-primary' : 'group-hover:text-primary'}`}>{item.name}</span>
                                                 </div>
+                                                {item.name === 'Pedidos' && pendingOrdersCount > 0 && (
+                                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-black animate-pulse shadow-lg shadow-red-500/20 z-10">
+                                                        {pendingOrdersCount}
+                                                    </div>
+                                                )}
                                                 {isActive && <div className="w-1.5 h-1.5 rounded-full bg-primary relative z-10" />}
                                             </Link>
                                         </motion.div>
@@ -451,7 +498,7 @@ const AdminLayout = () => {
                             </motion.nav>
 
                             <div className="pt-6 border-t border-white/5 flex items-center justify-center">
-                                <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/10 italic">Luxessence v1.0.2</p>
+                                <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/10 italic">Luxessence v1.0.3</p>
                             </div>
                         </motion.aside>
                     </>

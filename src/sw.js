@@ -44,10 +44,14 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // Check if there is already a window open with this URL
+            // Check if there is already a window open with this domain
             for (const client of clientList) {
-                if (client.url === targetUrl && 'focus' in client) {
-                    return client.focus();
+                if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
+                    client.focus();
+                    if ('navigate' in client) {
+                        return client.navigate(targetUrl);
+                    }
+                    return;
                 }
             }
             // If no window is open, open a new one

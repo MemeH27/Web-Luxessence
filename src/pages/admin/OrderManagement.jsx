@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { shareInvoicePNG, downloadInvoicePNG } from '../../utils/billing';
 import { exportToExcel } from '../../utils/export';
@@ -12,6 +13,7 @@ import { useToast } from '../../context/ToastContext';
 
 const OrderManagement = () => {
     const { addToast } = useToast();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -48,6 +50,18 @@ const OrderManagement = () => {
         setOrders(data || []);
         setLoading(false);
     };
+
+    useEffect(() => {
+        const urlId = searchParams.get('id');
+        if (urlId && orders.length > 0) {
+            const target = orders.find(o => o.id === urlId);
+            if (target && target.status === 'pending') {
+                handleOpenBilling(target);
+                searchParams.delete('id');
+                setSearchParams(searchParams, { replace: true });
+            }
+        }
+    }, [orders, searchParams, setSearchParams]);
 
     const handleSecurityConfirm = () => {
         if (!securityAction) return;

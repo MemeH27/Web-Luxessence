@@ -88,14 +88,14 @@ export const usePushNotifications = () => {
             addToast('¡Actualizaciones activadas! 🎉 Recibirás promociones antes que nadie.', 'success');
 
             // 🧪 ENVIAR NOTIFICACIÓN DE PRUEBA AL ACTIVAR (Directamente a esta suscripción)
-                await supabase.functions.invoke('notify-admins', {
-                    body: {
-                        title: '¡Actualizaciones activas! 🎉',
-                        body: 'Recibe promociones y novedades antes que nadie.',
-                        url: '/profile',
-                        subscription: subscription // Enviar directamente a esta suscripción
-                    }
-                }).catch(console.error);
+            await supabase.functions.invoke('notify-admins', {
+                body: {
+                    title: '¡Notificaciones activadas! 🎉',
+                    body: 'Las notificaciones push se activaron correctamente en este dispositivo.',
+                    url: '/',
+                    subscription: subscription.toJSON() // Enviar directamente a esta suscripción
+                }
+            }).catch(console.error);
         } catch (error) {
             console.error('Subscription error:', error);
             addToast(error.name === 'InvalidCharacterError' ? 'La llave VAPID configurada no es válida (Base64).' : error.message, 'error');

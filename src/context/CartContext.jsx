@@ -97,17 +97,8 @@ export const CartProvider = ({ children }) => {
                 const isExpired = !res || new Date(res.expires_at) <= now;
 
                 if (isExpired) {
-                    if (!item.reservationExpired) {
-                        anyChanged = true;
-                        return { ...item, reservationExpired: true };
-                    }
-                    return item;
-                }
-
-                // If not expired but it was marked as expired locally, reset it
-                if (item.reservationExpired) {
                     anyChanged = true;
-                    return { ...item, reservationExpired: false };
+                    return null; // Will trigger filtering
                 }
 
                 // Check for 1 minute warning
@@ -117,7 +108,7 @@ export const CartProvider = ({ children }) => {
                 }
 
                 return item;
-            });
+            }).filter(Boolean);
 
             // Track earliest expiry for the UI timer (only for non-expired ones)
             const activeReservations = reservations?.filter(r => new Date(r.expires_at) > now) || [];
