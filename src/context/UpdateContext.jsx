@@ -43,10 +43,12 @@ export const UpdateProvider = ({ children }) => {
 
         try {
             // Re-trigger service worker update check
-            await registration.update();
+            if (registration) {
+                await registration.update();
+            }
 
             // Check immediately if an update was found and is installing
-            if (registration.installing || registration.waiting) {
+            if (registration && (registration.installing || registration.waiting)) {
                 setUpdateAvailable(true);
                 setLastCheckResult('update-found');
                 setIsDismissed(false);
@@ -58,7 +60,7 @@ export const UpdateProvider = ({ children }) => {
             // Wait a bit to see if updateAvailable is triggered via SW events
             setTimeout(() => {
                 setUpdateAvailable(prev => {
-                    if (prev || registration.installing || registration.waiting) {
+                    if (prev || (registration && (registration.installing || registration.waiting))) {
                         setLastCheckResult('update-found');
                         setIsDismissed(false);
                         setShowModal(true);

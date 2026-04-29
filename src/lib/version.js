@@ -1,14 +1,9 @@
-export const APP_VERSION = '2.1.1';
+export const APP_VERSION = '2.2.0';
 
-export const UPDATE_CHANGELOG = {
-    version: APP_VERSION,
-    date: '2024-03-20',
-    features: [
-        "Corrección: Guardado de nombres para invitados en ventas",
-        "Mejora: Estabilidad en la lista de clientes y productos (Keys)",
-        "Notificaciones: Logo oficial Luxessence actualizado",
-        "Sistema de regalos exclusivos en compras",
-        "Notificaciones inteligentes automatizadas",
-        "Optimización de carga en el catálogo móvil"
-    ]
-};
+export const UPDATE_CHANGELOG = [
+    { type: 'new', text: '🔔 Nuevo sistema de Notificaciones Push y Alertas en tiempo real' },
+    { type: 'improve', text: '⚡ Rendimiento en la visualización de Carrito y Checkout' },
+    { type: 'fix', text: '🐛 Resolución de errores al guardar nuevos clientes' },
+    { type: 'new', text: '🛠️ Panel administrativo rediseñado y más rápido' },
+    { type: 'system', text: 'Mejoras de seguridad y base de datos (Zod & Supabase RLS)' }
+];
