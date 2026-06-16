@@ -39,14 +39,7 @@ const BottomNav = () => {
                 position: 'fixed'
             }}
         >
-            <motion.div
-                key={location.pathname}
-                initial={{ y: 30, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 30, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="pointer-events-auto"
-            >
+            <div className="pointer-events-auto">
                 <GlassSurface
                     borderRadius={48}
                     height={86}
@@ -68,7 +61,7 @@ const BottomNav = () => {
                         </div>
                         {tabs.map((tab) => {
                             const isActive = location.pathname === tab.path;
-
+ 
                             if (tab.isCenter) {
                                 return (
                                     <div key={tab.id} className="relative group">
@@ -99,7 +92,7 @@ const BottomNav = () => {
                                                 {tab.label}
                                             </motion.span>
                                         </button>
-
+ 
                                         {/* Update Indicator in Nav */}
                                         {updateAvailable && isDismissed && tab.id === 'profile' && (
                                             <motion.button
@@ -125,7 +118,7 @@ const BottomNav = () => {
                                     </div>
                                 );
                             }
-
+ 
                             return (
                                 <button
                                     key={tab.id}
@@ -139,11 +132,11 @@ const BottomNav = () => {
                                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                                         />
                                     )}
-
+ 
                                     <div className={`p-2 transition-all duration-700 ${isActive ? navColor : `${navMuteColor} group-hover:${navColor}`}`}>
                                         <tab.icon className={`w-5.5 h-5.5 stroke-[1.5px] transition-transform duration-500 ${isActive ? 'scale-110' : ''}`} />
                                     </div>
-
+ 
                                     <motion.span
                                         animate={{
                                             opacity: isActive ? 1 : 0.5,
@@ -158,7 +151,7 @@ const BottomNav = () => {
                         })}
                     </div>
                 </GlassSurface>
-            </motion.div>
+            </div>
         </div>
     );
 };
