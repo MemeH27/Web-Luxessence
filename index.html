@@ -16,7 +16,7 @@
 
   <!-- Security Headers (Prefer server-side headers) -->
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co https://*.vercel.app blob: https://images.unsplash.com https://plus.unsplash.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co data: localhost:* ws://localhost:* wss://localhost:*;" />
+    content="default-src 'self'; frame-src 'self' blob:; object-src 'self' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co https://*.vercel.app blob: https://images.unsplash.com https://plus.unsplash.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co data: localhost:* ws://localhost:* wss://localhost:*;" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta name="referrer-policy" content="strict-origin-when-cross-origin" />
 
@@ -37,7 +37,7 @@
   <meta property="twitter:image" content="https://web-luxessence.vercel.app/img/logoluxessence.png" />
 
   <title>Luxessence</title>
-  <!-- v2.0.0 -->
+  <!-- v2.1.0 -->
 </head>
 
 <body>

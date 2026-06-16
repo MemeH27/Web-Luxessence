@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { exportToExcel } from '../../utils/export';
 import { shareInvoicePNG, downloadInvoicePNG } from '../../utils/billing';
-import { Search, Calendar, Download, Trash2, Eye, DollarSign, CreditCard, Receipt, TrendingUp, Share2, Printer, X, ShoppingCart, Percent, Heart, Filter, Phone, Pencil } from 'lucide-react';
+import { Search, Calendar, Download, Trash2, Eye, DollarSign, CreditCard, Receipt, TrendingUp, Share2, Printer, X, ShoppingCart, Percent, Heart, Filter, Phone, Pencil, Check, FileText } from 'lucide-react';
 import SecurityModal from '../../components/admin/SecurityModal';
+import { jsPDF } from 'jspdf';
 import Pagination from '../../components/admin/Pagination';
 import InvoiceTemplate from '../../components/admin/InvoiceTemplate';
 import NewSaleModal from '../../components/admin/NewSaleModal';
@@ -45,6 +46,9 @@ const SalesHistory = () => {
     const [payments, setPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
     const [deleteConfirmSale, setDeleteConfirmSale] = useState(null); // sale waiting for delete confirmation
+    const [selectedPaymentForAction, setSelectedPaymentForAction] = useState(null); // payment undergoing security action
+    const [editingPaymentId, setEditingPaymentId] = useState(null);
+    const [editPaymentForm, setEditPaymentForm] = useState({ amount: '', notes: '', date: '' });
 
     const invoiceRef = useRef(null);
     const handlePrint = useReactToPrint({
@@ -189,8 +193,69 @@ const SalesHistory = () => {
             executeDelete(securityAction.id);
         } else if (securityAction.type === 'edit') {
             executeEdit(securityAction.id);
+        } else if (securityAction.type === 'deletePayment') {
+            executeDeletePayment(securityAction.paymentId, securityAction.payment);
+        } else if (securityAction.type === 'editPayment') {
+            executeEditPayment(securityAction.paymentId, securityAction.editData);
         }
         setSecurityAction(null);
+    };
+
+    const executeDeletePayment = async (paymentId, payment) => {
+        try {
+            const { error } = await supabase.from('payments').delete().eq('id', paymentId);
+            if (error) throw error;
+
+            addToast('Cuota eliminada correctamente');
+            
+            // Recalculate if still fully paid
+            const remainingPayments = payments.filter(p => p.id !== paymentId);
+            const newTotalPaid = remainingPayments.reduce((acc, p) => acc + Number(p.amount), 0);
+            const isFullyPaid = newTotalPaid >= selectedSale.total;
+            
+            // Update the sale status in database and state
+            await supabase.from('sales').update({ is_paid: isFullyPaid }).eq('id', selectedSale.id);
+            setSales(prev => prev.map(s => s.id === selectedSale.id ? { ...s, is_paid: isFullyPaid } : s));
+
+            handleOpenPayments(selectedSale);
+            fetchSales();
+        } catch (err) {
+            console.error(err);
+            addToast('Error al eliminar cuota', 'error');
+        }
+    };
+
+    const executeEditPayment = async (paymentId, editData) => {
+        try {
+            const { error } = await supabase
+                .from('payments')
+                .update({
+                    amount: Number(editData.amount),
+                    notes: editData.notes,
+                    created_at: editData.created_at
+                })
+                .eq('id', paymentId);
+
+            if (error) throw error;
+
+            addToast('Cuota modificada correctamente');
+            
+            // Recalculate if still fully paid
+            const updatedPayments = payments.map(p => p.id === paymentId ? { ...p, amount: Number(editData.amount) } : p);
+            const newTotalPaid = updatedPayments.reduce((acc, p) => acc + Number(p.amount), 0);
+            const isFullyPaid = newTotalPaid >= selectedSale.total;
+
+            // Update sale status
+            await supabase.from('sales').update({ is_paid: isFullyPaid }).eq('id', selectedSale.id);
+            setSales(prev => prev.map(s => s.id === selectedSale.id ? { ...s, is_paid: isFullyPaid } : s));
+
+            setEditingPaymentId(null);
+            handleOpenPayments(selectedSale);
+            fetchSales();
+        } catch (err) {
+            console.error(err);
+            addToast('Error al modificar cuota', 'error');
+        }
     };
 
     const handleDeleteSale = (id) => {
@@ -321,6 +386,129 @@ const SalesHistory = () => {
         exportToExcel(exportData, 'Historial_Ventas_Luxessence', 'Ventas');
     };
 
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        const primaryColor = '#711116';
+        
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(primaryColor);
+        doc.text('REPORTE DE VENTAS - LUXESSENCE', 14, 20);
+        
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, 14, 26);
+        doc.text(`Transacciones filtradas: ${filteredSales.length}`, 14, 31);
+        
+        // Draw elegant table header
+        doc.setFillColor(113, 17, 22);
+        doc.rect(14, 38, 182, 8, 'F');
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.text('Cliente', 16, 43);
+        doc.text('Fecha', 80, 43);
+        doc.text('Método', 115, 43);
+        doc.text('Estado', 145, 43);
+        doc.text('Total', 175, 43);
+        
+        let y = 52;
+        doc.setTextColor(26, 26, 26);
+        doc.setFont('Helvetica', 'normal');
+        
+        filteredSales.forEach((s, idx) => {
+            if (y > 275) {
+                doc.addPage();
+                // Draw header again on new page
+                doc.setFillColor(113, 17, 22);
+                doc.rect(14, 15, 182, 8, 'F');
+                doc.setFont('Helvetica', 'bold');
+                doc.setTextColor(255, 255, 255);
+                doc.text('Cliente', 16, 20);
+                doc.text('Fecha', 80, 20);
+                doc.text('Método', 115, 20);
+                doc.text('Estado', 145, 20);
+                doc.text('Total', 175, 20);
+                y = 29;
+                doc.setTextColor(26, 26, 26);
+                doc.setFont('Helvetica', 'normal');
+            }
+            
+            const clientName = s.customers ? `${s.customers.first_name} ${s.customers.last_name}` : 
+                               (s.orders?.notes?.startsWith('Invitado:') ? s.orders.notes.replace('Invitado:', '').trim() : 'Consumidor Final');
+            
+            const splitName = doc.splitTextToSize(clientName, 60);
+            doc.text(splitName, 16, y);
+            doc.text(new Date(s.created_at).toLocaleDateString(), 80, y);
+            doc.text(s.payment_method, 115, y);
+            doc.text(s.is_paid ? 'Pagado' : 'Pendiente', 145, y);
+            doc.text(`L. ${s.total.toLocaleString()}`, 175, y);
+            
+            y += (splitName.length * 5) + 2;
+        });
+        
+        doc.save(`Ventas_Luxessence_${new Date().toISOString().slice(0, 10)}.pdf`);
+        addToast('Reporte PDF descargado con éxito.');
+    };
+
+    const handleExportWord = () => {
+        let html = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+            <title>Historial de Ventas</title>
+            <style>
+                body { font-family: Arial, sans-serif; }
+                table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+                th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+                th { background-color: #711116; color: white; font-weight: bold; }
+                h2 { color: #711116; font-family: Georgia, serif; }
+            </style>
+        </head>
+        <body>
+            <h2>Libro de Ventas - Luxessence</h2>
+            <p>Fecha de exportación: ${new Date().toLocaleDateString()}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID Factura</th>
+                        <th>Fecha</th>
+                        <th>Cliente</th>
+                        <th>Total</th>
+                        <th>Método</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredSales.map(s => `
+                        <tr>
+                            <td>#${s.id.slice(0, 8)}</td>
+                            <td>${new Date(s.created_at).toLocaleDateString()}</td>
+                            <td>${s.customers ? `${s.customers.first_name} ${s.customers.last_name}` : 
+                                  (s.orders?.notes?.startsWith('Invitado:') ? s.orders.notes.replace('Invitado:', '').trim() : 'Consumidor Final')}</td>
+                            <td>L. ${s.total.toLocaleString()}</td>
+                            <td>${s.payment_method}</td>
+                            <td>${s.is_paid ? 'Pagado' : 'Pendiente'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </body>
+        </html>
+        `;
+        
+        const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Ventas_Luxessence_${new Date().toISOString().slice(0, 10)}.doc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        addToast('Reporte Word descargado con éxito.');
+    };
+
     const filteredSales = sales; // Server-side filtered already
 
     const paginatedSales = filteredSales;
@@ -379,9 +567,18 @@ const SalesHistory = () => {
                     <h1 className="text-4xl md:text-6xl font-serif font-black italic text-primary leading-tight">Libro de Ventas</h1>
                     <p className="text-primary/40 font-medium italic">Historial oficial de transacciones y análisis de rentabilidad.</p>
                 </div>
-                <div className="flex gap-4">
-                    <button onClick={handleExport} className="glass-panel p-3 md:p-5 rounded-xl md:rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors shadow-sm">
+                <div className="flex gap-3">
+                    <button onClick={handleExport} className="glass-panel p-3 md:p-5 rounded-xl md:rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors shadow-sm flex items-center gap-2" title="Exportar a Excel">
                         <Download className="w-5 h-5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Excel</span>
+                    </button>
+                    <button onClick={handleExportPDF} className="glass-panel p-3 md:p-5 rounded-xl md:rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors shadow-sm flex items-center gap-2" title="Exportar a PDF">
+                        <FileText className="w-5 h-5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">PDF</span>
+                    </button>
+                    <button onClick={handleExportWord} className="glass-panel p-3 md:p-5 rounded-xl md:rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors shadow-sm flex items-center gap-2" title="Exportar a Word">
+                        <FileText className="w-5 h-5 text-blue-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Word</span>
                     </button>
                 </div>
             </header>
@@ -820,35 +1017,110 @@ const SalesHistory = () => {
                                             ) : payments.length === 0 ? (
                                                 <div className="text-center py-10 italic text-primary/20 border-2 border-dashed border-primary/5 rounded-[2rem]">No se han registrado cuotas aún</div>
                                             ) : payments.map((p, idx) => (
-                                                <div key={idx} className="p-4 bg-white border border-primary/5 rounded-2xl flex justify-between items-center shadow-sm group">
-                                                    <div>
-                                                        <p className="text-xs font-bold text-primary">{new Date(p.created_at).toLocaleDateString()}</p>
-                                                        <p className="text-[9px] text-primary/40 font-black uppercase tracking-widest italic">{p.notes || 'Sin nota'}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <p className="text-lg font-black text-primary">L. {Number(p.amount).toLocaleString()}</p>
-                                                        <button 
-                                                            onClick={async () => {
-                                                                if(window.confirm('¿Eliminar este abono?')) {
-                                                                    const { error } = await supabase.from('payments').delete().eq('id', p.id);
-                                                                    if(error) addToast('Error al eliminar', 'error');
-                                                                    else {
-                                                                        addToast('Abono eliminado');
-                                                                        // Update is_paid to false if it was paid
-                                                                        if (selectedSale.is_paid) {
-                                                                            await supabase.from('sales').update({ is_paid: false }).eq('id', selectedSale.id);
-                                                                            setSales(prev => prev.map(s => s.id === selectedSale.id ? { ...s, is_paid: false } : s));
+                                                <div key={idx} className="p-4 bg-white border border-primary/5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm group">
+                                                    {editingPaymentId === p.id ? (
+                                                        <div className="w-full space-y-3 p-2 bg-primary/5 rounded-xl">
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div className="space-y-1">
+                                                                    <label className="text-[8px] font-black uppercase text-primary/40">Fecha</label>
+                                                                    <input
+                                                                        type="date"
+                                                                        className="w-full p-2 text-xs rounded-lg border border-primary/10 bg-white font-bold"
+                                                                        value={editPaymentForm.date}
+                                                                        onChange={e => setEditPaymentForm({ ...editPaymentForm, date: e.target.value })}
+                                                                    />
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    <label className="text-[8px] font-black uppercase text-primary/40">Monto (L.)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        className="w-full p-2 text-xs rounded-lg border border-primary/10 bg-white font-bold"
+                                                                        value={editPaymentForm.amount}
+                                                                        onChange={e => setEditPaymentForm({ ...editPaymentForm, amount: e.target.value })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <label className="text-[8px] font-black uppercase text-primary/40">Notas</label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-full p-2 text-xs rounded-lg border border-primary/10 bg-white"
+                                                                    value={editPaymentForm.notes}
+                                                                    onChange={e => setEditPaymentForm({ ...editPaymentForm, notes: e.target.value })}
+                                                                    placeholder="Notas de abono..."
+                                                                />
+                                                            </div>
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button
+                                                                    onClick={() => setEditingPaymentId(null)}
+                                                                    className="px-3 py-1.5 bg-primary/5 hover:bg-primary/10 text-primary/60 text-[9px] font-black uppercase rounded-lg transition-all"
+                                                                >
+                                                                    Cancelar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (!editPaymentForm.amount || Number(editPaymentForm.amount) <= 0) {
+                                                                            addToast('Ingrese un monto válido', 'error');
+                                                                            return;
                                                                         }
-                                                                        handleOpenPayments(selectedSale);
-                                                                        fetchSales();
-                                                                    }
-                                                                }
-                                                            }}
-                                                            className="opacity-0 group-hover:opacity-100 p-2 text-red-400 hover:text-red-600 transition-all"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
+                                                                        const paymentDate = new Date(editPaymentForm.date);
+                                                                        const now = new Date();
+                                                                        paymentDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+                                                                        
+                                                                        setSecurityAction({
+                                                                            type: 'editPayment',
+                                                                            paymentId: p.id,
+                                                                            editData: {
+                                                                                amount: editPaymentForm.amount,
+                                                                                notes: editPaymentForm.notes,
+                                                                                created_at: paymentDate.toISOString()
+                                                                            }
+                                                                        });
+                                                                        setIsSecurityOpen(true);
+                                                                    }}
+                                                                    className="px-3 py-1.5 bg-primary text-secondary-light hover:bg-primary/90 text-[9px] font-black uppercase rounded-lg shadow-sm transition-all"
+                                                                >
+                                                                    Guardar
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div>
+                                                                <p className="text-xs font-bold text-primary">{new Date(p.created_at).toLocaleDateString()}</p>
+                                                                <p className="text-[9px] text-primary/40 font-black uppercase tracking-widest italic">{p.notes || 'Sin nota'}</p>
+                                                            </div>
+                                                            <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+                                                                <p className="text-lg font-black text-primary">L. {Number(p.amount).toLocaleString()}</p>
+                                                                <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingPaymentId(p.id);
+                                                                            setEditPaymentForm({
+                                                                                amount: p.amount,
+                                                                                notes: p.notes || '',
+                                                                                date: new Date(p.created_at).toISOString().split('T')[0]
+                                                                            });
+                                                                        }}
+                                                                        className="p-2 text-blue-500 hover:text-blue-700 transition-colors"
+                                                                        title="Editar abono"
+                                                                    >
+                                                                        <Pencil className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setSecurityAction({ type: 'deletePayment', paymentId: p.id, payment: p });
+                                                                            setIsSecurityOpen(true);
+                                                                        }}
+                                                                        className="p-2 text-red-400 hover:text-red-600 transition-colors"
+                                                                        title="Eliminar abono"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -858,6 +1130,7 @@ const SalesHistory = () => {
                         </motion.div>
                     </div>
                 )}
+
             </AnimatePresence>
 
             <NewSaleModal 

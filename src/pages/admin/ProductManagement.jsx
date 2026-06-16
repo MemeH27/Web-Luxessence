@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { exportToExcel } from '../../utils/export';
-import { Plus, Edit3, Trash2, X, Upload, Search, Download, Package2, ChevronUp, ChevronDown, ListPlus, Lock, CheckCircle2, Circle, ChevronLeft, ChevronRight, Clock, Loader2, Camera } from 'lucide-react';
+import { Plus, Edit3, Trash2, X, Upload, Search, Download, Package2, ChevronUp, ChevronDown, ListPlus, Lock, CheckCircle2, Circle, ChevronLeft, ChevronRight, Clock, Loader2, Camera, Printer, AlertTriangle, ArrowUpDown, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SecurityModal from '../../components/admin/SecurityModal';
 import Pagination from '../../components/admin/Pagination';
 import { useToast } from '../../context/ToastContext';
 import { uploadAndOptimize } from '../../utils/image';
 import BarcodeScanner from '../../components/admin/BarcodeScanner';
+import { generateProductLabel, generateAllProductLabels, printProductLabelBlob } from '../../utils/labelPrinter';
+import { jsPDF } from 'jspdf';
 
 const StepperInput = ({ label, value, onChange, min = 0, step = 1, prefix = '' }) => (
     <div className="space-y-2">
@@ -56,9 +58,15 @@ const ProductManagement = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [newCategoryName, setNewCategoryName] = useState('');
     const [newCategoryImage, setNewCategoryImage] = useState('');
-    const [editingCategory, setEditingCategory] = useState(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+    // Advanced Filtering and Sorting States
+    const [filterType, setFilterType] = useState('all'); // 'all', 'low_stock'
+    const [sortType, setSortType] = useState('none'); // 'none', 'price_asc', 'price_desc'
+    const [previewLabelProduct, setPreviewLabelProduct] = useState(null);
+    const [isBatchPrintModalOpen, setIsBatchPrintModalOpen] = useState(false);
+    const [labelDimensions, setLabelDimensions] = useState({ width: 58, height: 40, unit: 'mm' });
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -373,7 +381,26 @@ const ProductManagement = () => {
         }
     };
 
-    const handleExport = () => {
+    const handlePrintAllLabels = async (layoutType) => {
+        if (products.length === 0) {
+            addToast('No hay productos disponibles para imprimir.', 'error');
+            return;
+        }
+        addToast('Generando lote de etiquetas...', 'info');
+        try {
+            const { blobUrl } = await generateAllProductLabels(products, layoutType, labelDimensions.width, labelDimensions.height, labelDimensions.unit);
+            if (blobUrl) {
+                printProductLabelBlob(blobUrl);
+                addToast('Lote de etiquetas generado con éxito.');
+            }
+        } catch (e) {
+            console.error(e);
+            addToast('Error al generar etiquetas.', 'error');
+        }
+        setIsBatchPrintModalOpen(false);
+    };
+
+    const handleExportExcel = () => {
         const exportData = filteredProducts.map(p => ({
             Nombre: p.name,
             Categoría: p.categories?.name,
@@ -385,21 +412,150 @@ const ProductManagement = () => {
         exportToExcel(exportData, 'Inventario_Luxessence', 'Productos');
     };
 
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        const primaryColor = '#711116';
+        
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(primaryColor);
+        doc.text('REPORTES DE INVENTARIO - LUXESSENCE', 14, 20);
+        
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, 14, 26);
+        doc.text(`Productos filtrados: ${filteredProducts.length}`, 14, 31);
+        
+        // Draw elegant table header
+        doc.setFillColor(113, 17, 22);
+        doc.rect(14, 38, 182, 8, 'F');
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.text('Nombre del Producto', 16, 43);
+        doc.text('Categoría', 100, 43);
+        doc.text('Precio', 145, 43);
+        doc.text('Stock', 175, 43);
+        
+        let y = 52;
+        doc.setTextColor(26, 26, 26);
+        doc.setFont('Helvetica', 'normal');
+        
+        filteredProducts.forEach((p, idx) => {
+            if (y > 275) {
+                doc.addPage();
+                // Draw header again on new page
+                doc.setFillColor(113, 17, 22);
+                doc.rect(14, 15, 182, 8, 'F');
+                doc.setFont('Helvetica', 'bold');
+                doc.setTextColor(255, 255, 255);
+                doc.text('Nombre del Producto', 16, 20);
+                doc.text('Categoría', 100, 20);
+                doc.text('Precio', 145, 20);
+                doc.text('Stock', 175, 20);
+                y = 29;
+                doc.setTextColor(26, 26, 26);
+                doc.setFont('Helvetica', 'normal');
+            }
+            
+            const splitName = doc.splitTextToSize(p.name, 80);
+            doc.text(splitName, 16, y);
+            doc.text(p.categories?.name || 'Colección', 100, y);
+            doc.text(`L. ${Number(p.price).toLocaleString()}`, 145, y);
+            doc.text(String(p.stock), 175, y);
+            
+            y += (splitName.length * 5) + 2;
+        });
+        
+        doc.save(`Inventario_Luxessence_${new Date().toISOString().slice(0, 10)}.pdf`);
+        addToast('Reporte PDF descargado con éxito.');
+    };
 
-    const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.categories?.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleExportWord = () => {
+        let html = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+            <title>Inventario</title>
+            <style>
+                body { font-family: Arial, sans-serif; }
+                table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+                th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+                th { background-color: #711116; color: white; font-weight: bold; }
+                h2 { color: #711116; font-family: Georgia, serif; }
+            </style>
+        </head>
+        <body>
+            <h2>Inventario de Productos - Luxessence</h2>
+            <p>Fecha de exportación: ${new Date().toLocaleDateString()}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Categoría</th>
+                        <th>Precio</th>
+                        <th>Costo</th>
+                        <th>Stock</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredProducts.map(p => `
+                        <tr>
+                            <td>${p.name}</td>
+                            <td>${p.categories?.name || 'Colección'}</td>
+                            <td>L. ${p.price.toLocaleString()}</td>
+                            <td>L. ${p.cost.toLocaleString()}</td>
+                            <td>${p.stock}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </body>
+        </html>
+        `;
+        
+        const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Inventario_Luxessence_${new Date().toISOString().slice(0, 10)}.doc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        addToast('Reporte Word descargado con éxito.');
+    };
+
+
+    const filteredProducts = products
+        .filter(p => {
+            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                p.categories?.name.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            if (filterType === 'low_stock') {
+                return matchesSearch && p.stock <= 5;
+            }
+            return matchesSearch;
+        })
+        .sort((a, b) => {
+            if (sortType === 'price_asc') {
+                return a.price - b.price;
+            }
+            if (sortType === 'price_desc') {
+                return b.price - a.price;
+            }
+            return 0; // Default sorting by backend response order
+        });
 
     const paginatedProducts = filteredProducts.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
-    // Reset to page 1 on search
+    // Reset to page 1 on search or filter change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, filterType, sortType]);
 
     return (
         <div className="space-y-12 pb-12">
@@ -408,9 +564,38 @@ const ProductManagement = () => {
                     <h1 className="text-4xl md:text-6xl font-serif font-black italic text-primary leading-tight">Gestión de Inventario</h1>
                     <p className="text-primary/40 font-medium italic">Control maestro de catálogo, existencias y precios.</p>
                 </div>
-                <div className="flex gap-4 w-full md:w-auto">
-                    <button onClick={handleExport} className="glass-panel p-5 rounded-2xl hover:bg-primary/5 text-primary/60 transition-colors shadow-sm border-primary/5">
+                <div className="flex flex-wrap gap-3 w-full md:w-auto">
+                    <button 
+                        onClick={() => setIsBatchPrintModalOpen(true)} 
+                        className="glass-panel px-6 py-4 rounded-2xl hover:bg-gold/10 text-gold-dark hover:border-gold/30 transition-all shadow-sm border-primary/5 flex items-center gap-2"
+                        title="Imprimir Todas las Etiquetas del Catálogo"
+                    >
+                        <Printer className="w-5 h-5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Etiquetas</span>
+                    </button>
+                    <button 
+                        onClick={handleExportExcel} 
+                        className="glass-panel px-6 py-4 rounded-2xl hover:bg-primary/5 text-primary/60 transition-all shadow-sm border-primary/5 flex items-center gap-2"
+                        title="Exportar a Excel"
+                    >
                         <Download className="w-5 h-5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Excel</span>
+                    </button>
+                    <button 
+                        onClick={handleExportPDF} 
+                        className="glass-panel px-6 py-4 rounded-2xl hover:bg-primary/5 text-primary/60 transition-all shadow-sm border-primary/5 flex items-center gap-2"
+                        title="Exportar a PDF"
+                    >
+                        <ListPlus className="w-5 h-5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">PDF</span>
+                    </button>
+                    <button 
+                        onClick={handleExportWord} 
+                        className="glass-panel px-6 py-4 rounded-2xl hover:bg-primary/5 text-primary/60 transition-all shadow-sm border-primary/5 flex items-center gap-2"
+                        title="Exportar a Word"
+                    >
+                        <FileText className="w-5 h-5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Word</span>
                     </button>
                     <button onClick={() => handleOpenModal()} className="btn-primary flex-1 md:flex-none flex items-center justify-center gap-3 !py-5 shadow-xl shadow-primary/10">
                         <Plus className="w-6 h-6" /> <span className="text-xs uppercase tracking-widest font-black">Nuevo Producto</span>
@@ -449,6 +634,60 @@ const ProductManagement = () => {
                                 className="w-full bg-primary/5 border-none pl-14 pr-6 py-4 rounded-2xl text-sm font-bold text-primary focus:ring-2 ring-primary/10 transition-all placeholder:text-primary/10"
                             />
                         </div>
+                    </div>
+
+                              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white/80 p-4 rounded-3xl border border-primary/5 shadow-sm">
+                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-primary/40 col-span-2 sm:col-span-1 mr-1">Filtros y Orden:</span>
+                            
+                            <button
+                                onClick={() => setFilterType(filterType === 'low_stock' ? 'all' : 'low_stock')}
+                                className={`px-4 py-3 sm:py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-1.5 ${
+                                    filterType === 'low_stock'
+                                        ? 'bg-red-500/10 border-red-500/30 text-red-600 shadow-sm'
+                                        : 'bg-white border-primary/5 text-primary/40 hover:text-primary hover:border-primary/20'
+                                }`}
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>Poco Stock (≤ 5)</span>
+                            </button>
+
+                            <button
+                                onClick={() => setSortType(sortType === 'price_desc' ? 'none' : 'price_desc')}
+                                className={`px-4 py-3 sm:py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-1.5 ${
+                                    sortType === 'price_desc'
+                                        ? 'bg-gold/10 border-gold/30 text-gold-dark shadow-sm'
+                                        : 'bg-white border-primary/5 text-primary/40 hover:text-primary hover:border-primary/20'
+                                }`}
+                            >
+                                <ArrowUpDown className="w-3.5 h-3.5" />
+                                <span>Mayor Precio</span>
+                            </button>
+
+                            <button
+                                onClick={() => setSortType(sortType === 'price_asc' ? 'none' : 'price_asc')}
+                                className={`px-4 py-3 sm:py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-1.5 ${
+                                    sortType === 'price_asc'
+                                        ? 'bg-gold/10 border-gold/30 text-gold-dark shadow-sm'
+                                        : 'bg-white border-primary/5 text-primary/40 hover:text-primary hover:border-primary/20'
+                                }`}
+                            >
+                                <ArrowUpDown className="w-3.5 h-3.5 rotate-180" />
+                                <span>Menor Precio</span>
+                            </button>
+                        </div>
+
+                        {(filterType !== 'all' || sortType !== 'none') && (
+                            <button
+                                onClick={() => {
+                                    setFilterType('all');
+                                    setSortType('none');
+                                }}
+                                className="w-full lg:w-auto px-4 py-3 sm:py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-primary text-secondary-light hover:bg-black transition-all text-center"
+                            >
+                                Limpiar Filtros
+                            </button>
+                        )}
                     </div>
 
                     <div className="bg-white/40 rounded-[3rem] p-4 md:p-8 shadow-sm border border-primary/5 min-h-[600px] max-h-[800px] overflow-y-auto no-scrollbar space-y-4">
@@ -498,6 +737,13 @@ const ProductManagement = () => {
                                                     title="Próximamente"
                                                 >
                                                     <Clock className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => setPreviewLabelProduct(prod)}
+                                                    className="p-2.5 md:p-3 bg-gold/5 border border-gold/15 text-gold-dark hover:bg-gold hover:text-white rounded-xl transition-all"
+                                                    title="Imprimir Etiqueta"
+                                                >
+                                                    <Printer className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => { setEditingProduct(prod); setForm(prod); setIsModalOpen(true); }}
@@ -871,6 +1117,247 @@ const ProductManagement = () => {
                                     </div>
                                 </div>
                             </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+            {/* Label Print Preview Modal */}
+            <AnimatePresence>
+                {previewLabelProduct && (
+                    <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }} 
+                            animate={{ opacity: 1 }} 
+                            exit={{ opacity: 0 }} 
+                            className="absolute inset-0 bg-primary/30 backdrop-blur-md" 
+                            onClick={() => setPreviewLabelProduct(null)} 
+                        />
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }} 
+                            animate={{ scale: 1, opacity: 1 }} 
+                            exit={{ scale: 0.9, opacity: 0 }} 
+                            className="bg-secondary-light w-full max-w-md rounded-[3rem] p-8 relative z-10 shadow-2xl border border-primary/10 overflow-hidden"
+                        >
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="text-xl font-serif font-bold italic text-primary">Vista Previa</h3>
+                                    <p className="text-[8px] text-primary/30 uppercase tracking-[0.2em] font-black">Etiqueta Térmica de Producto</p>
+                                </div>
+                                <button 
+                                    onClick={() => setPreviewLabelProduct(null)} 
+                                    className="p-2 bg-primary/5 hover:bg-red-500 hover:text-white rounded-full text-primary transition-all"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Label Layout Mimicking The Generated PDF */}
+                            <div className="bg-white p-6 rounded-2xl border-2 border-primary/20 aspect-[58/40] w-full flex flex-col justify-between relative shadow-inner mb-6">
+                                {/* Ocre line border */}
+                                <div className="absolute inset-1.5 border-[0.5px] border-primary pointer-events-none" />
+
+                                <div className="text-center space-y-1 relative z-10 pt-2">
+                                    <img 
+                                        src="/img/logo-blanco.png" 
+                                        className="h-5 object-contain mx-auto" 
+                                        style={{ filter: 'brightness(0) saturate(100%) invert(14%) sepia(82%) saturate(3015%) hue-rotate(345deg) brightness(84%) contrast(98%)' }} 
+                                        alt="Luxessence" 
+                                    />
+                                    <div className="h-[0.3px] w-2/3 bg-gold mx-auto my-1" />
+                                    <span className="inline-block text-[6px] font-bold text-black/40 uppercase tracking-widest">
+                                        {previewLabelProduct.categories?.name || 'Fragancia'}
+                                    </span>
+                                </div>
+
+                                <div className="text-center px-2 relative z-10 my-1">
+                                    <p className="font-serif font-black italic text-primary text-sm leading-tight line-clamp-2">
+                                        {previewLabelProduct.name}
+                                    </p>
+                                </div>
+
+                                <div className="text-center space-y-1 relative z-10 pb-2">
+                                    <p className="text-2xl font-black text-primary tracking-tight">
+                                        L. {Number(previewLabelProduct.price).toLocaleString()}
+                                    </p>
+                                    
+                                    {previewLabelProduct.sku ? (
+                                        <div className="space-y-0.5">
+                                            <p className="font-mono text-[7px] text-black tracking-widest font-bold">*{previewLabelProduct.sku}*</p>
+                                            <p className="text-[5.5px] text-black/30 font-bold">{previewLabelProduct.sku}</p>
+                                        </div>
+                                    ) : (
+                                        <p className="text-[5.5px] text-black/30 italic">Luxessence Premium Quality</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Custom roll dimensions configuration */}
+                            <div className="bg-primary/5 p-4 rounded-2xl border border-primary/5 space-y-3 mb-6">
+                                <p className="text-[9px] font-black uppercase tracking-wider text-primary/40">Medidas del Rollo (Personalizado)</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label className="text-[8px] font-bold text-primary/45 block mb-1">Ancho</label>
+                                        <input
+                                            type="number"
+                                            value={labelDimensions.width}
+                                            onChange={e => setLabelDimensions({ ...labelDimensions, width: e.target.value })}
+                                            className="w-full p-2 text-xs font-bold rounded-lg border border-primary/10 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[8px] font-bold text-primary/45 block mb-1">Alto</label>
+                                        <input
+                                            type="number"
+                                            value={labelDimensions.height}
+                                            onChange={e => setLabelDimensions({ ...labelDimensions, height: e.target.value })}
+                                            className="w-full p-2 text-xs font-bold rounded-lg border border-primary/10 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[8px] font-bold text-primary/45 block mb-1">Unidad</label>
+                                        <select
+                                            value={labelDimensions.unit}
+                                            onChange={e => setLabelDimensions({ ...labelDimensions, unit: e.target.value })}
+                                            className="w-full p-2 text-xs font-bold rounded-lg border border-primary/10 bg-white outline-none"
+                                        >
+                                            <option value="mm">mm</option>
+                                            <option value="cm">cm</option>
+                                            <option value="in">in</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={() => setPreviewLabelProduct(null)} 
+                                    className="flex-1 py-3.5 text-[10px] font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors bg-primary/5 rounded-xl"
+                                >
+                                    Cerrar
+                                </button>
+                                <button 
+                                    onClick={async () => {
+                                        const { blobUrl } = await generateProductLabel(previewLabelProduct, labelDimensions.width, labelDimensions.height, labelDimensions.unit);
+                                        printProductLabelBlob(blobUrl);
+                                        setPreviewLabelProduct(null);
+                                    }} 
+                                    className="flex-1 btn-primary !py-3.5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                                >
+                                    <Printer className="w-4 h-4" />
+                                    Confirmar e Imprimir
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+            {/* Batch Printing Layout Selector Modal */}
+            <AnimatePresence>
+                {isBatchPrintModalOpen && (
+                    <div className="fixed inset-0 z-[230] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }} 
+                            animate={{ opacity: 1 }} 
+                            exit={{ opacity: 0 }} 
+                            className="absolute inset-0 bg-primary/30 backdrop-blur-md" 
+                            onClick={() => setIsBatchPrintModalOpen(false)} 
+                        />
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }} 
+                            animate={{ scale: 1, opacity: 1 }} 
+                            exit={{ scale: 0.9, opacity: 0 }} 
+                            className="bg-secondary-light w-full max-w-md rounded-[3rem] p-8 relative z-10 shadow-2xl border border-primary/10 overflow-hidden space-y-6"
+                        >
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h3 className="text-xl font-serif font-bold italic text-primary">Formato de Impresión</h3>
+                                    <p className="text-[8px] text-primary/30 uppercase tracking-[0.2em] font-black">Lote de Etiquetas del Catálogo</p>
+                                </div>
+                                <button 
+                                    onClick={() => setIsBatchPrintModalOpen(false)} 
+                                    className="p-2 bg-primary/5 hover:bg-red-500 hover:text-white rounded-full text-primary transition-all"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <p className="text-xs text-primary/60 leading-relaxed">
+                                Selecciona la distribución y tamaño de hoja adecuados para tu impresora:
+                            </p>
+
+                            <div className="space-y-3">
+                                <div className="p-5 bg-white border border-primary/10 rounded-2xl hover:shadow-lg transition-all space-y-4">
+                                    <button 
+                                        onClick={() => handlePrintAllLabels('thermal')}
+                                        className="w-full text-left flex items-center gap-4 group"
+                                    >
+                                        <div className="w-10 h-10 bg-primary/5 rounded-xl flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-secondary-light transition-all">
+                                            <Printer className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-primary">Impresora Térmica / Rollo</p>
+                                            <p className="text-[8px] text-primary/40 uppercase tracking-wider font-black">Una etiqueta por página (Tamaño personalizado)</p>
+                                        </div>
+                                    </button>
+
+                                    {/* Inline custom dimensions inputs for batch thermal print */}
+                                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/5 space-y-3">
+                                        <p className="text-[9px] font-black uppercase tracking-wider text-primary/40">Medidas del Rollo (Personalizado)</p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div>
+                                                <label className="text-[8px] font-bold text-primary/45 block mb-1">Ancho</label>
+                                                <input
+                                                    type="number"
+                                                    value={labelDimensions.width}
+                                                    onChange={e => setLabelDimensions({ ...labelDimensions, width: e.target.value })}
+                                                    className="w-full p-2 text-xs font-bold rounded-lg border border-primary/10 bg-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[8px] font-bold text-primary/45 block mb-1">Alto</label>
+                                                <input
+                                                    type="number"
+                                                    value={labelDimensions.height}
+                                                    onChange={e => setLabelDimensions({ ...labelDimensions, height: e.target.value })}
+                                                    className="w-full p-2 text-xs font-bold rounded-lg border border-primary/10 bg-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[8px] font-bold text-primary/45 block mb-1">Unidad</label>
+                                                <select
+                                                    value={labelDimensions.unit}
+                                                    onChange={e => setLabelDimensions({ ...labelDimensions, unit: e.target.value })}
+                                                    className="w-full p-2 text-xs font-bold rounded-lg border border-primary/10 bg-white outline-none"
+                                                >
+                                                    <option value="mm">mm</option>
+                                                    <option value="cm">cm</option>
+                                                    <option value="in">in</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={() => handlePrintAllLabels('grid')}
+                                    className="w-full text-left p-5 bg-white border border-primary/10 hover:border-primary/30 rounded-2xl hover:shadow-lg transition-all flex items-center gap-4 group"
+                                >
+                                    <div className="w-10 h-10 bg-primary/5 rounded-xl flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-secondary-light transition-all">
+                                        <FileText className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-primary">Impresora Estándar (Planilla A4)</p>
+                                        <p className="text-[8px] text-primary/40 uppercase tracking-wider font-black">21 etiquetas por hoja (3 cols × 7 filas)</p>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <button 
+                                onClick={() => setIsBatchPrintModalOpen(false)} 
+                                className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors bg-primary/5 rounded-xl"
+                            >
+                                Cancelar
+                            </button>
                         </motion.div>
                     </div>
                 )}

@@ -35,12 +35,16 @@ const BottomNav = () => {
             style={{ 
                 bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
                 WebkitTransform: 'translate3d(0,0,0)',
-                transform: 'translate3d(0,0,0)'
+                transform: 'translate3d(0,0,0)',
+                position: 'fixed'
             }}
         >
             <motion.div
-                initial={{ y: 50, opacity: 0 }}
+                key={location.pathname}
+                initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 30, opacity: 0 }}
+                transition={{ duration: 0.3 }}
                 className="pointer-events-auto"
             >
                 <GlassSurface
